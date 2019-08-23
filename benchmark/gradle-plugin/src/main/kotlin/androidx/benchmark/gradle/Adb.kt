@@ -16,9 +16,7 @@
 
 package androidx.benchmark.gradle
 
-import com.android.build.gradle.BaseExtension
 import org.gradle.api.GradleException
-import org.gradle.api.Project
 import org.gradle.api.logging.LogLevel
 import org.gradle.api.logging.Logger
 import java.util.concurrent.TimeUnit
@@ -40,15 +38,31 @@ class Adb {
     private val adbPath: String
     private val logger: Logger
 
-    constructor(project: Project) {
-        val extension = project.extensions.getByType(BaseExtension::class.java)
-        adbPath = extension.adbExecutable.absolutePath
-        logger = project.logger
-    }
-
     constructor(adbPath: String, logger: Logger) {
         this.adbPath = adbPath
         this.logger = logger
+    }
+
+    /**
+     * Check if adb shell runs as root by default.
+     *
+     * The most common case for this is when adbd is running as root.
+     *
+     * @return `true` if adb shell runs as root by default, `false` otherwise.
+     */
+    fun isAdbdRoot(): Boolean {
+        val defaultUser = execSync("shell id").stdout
+        return defaultUser.contains("uid=0(root)")
+    }
+
+    /**
+     * Check if the `su` binary is installed.
+     */
+    fun isSuInstalled(): Boolean {
+        // Not all devices / methods of rooting support su -c, but sh -c is usually supported.
+        // Although the root group is su's default, using syntax different from "su gid cmd", can
+        // cause the adb shell command to hang on some devices.
+        return execSync("shell su 0 sh -c exit", shouldThrow = false).exitValue == 0
     }
 
     fun execSync(

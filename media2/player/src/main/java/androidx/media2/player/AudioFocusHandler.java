@@ -280,7 +280,7 @@ public class AudioFocusHandler {
                 // want to have more finer grained control. (e.g. adding audio focus listener)
                 return AudioManager.AUDIOFOCUS_NONE;
             }
-            // Javadoc here means 'The different types of focus reuqests' written in the
+            // Javadoc here means 'The different types of focus requests' written in the
             // {@link AudioFocusRequest}.
             switch (audioAttributesCompat.getUsage()) {
                 // USAGE_VOICE_COMMUNICATION_SIGNALLING is for DTMF that may happen multiple times
@@ -344,6 +344,8 @@ public class AudioFocusHandler {
             }
 
             // Note: This is always the main thread, except for the test.
+            // TODO(b/138091975) Do not ignore returned Futures if feasible.
+            @SuppressWarnings("FutureReturnValueIgnored")
             @Override
             public void onReceive(Context context, Intent intent) {
                 if (!AudioManager.ACTION_AUDIO_BECOMING_NOISY.equals(intent.getAction())) {
@@ -387,6 +389,8 @@ public class AudioFocusHandler {
 
             // This is the thread where the AudioManager was originally instantiated.
             // see: b/78617702
+            // TODO(b/138091975) Do not ignore returned Futures if feasible.
+            @SuppressWarnings("FutureReturnValueIgnored")
             @Override
             public void onAudioFocusChange(int focusGain) {
                 switch (focusGain) {

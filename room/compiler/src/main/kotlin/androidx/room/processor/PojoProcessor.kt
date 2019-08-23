@@ -19,6 +19,7 @@ package androidx.room.processor
 import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Ignore
+import androidx.room.Junction
 import androidx.room.PrimaryKey
 import androidx.room.Relation
 import androidx.room.ext.extendsBoundOrSelf
@@ -34,13 +35,13 @@ import androidx.room.kotlin.KotlinMetadataElement
 import androidx.room.kotlin.descriptor
 import androidx.room.processor.ProcessorErrors.CANNOT_FIND_GETTER_FOR_FIELD
 import androidx.room.processor.ProcessorErrors.CANNOT_FIND_SETTER_FOR_FIELD
-import androidx.room.processor.ProcessorErrors.CANNOT_FIND_TYPE
 import androidx.room.processor.ProcessorErrors.POJO_FIELD_HAS_DUPLICATE_COLUMN_NAME
 import androidx.room.processor.autovalue.AutoValuePojoProcessorDelegate
 import androidx.room.processor.cache.Cache
 import androidx.room.vo.CallType
 import androidx.room.vo.Constructor
 import androidx.room.vo.EmbeddedField
+import androidx.room.vo.Entity
 import androidx.room.vo.EntityOrView
 import androidx.room.vo.Field
 import androidx.room.vo.FieldGetter
@@ -78,7 +79,6 @@ class PojoProcessor private constructor(
     val bindingScope: FieldProcessor.BindingScope,
     val parent: EmbeddedField?,
     val referenceStack: LinkedHashSet<Name> = LinkedHashSet(),
-    val ignoredColumns: Set<String>,
     private val delegate: Delegate
 ) {
     val context = baseContext.fork(element)
@@ -96,8 +96,7 @@ class PojoProcessor private constructor(
             element: TypeElement,
             bindingScope: FieldProcessor.BindingScope,
             parent: EmbeddedField?,
-            referenceStack: LinkedHashSet<Name> = LinkedHashSet(),
-            ignoredColumns: Set<String> = emptySet()
+            referenceStack: LinkedHashSet<Name> = LinkedHashSet()
         ): PojoProcessor {
             val (pojoElement, delegate) = if (element.hasAnnotation(AutoValue::class)) {
                 val elementUtils = context.processingEnv.elementUtils
@@ -116,7 +115,6 @@ class PojoProcessor private constructor(
                     bindingScope = bindingScope,
                     parent = parent,
                     referenceStack = referenceStack,
-                    ignoredColumns = ignoredColumns,
                     delegate = delegate)
         }
     }
@@ -160,6 +158,10 @@ class PojoProcessor private constructor(
                     }
                 }
 
+        val ignoredColumns =
+            element.toAnnotationBox(androidx.room.Entity::class)?.value?.ignoredColumns?.toSet()
+                ?: emptySet()
+        val fieldBindingErrors = mutableMapOf<Field, String>()
         val unfilteredMyFields = allFields[null]
                 ?.map {
                     FieldProcessor(
@@ -167,10 +169,17 @@ class PojoProcessor private constructor(
                             containing = declaredType,
                             element = it,
                             bindingScope = bindingScope,
-                            fieldParent = parent).process()
+                            fieldParent = parent,
+                            onBindingError = { field, errorMsg ->
+                                fieldBindingErrors[field] = errorMsg
+                            }).process()
                 } ?: emptyList()
         val myFields = unfilteredMyFields.filterNot { ignoredColumns.contains(it.columnName) }
-
+        myFields.forEach { field ->
+            fieldBindingErrors[field]?.let {
+                context.logger.e(field.element, it)
+            }
+        }
         val unfilteredEmbeddedFields =
                 allFields[Embedded::class]
                         ?.mapNotNull {
@@ -462,23 +471,23 @@ class PojoProcessor private constructor(
             return null
         }
         val declared = MoreTypes.asDeclared(asMember)
-        if (!declared.isCollection()) {
-            context.logger.e(relationElement, ProcessorErrors.RELATION_NOT_COLLECTION)
+        val asType = if (declared.isCollection()) {
+            declared.typeArguments.first().extendsBoundOrSelf()
+        } else {
+            asMember
+        }
+        if (asType.kind == TypeKind.ERROR) {
+            context.logger.e(asType.asTypeElement(), ProcessorErrors.CANNOT_FIND_TYPE)
             return null
         }
-        val typeArg = declared.typeArguments.first().extendsBoundOrSelf()
-        if (typeArg.kind == TypeKind.ERROR) {
-            context.logger.e(typeArg.asTypeElement(), CANNOT_FIND_TYPE)
-            return null
-        }
-        val typeArgElement = typeArg.asTypeElement()
+        val typeElement = asType.asTypeElement()
         val entityClassInput = annotation.getAsTypeMirror("entity")
 
         // do we need to decide on the entity?
         val inferEntity = (entityClassInput == null ||
                 MoreTypes.isTypeOf(Any::class.java, entityClassInput))
         val entityElement = if (inferEntity) {
-            typeArgElement
+            typeElement
         } else {
             entityClassInput!!.asTypeElement()
         }
@@ -491,7 +500,6 @@ class PojoProcessor private constructor(
 
         // now find the field in the entity.
         val entityField = entity.findFieldByColumnName(annotation.value.entityColumn)
-
         if (entityField == null) {
             context.logger.e(relationElement,
                     ProcessorErrors.relationCannotFindEntityField(
@@ -499,6 +507,82 @@ class PojoProcessor private constructor(
                             columnName = annotation.value.entityColumn,
                             availableColumns = entity.columnNames))
             return null
+        }
+
+        // do we have a join entity?
+        val junctionAnnotation = annotation.getAsAnnotationBox<Junction>("associateBy")
+        val junctionClassInput = junctionAnnotation.getAsTypeMirror("value")
+        val junctionElement: TypeElement? = if (junctionClassInput != null &&
+                !MoreTypes.isTypeOf(Any::class.java, junctionClassInput)) {
+            junctionClassInput.asTypeElement()
+        } else {
+            null
+        }
+        val junction = junctionElement?.let {
+            val entityOrView = EntityOrViewProcessor(context, it, referenceStack).process()
+
+            fun findAndValidateJunctionColumn(
+                columnName: String,
+                onMissingField: () -> Unit
+            ): Field? {
+                val field = entityOrView.findFieldByColumnName(columnName)
+                if (field == null) {
+                    onMissingField()
+                    return null
+                }
+                if (entityOrView is Entity) {
+                    // warn about not having indices in the junction columns, only considering
+                    // 1st column in composite primary key and indices, since order matters.
+                    val coveredColumns = entityOrView.primaryKey.fields.columnNames.first() +
+                            entityOrView.indices.map { it.columnNames.first() }
+                    if (!coveredColumns.contains(field.columnName)) {
+                        context.logger.w(Warning.MISSING_INDEX_ON_JUNCTION, field.element,
+                            ProcessorErrors.junctionColumnWithoutIndex(
+                                entityName = entityOrView.typeName.toString(),
+                                columnName = columnName))
+                    }
+                }
+                return field
+            }
+
+            val junctionParentColumn = if (junctionAnnotation.value.parentColumn.isNotEmpty()) {
+                junctionAnnotation.value.parentColumn
+            } else {
+                parentField.columnName
+            }
+            val junctionParentField = findAndValidateJunctionColumn(
+                columnName = junctionParentColumn,
+                onMissingField = {
+                    context.logger.e(junctionElement,
+                        ProcessorErrors.relationCannotFindJunctionParentField(
+                            entityName = entityOrView.typeName.toString(),
+                            columnName = junctionParentColumn,
+                            availableColumns = entityOrView.columnNames))
+                })
+
+            val junctionEntityColumn = if (junctionAnnotation.value.entityColumn.isNotEmpty()) {
+                junctionAnnotation.value.entityColumn
+            } else {
+                entityField.columnName
+            }
+            val junctionEntityField = findAndValidateJunctionColumn(
+                columnName = junctionEntityColumn,
+                onMissingField = {
+                    context.logger.e(junctionElement,
+                        ProcessorErrors.relationCannotFindJunctionEntityField(
+                            entityName = entityOrView.typeName.toString(),
+                            columnName = junctionEntityColumn,
+                            availableColumns = entityOrView.columnNames))
+                })
+
+            if (junctionParentField == null || junctionEntityField == null) {
+                return null
+            }
+
+            androidx.room.vo.Junction(
+                entity = entityOrView,
+                parentField = junctionParentField,
+                entityField = junctionEntityField)
         }
 
         val field = Field(
@@ -510,7 +594,7 @@ class PojoProcessor private constructor(
 
         val projection = if (annotation.value.projection.isEmpty()) {
             // we need to infer the projection from inputs.
-            createRelationshipProjection(inferEntity, typeArg, entity, entityField, typeArgElement)
+            createRelationshipProjection(inferEntity, asType, entity, entityField, typeElement)
         } else {
             // make sure projection makes sense
             validateRelationshipProjection(annotation.value.projection, entity, relationElement)
@@ -519,10 +603,11 @@ class PojoProcessor private constructor(
         // if types don't match, row adapter prints a warning
         return androidx.room.vo.Relation(
                 entity = entity,
-                pojoType = typeArg,
+                pojoType = asType,
                 field = field,
                 parentField = parentField,
                 entityField = entityField,
+                junction = junction,
                 projection = projection
         )
     }
@@ -630,7 +715,9 @@ class PojoProcessor private constructor(
                     context.logger.e(field.element,
                             ProcessorErrors.tooManyMatchingGetters(field, matching))
                 })
-        context.checker.check(success, field.element, CANNOT_FIND_GETTER_FOR_FIELD)
+        context.checker.check(
+            success || bindingScope == FieldProcessor.BindingScope.READ_FROM_CURSOR,
+            field.element, CANNOT_FIND_GETTER_FOR_FIELD)
     }
 
     private fun assignSetters(
@@ -679,7 +766,9 @@ class PojoProcessor private constructor(
                     context.logger.e(field.element,
                             ProcessorErrors.tooManyMatchingSetter(field, matching))
                 })
-        context.checker.check(success, field.element, CANNOT_FIND_SETTER_FOR_FIELD)
+        context.checker.check(
+            success || bindingScope == FieldProcessor.BindingScope.BIND_TO_STMT,
+            field.element, CANNOT_FIND_SETTER_FOR_FIELD)
     }
 
     /**

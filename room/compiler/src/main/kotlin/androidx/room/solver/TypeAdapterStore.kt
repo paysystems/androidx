@@ -28,6 +28,7 @@ import androidx.room.processor.Context
 import androidx.room.processor.EntityProcessor
 import androidx.room.processor.FieldProcessor
 import androidx.room.processor.PojoProcessor
+import androidx.room.solver.binderprovider.CoroutineFlowResultBinderProvider
 import androidx.room.solver.binderprovider.CursorQueryResultBinderProvider
 import androidx.room.solver.binderprovider.DataSourceFactoryQueryResultBinderProvider
 import androidx.room.solver.binderprovider.DataSourceQueryResultBinderProvider
@@ -81,6 +82,7 @@ import androidx.room.solver.shortcut.result.InsertMethodAdapter
 import androidx.room.solver.types.BoxedBooleanToBoxedIntConverter
 import androidx.room.solver.types.BoxedPrimitiveColumnTypeAdapter
 import androidx.room.solver.types.ByteArrayColumnTypeAdapter
+import androidx.room.solver.types.ByteBufferColumnTypeAdapter
 import androidx.room.solver.types.ColumnTypeAdapter
 import androidx.room.solver.types.CompositeAdapter
 import androidx.room.solver.types.CompositeTypeConverter
@@ -155,6 +157,7 @@ class TypeAdapterStore private constructor(
                     .forEach(::addColumnAdapter)
             addColumnAdapter(StringColumnTypeAdapter(context.processingEnv))
             addColumnAdapter(ByteArrayColumnTypeAdapter(context.processingEnv))
+            addColumnAdapter(ByteBufferColumnTypeAdapter(context.processingEnv))
             PrimitiveBooleanToIntConverter.create(context.processingEnv).forEach(::addTypeConverter)
             BoxedBooleanToBoxedIntConverter.create(context.processingEnv)
                     .forEach(::addTypeConverter)
@@ -173,6 +176,7 @@ class TypeAdapterStore private constructor(
             RxSingleQueryResultBinderProvider(context),
             DataSourceQueryResultBinderProvider(context),
             DataSourceFactoryQueryResultBinderProvider(context),
+            CoroutineFlowResultBinderProvider(context),
             InstantQueryResultBinderProvider(context)
     )
 

@@ -391,7 +391,7 @@ public class WebViewFeature {
      * TODO(cricke): unhide
      * @hide
      */
-    @RestrictTo(RestrictTo.Scope.LIBRARY)
+    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
     public static final String SUPPRESS_ERROR_PAGE = "SUPPRESS_ERROR_PAGE";
 
     /**
@@ -401,19 +401,19 @@ public class WebViewFeature {
      * TODO(laisminchillo): unhide
      * @hide
      */
-    @RestrictTo(RestrictTo.Scope.LIBRARY)
+    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
     public static final String MULTI_PROCESS_QUERY = "MULTI_PROCESS_QUERY";
 
     /**
      * Feature for {@link #isFeatureSupported(String)}.
      * This feature covers
-     * {@link WebViewCompat#setForceDark(WebSettings, int)} and
-     * {@link WebViewCompat#getForceDark(WebSettings)}.
+     * {@link WebSettingsCompat#setForceDark(WebSettings, int)} and
+     * {@link WebSettingsCompat#getForceDark(WebSettings)}.
      *
      * TODO(amalova): unhide
      * @hide
      */
-    @RestrictTo(RestrictTo.Scope.LIBRARY)
+    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
     public static final String FORCE_DARK = "FORCE_DARK";
 
     /**

@@ -16,8 +16,12 @@
 package androidx.build
 
 import androidx.build.gmaven.GMavenVersionChecker
+import com.android.build.gradle.LibraryExtension
+import com.android.build.gradle.api.LibraryVariant
 import org.gradle.api.Action
 import org.gradle.api.Project
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.Upload
 import org.gradle.api.tasks.bundling.Zip
@@ -42,15 +46,18 @@ open class GMavenZipTask : Zip() {
     /**
      * The version checker which is used to check if a library is already released.
      */
+    @get:Internal
     lateinit var versionChecker: GMavenVersionChecker
     /**
      * If `true`, all libraries will be included in the zip. Otherwise, only those which are not
      * in maven.google.com are included.
      */
+    @get:Input
     var includeReleased = false
     /**
      * Set to true to include maven-metadata.xml
      */
+    @get:Input
     var includeMetadata: Boolean = false
     /**
      * List of artifacts that might be included in the generated zip.
@@ -183,12 +190,17 @@ object Release {
      * Registers the project to be included in its group's zip file as well as the global zip files.
      */
     fun register(project: Project, extension: AndroidXExtension) {
-        if (!extension.publish) {
-            throw IllegalArgumentException(
-                    "Cannot register ${project.path} into the release" +
-                            " because publish is false!"
-            )
+        if (extension.publish == Publish.NONE) {
+            project.logger.info("project ${project.name} isn't part of release," +
+                    " because its \"publish\" property is explicitly set to Publish.NONE")
+            return
         }
+        if (extension.publish == Publish.SNAPSHOT_ONLY && !isSnapshotBuild()) {
+            project.logger.info("project ${project.name} isn't part of release, because its" +
+                    " \"publish\" property is SNAPSHOT_ONLY, but it is not a snapshot build")
+            return
+        }
+
         val mavenGroup = extension.mavenGroup?.group ?: throw IllegalArgumentException(
                 "Cannot register a project to release if it does not have a mavenGroup set up"
         )
@@ -225,7 +237,7 @@ object Release {
         val params = configActionParams ?: GMavenZipTask.ConfigAction.Params(
                 mavenGroup = "",
                 includeMetadata = false,
-                supportRepoOut = project.property("supportRepoOut") as File,
+                supportRepoOut = project.getRepositoryDirectory(),
                 gMavenVersionChecker =
                 project.property("versionChecker") as GMavenVersionChecker,
                 distDir = projectDist,
@@ -297,6 +309,17 @@ object Release {
             onRegister = {
             }
         )
+    }
+}
+
+/**
+ * Let you configure a library variant associated with [Release.DEFAULT_PUBLISH_CONFIG]
+ */
+fun LibraryExtension.defaultPublishVariant(config: (LibraryVariant) -> Unit) {
+    libraryVariants.all { variant ->
+        if (variant.name == Release.DEFAULT_PUBLISH_CONFIG) {
+            config(variant)
+        }
     }
 }
 

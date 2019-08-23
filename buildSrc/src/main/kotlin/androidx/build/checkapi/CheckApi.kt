@@ -40,13 +40,13 @@ fun hasApiTasks(project: Project, extension: AndroidXExtension): Boolean {
         return true
     }
 
-    if (!extension.publish) {
+    if (!extension.publish.shouldRelease()) {
         project.logger.info("Project ${project.name} is not published, ignoring API tasks." +
                 "If you still want to trackApi, simply create \"api\" folder in your project path")
         return false
     }
 
-    if (extension.publish && project.version().isFinalApi()) {
+    if (extension.publish.shouldRelease() && project.version().isFinalApi()) {
         throw GradleException("Project ${project.name} must track API before stabilizing API\n." +
                 "To do that create \"api\" in your project directory and " +
                 "run \"./gradlew updateApi\" command")
@@ -65,9 +65,11 @@ fun hasApiTasks(project: Project, extension: AndroidXExtension): Boolean {
 fun Project.getCurrentApiFile() = getApiFile(project.projectDir, project.version())
 
 /**
- * Same as getCurrentApiFile but also contains a restricted API file too
+ * Returns an ApiLocation with the given version
  */
-fun Project.getCurrentApiLocation() = ApiLocation.fromPublicApiFile(project.getCurrentApiFile())
+fun Project.getApiLocation(version: Version = project.version()): ApiLocation {
+    return ApiLocation.fromPublicApiFile(getApiFile(project.projectDir, version))
+}
 
 /**
  * Returns the API file containing the public API that this library promises to support
@@ -75,7 +77,8 @@ fun Project.getCurrentApiLocation() = ApiLocation.fromPublicApiFile(project.getC
  * @return the API file
  */
 fun Project.getRequiredCompatibilityApiFile() =
-        getLastReleasedApiFile(project.projectDir, project.version(), true, true)
+        getRequiredCompatibilityApiFileFromDir(File(project.projectDir, "api"), project.version(),
+            ApiType.CLASSAPI)
 
 /*
  * Same as getRequiredCompatibilityApiFile but also contains a restricted API file
@@ -94,8 +97,8 @@ fun Project.getRequiredCompatibilityApiLocation(): ApiLocation? {
  * @param version the API version, ex. 25.0.0-SNAPSHOT
  * @return the API file of this version
  */
-private fun getApiFile(rootDir: File, version: Version): File {
-    if (version.patch != 0 && (version.isAlpha() || version.isBeta())) {
+fun getApiFile(rootDir: File, version: Version): File {
+    if (!isValidApiVersion(version)) {
         val suggestedVersion = Version("${version.major}.${version.minor}.${version.patch}-rc01")
         throw GradleException("Illegal version $version . It is not allowed to have a nonzero " +
                 "patch number and be alpha or beta at the same time.\n" +
@@ -110,36 +113,26 @@ private fun getApiFile(rootDir: File, version: Version): File {
     return File(apiDir, "${version.major}.${version.minor}.0$extra.txt")
 }
 
-private fun getLastReleasedApiFile(
-    rootFolder: File,
-    refVersion: Version?,
-    requireFinalApi: Boolean,
-    requireSameMajorRevision: Boolean
-): File? {
-    val apiDir = File(rootFolder, "api")
-    return getLastReleasedApiFileFromDir(apiDir, refVersion, requireFinalApi,
-            requireSameMajorRevision, ApiType.CLASSAPI)
+/**
+ * Whether it is allowed to generate an API of the given version
+ */
+fun isValidApiVersion(version: Version): Boolean {
+    if (version.patch != 0 && (version.isAlpha() || version.isBeta())) {
+        return false
+    }
+    return true
 }
 
 /**
- * Returns the api file with highest version among those having version less than
- * maxVersionExclusive or null.
- * Ignores alpha versions if requireFinalApi is true.
- * If requireSameMajorRevision is true then only considers releases having the same major revision.
+ * Returns the api file that version <version> is required to be compatible with.
  * If apiType is RESOURCEAPI, it will return the resource api file and if it is CLASSAPI, it will
  * return the regular api file.
  */
-fun getLastReleasedApiFileFromDir(
+fun getRequiredCompatibilityApiFileFromDir(
     apiDir: File,
-    maxVersionExclusive: Version?,
-    requireFinalApi: Boolean,
-    requireSameMajorRevision: Boolean,
+    version: Version,
     apiType: ApiType
 ): File? {
-    if (requireSameMajorRevision && maxVersionExclusive == null) {
-        throw GradleException("Version is not specified for the current project, " +
-                "please specify a mavenVersion in your gradle build file")
-    }
     var lastFile: File? = null
     var lastVersion: Version? = null
     var apiFiles = apiDir.listFiles().toList()
@@ -147,13 +140,13 @@ fun getLastReleasedApiFileFromDir(
             (apiType == ApiType.CLASSAPI && !it.name.startsWith("res")) }
     apiFiles.forEach { file ->
         val parsed = Version.parseOrNull(file)
-        parsed?.let { version ->
-            if ((lastFile == null || lastVersion!! < version) &&
-                    (maxVersionExclusive == null || version < maxVersionExclusive) &&
-                    (!requireFinalApi || version.isFinalApi()) &&
-                    (!requireSameMajorRevision || version.major == maxVersionExclusive?.major)) {
+        parsed?.let { otherVersion ->
+            if ((lastFile == null || lastVersion!! < otherVersion) &&
+                    (otherVersion < version) &&
+                    (otherVersion.isFinalApi()) &&
+                    (otherVersion.major == version.major)) {
                 lastFile = file
-                lastVersion = version
+                lastVersion = otherVersion
             }
         }
     }

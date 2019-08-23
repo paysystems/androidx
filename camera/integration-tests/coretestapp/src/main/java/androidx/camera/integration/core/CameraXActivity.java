@@ -27,6 +27,7 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.StrictMode;
+import android.os.SystemClock;
 import android.util.Log;
 import android.util.Size;
 import android.view.Surface;
@@ -39,9 +40,10 @@ import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.camera.core.CameraDeviceConfig;
+import androidx.camera.core.CameraInfoUnavailableException;
 import androidx.camera.core.CameraX;
 import androidx.camera.core.CameraX.LensFacing;
 import androidx.camera.core.FlashMode;
@@ -104,6 +106,7 @@ public class CameraXActivity extends AppCompatActivity
     private ImageAnalysis mImageAnalysis;
     private ImageCapture mImageCapture;
     private VideoCapture mVideoCapture;
+    private ImageCapture.CaptureMode mCaptureMode = ImageCapture.CaptureMode.MIN_LATENCY;
 
     // Espresso testing variables
     @VisibleForTesting
@@ -214,21 +217,21 @@ public class CameraXActivity extends AppCompatActivity
 
     void transformPreview() {
         String cameraId = null;
-        LensFacing previewLensFacing =
-                ((CameraDeviceConfig) mPreview.getUseCaseConfig())
-                        .getLensFacing(/*valueIfMissing=*/ null);
+        PreviewConfig config = (PreviewConfig) mPreview.getUseCaseConfig();
+        LensFacing previewLensFacing = config.getLensFacing(/*valueIfMissing=*/ null);
         if (previewLensFacing != mCurrentCameraLensFacing) {
             throw new IllegalStateException(
-                    "Invalid view finder lens facing: "
+                    "Invalid preview lens facing: "
                             + previewLensFacing
                             + " Should be: "
                             + mCurrentCameraLensFacing);
         }
         try {
-            cameraId = CameraX.getCameraWithLensFacing(previewLensFacing);
-        } catch (Exception e) {
+            cameraId = CameraX.getCameraWithCameraDeviceConfig(config);
+        } catch (CameraInfoUnavailableException e) {
             throw new IllegalArgumentException(
-                    "Unable to get camera id for lens facing " + previewLensFacing, e);
+                    "Unable to get camera id for the camera device config "
+                            + config.getLensFacing(), e);
         }
         Size srcResolution = mPreview.getAttachedSurfaceResolution(cameraId);
 
@@ -287,9 +290,6 @@ public class CameraXActivity extends AppCompatActivity
         // Compute the new left/top positions to do translate
         int layoutL = centerX - (scaled.getWidth() / 2);
         int layoutT = centerY - (scaled.getHeight() / 2);
-
-        // Do corresponding translation to be center crop
-        matrix.postTranslate(layoutL, layoutT);
 
         textureView.setTransform(matrix);
     }
@@ -460,6 +460,7 @@ public class CameraXActivity extends AppCompatActivity
         ImageCaptureConfig config =
                 new ImageCaptureConfig.Builder()
                         .setLensFacing(mCurrentCameraLensFacing)
+                        .setCaptureMode(mCaptureMode)
                         .setTargetName("ImageCapture")
                         .build();
 
@@ -477,10 +478,13 @@ public class CameraXActivity extends AppCompatActivity
         final File dir = this.getExternalFilesDir(null);
         button.setOnClickListener(
                 new View.OnClickListener() {
+                    long mStartCaptureTime = 0;
+
                     @Override
                     public void onClick(View view) {
                         mImageSavedIdlingResource.increment();
 
+                        mStartCaptureTime = SystemClock.elapsedRealtime();
                         mImageCapture.takePicture(
                                 new File(
                                         dir,
@@ -488,17 +492,28 @@ public class CameraXActivity extends AppCompatActivity
                                                 + ".jpg"),
                                 new ImageCapture.OnImageSavedListener() {
                                     @Override
-                                    public void onImageSaved(File file) {
+                                    public void onImageSaved(@NonNull File file) {
                                         Log.d(TAG, "Saved image to " + file);
                                         if (!mImageSavedIdlingResource.isIdleNow()) {
                                             mImageSavedIdlingResource.decrement();
                                         }
+
+                                        long duration =
+                                                SystemClock.elapsedRealtime() - mStartCaptureTime;
+                                        runOnUiThread(new Runnable() {
+                                            @Override
+                                            public void run() {
+                                                Toast.makeText(CameraXActivity.this,
+                                                        "Image captured in " + duration + " ms",
+                                                        Toast.LENGTH_SHORT).show();
+                                            }
+                                        });
                                     }
 
                                     @Override
                                     public void onError(
-                                            ImageCapture.UseCaseError useCaseError,
-                                            String message,
+                                            @NonNull ImageCapture.ImageCaptureError error,
+                                            @NonNull String message,
                                             Throwable cause) {
                                         Log.e(TAG, "Failed to save image.", cause);
                                         if (!mImageSavedIdlingResource.isIdleNow()) {
@@ -510,6 +525,22 @@ public class CameraXActivity extends AppCompatActivity
                 });
 
         refreshFlashButtonIcon();
+
+
+        Button btnCaptureQuality = this.findViewById(R.id.capture_quality);
+        btnCaptureQuality.setVisibility(View.VISIBLE);
+        btnCaptureQuality.setText(
+                mCaptureMode == ImageCapture.CaptureMode.MAX_QUALITY ? "MAX" : "MIN");
+        btnCaptureQuality.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                mCaptureMode = (mCaptureMode == ImageCapture.CaptureMode.MAX_QUALITY
+                        ? ImageCapture.CaptureMode.MIN_LATENCY
+                        : ImageCapture.CaptureMode.MAX_QUALITY);
+                rebindUseCases();
+            }
+        });
+
     }
 
     void disableImageCapture() {
@@ -518,6 +549,9 @@ public class CameraXActivity extends AppCompatActivity
         mImageCapture = null;
         Button button = this.findViewById(R.id.Picture);
         button.setOnClickListener(null);
+
+        Button btnCaptureQuality = this.findViewById(R.id.capture_quality);
+        btnCaptureQuality.setVisibility(View.GONE);
 
         refreshFlashButtonIcon();
     }
@@ -720,21 +754,8 @@ public class CameraXActivity extends AppCompatActivity
                                 }
 
                                 Log.d(TAG, "Change camera direction: " + mCurrentCameraLensFacing);
+                                rebindUseCases();
 
-                                // Rebind all use cases.
-                                CameraX.unbindAll();
-                                if (mImageCapture != null) {
-                                    enableImageCapture();
-                                }
-                                if (mPreview != null) {
-                                    enablePreview();
-                                }
-                                if (mImageAnalysis != null) {
-                                    enableImageAnalysis();
-                                }
-                                if (mVideoCapture != null) {
-                                    enableVideoCapture();
-                                }
                             }
                         });
 
@@ -752,6 +773,23 @@ public class CameraXActivity extends AppCompatActivity
                         });
                     }
                 });
+    }
+
+    private void rebindUseCases() {
+        // Rebind all use cases.
+        CameraX.unbindAll();
+        if (mImageCapture != null) {
+            enableImageCapture();
+        }
+        if (mPreview != null) {
+            enablePreview();
+        }
+        if (mImageAnalysis != null) {
+            enableImageAnalysis();
+        }
+        if (mVideoCapture != null) {
+            enableVideoCapture();
+        }
     }
 
     private void setupPermissions() {
@@ -799,7 +837,7 @@ public class CameraXActivity extends AppCompatActivity
 
     @Override
     public void onRequestPermissionsResult(
-            int requestCode, String[] permissions, int[] grantResults) {
+            int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         switch (requestCode) {
             case PERMISSIONS_REQUEST_CODE: {
                 // If request is cancelled, the result arrays are empty.

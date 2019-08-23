@@ -18,7 +18,6 @@ package androidx.media2.player.exoplayer;
 
 import static androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX;
 import static androidx.media2.player.MediaPlayer2.MEDIA_ERROR_UNKNOWN;
-import static androidx.media2.player.MediaPlayer2.TrackInfo.MEDIA_TRACK_TYPE_SUBTITLE;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
@@ -29,6 +28,7 @@ import android.os.PersistableBundle;
 import android.util.Log;
 import android.view.Surface;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.annotation.RestrictTo;
@@ -37,6 +37,7 @@ import androidx.media.AudioAttributesCompat;
 import androidx.media2.common.CallbackMediaItem;
 import androidx.media2.common.FileMediaItem;
 import androidx.media2.common.MediaItem;
+import androidx.media2.common.SessionPlayer.TrackInfo;
 import androidx.media2.common.SubtitleData;
 import androidx.media2.common.UriMediaItem;
 import androidx.media2.exoplayer.external.C;
@@ -102,8 +103,8 @@ import java.util.Map;
         /** Called when the player is prepared. */
         void onPrepared(MediaItem mediaItem);
 
-        /** Called when metadata (e.g., the set of available tracks) changes. */
-        void onMetadataChanged(MediaItem mediaItem);
+        /** Called when the list of available tracks changes. */
+        void onTrackInfoChanged(@NonNull List<TrackInfo> tracks);
 
         /** Called when a seek request has completed. */
         void onSeekCompleted();
@@ -127,7 +128,8 @@ import java.util.Map;
         void onVideoSizeChanged(MediaItem mediaItem, int width, int height);
 
         /** Called when subtitle data is handled. */
-        void onSubtitleData(MediaItem mediaItem, int trackIndex, SubtitleData subtitleData);
+        void onSubtitleData(@NonNull MediaItem mediaItem, @NonNull TrackInfo track,
+                @NonNull SubtitleData subtitleData);
 
         /** Called when timed metadata is handled. */
         void onTimedMetadata(MediaItem mediaItem, TimedMetaData timedMetaData);
@@ -230,40 +232,23 @@ import java.util.Map;
 
     public void seekTo(long position, @MediaPlayer2.SeekMode int mode) {
         mPlayer.setSeekParameters(ExoPlayerUtils.getSeekParameters(mode));
-        MediaItem mediaItem = mMediaItemQueue.getCurrentMediaItem();
-        if (mediaItem != null) {
-            Preconditions.checkArgument(
-                    mediaItem.getStartPosition() <= position
-                            && mediaItem.getEndPosition() >= position,
-                    "Requested seek position is out of range : " + position);
-            position -= mediaItem.getStartPosition();
-        }
         mPlayer.seekTo(position);
     }
 
     public long getCurrentPosition() {
         Preconditions.checkState(getState() != MediaPlayer2.PLAYER_STATE_IDLE);
-        long position = Math.max(0, mPlayer.getCurrentPosition());
-        MediaItem mediaItem = mMediaItemQueue.getCurrentMediaItem();
-        if (mediaItem != null) {
-            position += mediaItem.getStartPosition();
-        }
-        return position;
+        return Math.max(0, mPlayer.getCurrentPosition());
     }
 
     public long getDuration() {
-        long duration = mMediaItemQueue.getCurrentMediaItemDuration();
+        Preconditions.checkState(getState() != MediaPlayer2.PLAYER_STATE_IDLE);
+        long duration = mPlayer.getDuration();
         return duration == C.TIME_UNSET ? -1 : duration;
     }
 
     public long getBufferedPosition() {
         Preconditions.checkState(getState() != MediaPlayer2.PLAYER_STATE_IDLE);
-        long position = mPlayer.getBufferedPosition();
-        MediaItem mediaItem = mMediaItemQueue.getCurrentMediaItem();
-        if (mediaItem != null) {
-            position += mediaItem.getStartPosition();
-        }
-        return position;
+        return mPlayer.getBufferedPosition();
     }
 
     public @MediaPlayer2.MediaPlayer2State int getState() {
@@ -393,20 +378,20 @@ import java.util.Map;
         return mPlayer.getVolume();
     }
 
-    public List<MediaPlayer2.TrackInfo> getTrackInfo() {
+    public List<TrackInfo> getTrackInfo() {
         return mTrackSelector.getTrackInfos();
     }
 
-    public int getSelectedTrack(int trackType) {
+    public TrackInfo getSelectedTrack(int trackType) {
         return mTrackSelector.getSelectedTrack(trackType);
     }
 
-    public void selectTrack(int index) {
-        mTrackSelector.selectTrack(index);
+    public void selectTrack(int trackId) {
+        mTrackSelector.selectTrack(trackId);
     }
 
-    public void deselectTrack(int index) {
-        mTrackSelector.deselectTrack(index);
+    public void deselectTrack(int trackId) {
+        mTrackSelector.deselectTrack(trackId);
     }
 
     @RequiresApi(21)
@@ -508,13 +493,18 @@ import java.util.Map;
 
     @SuppressWarnings("WeakerAccess") /* synthetic access */
     void handleVideoSizeChanged(int width, int height, float pixelWidthHeightRatio) {
+        int scaledWidth;
         if (pixelWidthHeightRatio != 1f) {
-            mVideoWidth = (int) (pixelWidthHeightRatio * width);
+            scaledWidth = (int) (pixelWidthHeightRatio * width);
         } else {
-            mVideoWidth = width;
+            scaledWidth = width;
         }
+        if (mVideoWidth == scaledWidth && mVideoHeight == height) {
+            return;
+        }
+        mVideoWidth = scaledWidth;
         mVideoHeight = height;
-        mListener.onVideoSizeChanged(mMediaItemQueue.getCurrentMediaItem(), width, height);
+        mListener.onVideoSizeChanged(mMediaItemQueue.getCurrentMediaItem(), scaledWidth, height);
     }
 
     @SuppressWarnings("WeakerAccess") /* synthetic access */
@@ -559,16 +549,17 @@ import java.util.Map;
     @SuppressWarnings("WeakerAccess") /* synthetic access */
     void handleTextRendererChannelAvailable(int type, int channel) {
         mTrackSelector.handleTextRendererChannelAvailable(type, channel);
-        if (mTrackSelector.hasPendingMetadataUpdate()) {
-            mListener.onMetadataChanged(getCurrentMediaItem());
+        if (mTrackSelector.hasPendingTracksUpdate()) {
+            mListener.onTrackInfoChanged(getTrackInfo());
         }
     }
 
     @SuppressWarnings("WeakerAccess") /* synthetic access */
-    void handlePlayerTracksChanged() {
-        mTrackSelector.handlePlayerTracksChanged(mPlayer);
-        if (mTrackSelector.hasPendingMetadataUpdate()) {
-            mListener.onMetadataChanged(getCurrentMediaItem());
+    void handlePlayerTracksChanged(TrackSelectionArray trackSelections) {
+        MediaItem currentMediaItem = getCurrentMediaItem();
+        mTrackSelector.handlePlayerTracksChanged(currentMediaItem, trackSelections);
+        if (mTrackSelector.hasPendingTracksUpdate()) {
+            mListener.onTrackInfoChanged(getTrackInfo());
         }
     }
 
@@ -605,9 +596,9 @@ import java.util.Map;
 
     @SuppressWarnings("WeakerAccess") /* synthetic access */
     void handleSubtitleData(byte[] data, long timeUs) {
-        int trackIndex = mTrackSelector.getSelectedTrack(MEDIA_TRACK_TYPE_SUBTITLE);
+        TrackInfo track = mTrackSelector.getSelectedTrack(TrackInfo.MEDIA_TRACK_TYPE_SUBTITLE);
         final MediaItem currentMediaItem = getCurrentMediaItem();
-        mListener.onSubtitleData(currentMediaItem, trackIndex,
+        mListener.onSubtitleData(currentMediaItem, track,
                 new SubtitleData(timeUs, /* durationUs= */ 0L, data));
     }
 
@@ -705,7 +696,7 @@ import java.util.Map;
         @Override
         public void onTracksChanged(
                 TrackGroupArray trackGroups, TrackSelectionArray trackSelections) {
-            handlePlayerTracksChanged();
+            handlePlayerTracksChanged(trackSelections);
         }
 
         @Override
@@ -757,7 +748,10 @@ import java.util.Map;
         public void onDroppedFrames(int count, long elapsedMs) {}
 
         @Override
-        public void onVideoDisabled(DecoderCounters counters) {}
+        public void onVideoDisabled(DecoderCounters counters) {
+            handleVideoSizeChanged(
+                    /* width= */ 0, /* height= */ 0, /* pixelWidthHeightRatio= */ 1f);
+        }
 
         // AudioListener implementation.
 
@@ -817,16 +811,10 @@ import java.util.Map;
     private static final class MediaItemInfo {
 
         final MediaItem mMediaItem;
-        @Nullable
-        final DurationProvidingMediaSource mDurationProvidingMediaSource;
         final boolean mIsRemote;
 
-        MediaItemInfo(
-                MediaItem mediaItem,
-                @Nullable DurationProvidingMediaSource durationProvidingMediaSource,
-                boolean isRemote) {
+        MediaItemInfo(MediaItem mediaItem, boolean isRemote) {
             mMediaItem = mediaItem;
-            mDurationProvidingMediaSource = durationProvidingMediaSource;
             mIsRemote = isRemote;
         }
 
@@ -911,11 +899,12 @@ import java.util.Map;
 
         public void setNextMediaItems(List<MediaItem> mediaItems) {
             int size = mConcatenatingMediaSource.getSize();
+            List<MediaItemInfo> oldMediaItemInfos = new ArrayList<>(size > 1 ? size - 1 : 0);
             if (size > 1) {
                 mConcatenatingMediaSource.removeMediaSourceRange(
                         /* fromIndex= */ 1, /* toIndex= */ size);
                 while (mMediaItemInfos.size() > 1) {
-                    releaseMediaItem(mMediaItemInfos.removeLast());
+                    oldMediaItemInfos.add(mMediaItemInfos.removeLast());
                 }
             }
 
@@ -931,6 +920,13 @@ import java.util.Map;
                         mediaSources);
             }
             mConcatenatingMediaSource.addMediaSources(mediaSources);
+
+            // Release old media items after appending new ones, so that any items that are present
+            // both before and after this call have their reference counts incremented before they
+            // are decremented.
+            for (MediaItemInfo mediaItemInfo : oldMediaItemInfos) {
+                releaseMediaItem(mediaItemInfo);
+            }
         }
 
         public void preparePlayer() {
@@ -940,16 +936,6 @@ import java.util.Map;
         @Nullable
         public MediaItem getCurrentMediaItem() {
             return mMediaItemInfos.isEmpty() ? null : mMediaItemInfos.peekFirst().mMediaItem;
-        }
-
-        public long getCurrentMediaItemDuration() {
-            DurationProvidingMediaSource durationProvidingMediaSource =
-                    mMediaItemInfos.peekFirst().mDurationProvidingMediaSource;
-            if (durationProvidingMediaSource != null) {
-                return durationProvidingMediaSource.getDurationMs();
-            } else {
-                return mPlayer.getDuration();
-            }
         }
 
         public long getCurrentMediaItemPlayingTimeMs() {
@@ -1040,16 +1026,16 @@ import java.util.Map;
             MediaSource mediaSource = ExoPlayerUtils.createUnclippedMediaSource(
                     mContext, dataSourceFactory, mediaItem);
 
-            // Apply clipping if needed. Because ExoPlayer doesn't expose the unclipped duration, we
-            // wrap the child source in an intermediate source that lets us access its duration.
-            DurationProvidingMediaSource durationProvidingMediaSource = null;
+            // Apply clipping if needed.
             long startPosition = mediaItem.getStartPosition();
             long endPosition = mediaItem.getEndPosition();
             if (startPosition != 0L || endPosition != MediaItem.POSITION_UNKNOWN) {
-                durationProvidingMediaSource = new DurationProvidingMediaSource(mediaSource);
+                if (endPosition == MediaItem.POSITION_UNKNOWN) {
+                    endPosition = C.TIME_END_OF_SOURCE;
+                }
                 // Disable the initial discontinuity to give seamless transitions to clips.
                 mediaSource = new ClippingMediaSource(
-                        durationProvidingMediaSource,
+                        mediaSource,
                         C.msToUs(startPosition),
                         C.msToUs(endPosition),
                         /* enableInitialDiscontinuity= */ false,
@@ -1060,8 +1046,7 @@ import java.util.Map;
             boolean isRemote = mediaItem instanceof UriMediaItem
                     && !Util.isLocalFileUri(((UriMediaItem) mediaItem).getUri());
             mediaSources.add(mediaSource);
-            mediaItemInfos.add(
-                    new MediaItemInfo(mediaItem, durationProvidingMediaSource, isRemote));
+            mediaItemInfos.add(new MediaItemInfo(mediaItem, isRemote));
         }
 
         private void releaseMediaItem(MediaItemInfo mediaItemInfo) {
@@ -1074,8 +1059,7 @@ import java.util.Map;
                     mFileDescriptorRegistry.unregisterMediaItem(fileDescriptor);
                     ((FileMediaItem) mediaItem).decreaseRefCount();
                 } else if (mediaItem instanceof CallbackMediaItem) {
-                    ((CallbackMediaItem) mediaItemInfo.mMediaItem)
-                            .getDataSourceCallback().close();
+                    ((CallbackMediaItem) mediaItem).getDataSourceCallback().close();
                 }
             } catch (IOException e) {
                 Log.w(TAG, "Error releasing media item " + mediaItem, e);

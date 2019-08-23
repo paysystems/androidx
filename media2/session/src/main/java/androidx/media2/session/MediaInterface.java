@@ -69,6 +69,7 @@ class MediaInterface {
         ListenableFuture<PlayerResult> addPlaylistItem(int index, MediaItem item);
         ListenableFuture<PlayerResult> removePlaylistItem(int index);
         ListenableFuture<PlayerResult> replacePlaylistItem(int index, MediaItem item);
+        ListenableFuture<PlayerResult> movePlaylistItem(int fromIndex, int toIndex);
 
         int getRepeatMode();
         ListenableFuture<PlayerResult> setRepeatMode(int repeatMode);
@@ -83,5 +84,6 @@ class MediaInterface {
         List<TrackInfo> getTrackInfo();
         ListenableFuture<PlayerResult> selectTrack(TrackInfo trackInfo);
         ListenableFuture<PlayerResult> deselectTrack(TrackInfo trackInfo);
+        TrackInfo getSelectedTrack(int trackType);
     }
 }

@@ -24,6 +24,7 @@ import org.gradle.api.logging.Logger
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.OutputFiles
 import org.gradle.api.tasks.TaskAction
@@ -39,7 +40,7 @@ abstract class UpdateApiTask : DefaultTask() {
     abstract val inputApiLocation: Property<ApiLocation>
 
     /** Text files to which API signatures will be written. */
-    @get:Input
+    @get:Internal // outputs are declared in getTaskOutputs()
     abstract val outputApiLocations: ListProperty<ApiLocation>
 
     /** Whether to update restricted API files too */
@@ -61,13 +62,6 @@ abstract class UpdateApiTask : DefaultTask() {
 
     @TaskAction
     fun exec() {
-        val inputPublicApi = checkNotNull(inputApiLocation.get().publicApiFile) {
-            "inputPublicApi not set"
-        }
-
-        val inputRestrictedApi = checkNotNull(inputApiLocation.get().restrictedApiFile) {
-            "inputRestrictedApi not set"
-        }
         var permitOverwriting = true
         for (outputApi in outputApiLocations.get()) {
             val version = outputApi.version()
@@ -78,12 +72,19 @@ abstract class UpdateApiTask : DefaultTask() {
             }
         }
         for (outputApi in outputApiLocations.get()) {
-            copy(inputPublicApi, outputApi.publicApiFile, permitOverwriting, project.logger)
+            copy(
+                inputApiLocation.get().publicApiFile,
+                outputApi.publicApiFile,
+                permitOverwriting,
+                project.logger
+            )
             if (updateRestrictedAPIs) {
-                copy(inputRestrictedApi,
+                copy(
+                    inputApiLocation.get().restrictedApiFile,
                     outputApi.restrictedApiFile,
                     permitOverwriting,
-                    project.logger)
+                    project.logger
+                )
             }
         }
     }

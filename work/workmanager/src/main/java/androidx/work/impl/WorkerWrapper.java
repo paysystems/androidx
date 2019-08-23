@@ -35,6 +35,7 @@ import androidx.annotation.WorkerThread;
 import androidx.work.Configuration;
 import androidx.work.Data;
 import androidx.work.InputMerger;
+import androidx.work.InputMergerFactory;
 import androidx.work.ListenableWorker;
 import androidx.work.Logger;
 import androidx.work.WorkInfo;
@@ -46,6 +47,7 @@ import androidx.work.impl.model.WorkSpec;
 import androidx.work.impl.model.WorkSpecDao;
 import androidx.work.impl.model.WorkTagDao;
 import androidx.work.impl.utils.PackageManagerHelper;
+import androidx.work.impl.utils.WorkProgressUpdater;
 import androidx.work.impl.utils.futures.SettableFuture;
 import androidx.work.impl.utils.taskexecutor.TaskExecutor;
 
@@ -199,7 +201,10 @@ public class WorkerWrapper implements Runnable {
         if (mWorkSpec.isPeriodic()) {
             input = mWorkSpec.input;
         } else {
-            InputMerger inputMerger = InputMerger.fromClassName(mWorkSpec.inputMergerClassName);
+            InputMergerFactory inputMergerFactory = mConfiguration.getInputMergerFactory();
+            String inputMergerClassName = mWorkSpec.inputMergerClassName;
+            InputMerger inputMerger =
+                    inputMergerFactory.createInputMergerWithDefaultFallback(inputMergerClassName);
             if (inputMerger == null) {
                 Logger.get().error(TAG, String.format("Could not create Input Merger %s",
                         mWorkSpec.inputMergerClassName));
@@ -220,7 +225,8 @@ public class WorkerWrapper implements Runnable {
                 mWorkSpec.runAttemptCount,
                 mConfiguration.getExecutor(),
                 mWorkTaskExecutor,
-                mConfiguration.getWorkerFactory());
+                mConfiguration.getWorkerFactory(),
+                new WorkProgressUpdater(mWorkDatabase, mWorkTaskExecutor));
 
         // Not always creating a worker here, as the WorkerWrapper.Builder can set a worker override
         // in test mode.
@@ -314,8 +320,8 @@ public class WorkerWrapper implements Runnable {
     void onWorkFinished() {
         boolean isWorkFinished = false;
         if (!tryCheckForInterruptionAndResolve()) {
+            mWorkDatabase.beginTransaction();
             try {
-                mWorkDatabase.beginTransaction();
                 WorkInfo.State state = mWorkSpecDao.getState(mWorkSpecId);
                 if (state == null) {
                     // state can be null here with a REPLACE on beginUniqueWork().
@@ -409,6 +415,7 @@ public class WorkerWrapper implements Runnable {
     }
 
     private void resolve(final boolean needsReschedule) {
+        mWorkDatabase.beginTransaction();
         try {
             // IMPORTANT: We are using a transaction here as to ensure that we have some guarantees
             // about the state of the world before we disable RescheduleReceiver.
@@ -416,7 +423,6 @@ public class WorkerWrapper implements Runnable {
             // Check to see if there is more work to be done. If there is no more work, then
             // disable RescheduleReceiver. Using a transaction here, as there could be more than
             // one thread looking at the list of eligible WorkSpecs.
-            mWorkDatabase.beginTransaction();
             List<String> unfinishedWork = mWorkDatabase.workSpecDao().getAllUnfinishedWork();
             boolean noMoreWork = unfinishedWork == null || unfinishedWork.isEmpty();
             if (noMoreWork) {

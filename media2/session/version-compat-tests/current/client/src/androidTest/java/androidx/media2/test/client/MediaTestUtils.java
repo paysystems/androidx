@@ -111,23 +111,23 @@ public final class MediaTestUtils {
 
     public static List<SessionPlayer.TrackInfo> createTrackInfoList() {
         List<SessionPlayer.TrackInfo> list = new ArrayList<>();
-        list.add(createTrackInfo(0, "test_0", SessionPlayer.TrackInfo.MEDIA_TRACK_TYPE_VIDEO));
-        list.add(createTrackInfo(1, "test_1", SessionPlayer.TrackInfo.MEDIA_TRACK_TYPE_AUDIO));
-        list.add(createTrackInfo(2, "test_2", SessionPlayer.TrackInfo.MEDIA_TRACK_TYPE_SUBTITLE));
+        list.add(createTrackInfo(0, SessionPlayer.TrackInfo.MEDIA_TRACK_TYPE_VIDEO));
+        list.add(createTrackInfo(1, SessionPlayer.TrackInfo.MEDIA_TRACK_TYPE_AUDIO));
+        list.add(createTrackInfo(2, SessionPlayer.TrackInfo.MEDIA_TRACK_TYPE_SUBTITLE));
         return list;
     }
 
-    public static SessionPlayer.TrackInfo createTrackInfo(int index, String mediaId,
-            int trackType) {
-        MediaMetadata metadata = new MediaMetadata.Builder().putString(
-                MediaMetadata.METADATA_KEY_MEDIA_ID, mediaId).build();
-        MediaItem mediaItem = new MediaItem.Builder().setMetadata(metadata).build();
-        MediaFormat format = new MediaFormat();
+    public static SessionPlayer.TrackInfo createTrackInfo(int index, int trackType) {
+        MediaFormat format = null;
         if (trackType == SessionPlayer.TrackInfo.MEDIA_TRACK_TYPE_SUBTITLE) {
+            format = new MediaFormat();
             format.setString(MediaFormat.KEY_LANGUAGE, "eng");
             format.setString(MediaFormat.KEY_MIME, "text/cea-608");
+            format.setInteger(MediaFormat.KEY_IS_FORCED_SUBTITLE, 1);
+            format.setInteger(MediaFormat.KEY_IS_AUTOSELECT, 0);
+            format.setInteger(MediaFormat.KEY_IS_DEFAULT, 1);
         }
-        return new SessionPlayer.TrackInfo(index, mediaItem, trackType, format);
+        return new SessionPlayer.TrackInfo(index, trackType, format);
     }
 
     public static List<ParcelImpl> convertToParcelImplList(List<MediaItem> list) {

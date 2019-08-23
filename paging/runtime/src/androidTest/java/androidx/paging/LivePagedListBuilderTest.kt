@@ -22,12 +22,18 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.Observer
-import androidx.paging.PagedList.LoadState.IDLE
-import androidx.paging.PagedList.LoadState.LOADING
-import androidx.paging.PagedList.LoadState.RETRYABLE_ERROR
-import androidx.paging.PagedList.LoadType.REFRESH
+import androidx.paging.PagedList.LoadState.Error
+import androidx.paging.PagedList.LoadState.Idle
+import androidx.paging.PagedList.LoadState.Loading
+import androidx.paging.PageLoadType.REFRESH
 import androidx.test.filters.SmallTest
+import androidx.testutils.TestDispatcher
 import androidx.testutils.TestExecutor
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Runnable
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -43,6 +49,7 @@ import org.junit.runners.JUnit4
 @SmallTest
 @RunWith(JUnit4::class)
 class LivePagedListBuilderTest {
+    private val mainDispatcher = TestDispatcher()
     private val backgroundExecutor = TestExecutor()
     private val lifecycleOwner = object : LifecycleOwner {
         private val lifecycle = LifecycleRegistry(this)
@@ -56,8 +63,15 @@ class LivePagedListBuilderTest {
         }
     }
 
+    private data class LoadState(
+        val type: PageLoadType,
+        val state: PagedList.LoadState
+    )
+
+    @ExperimentalCoroutinesApi
     @Before
     fun setup() {
+        Dispatchers.setMain(mainDispatcher)
         ArchTaskExecutor.getInstance().setDelegate(object : TaskExecutor() {
             override fun executeOnDiskIO(runnable: Runnable) {
                 fail("IO executor should be overwritten")
@@ -74,15 +88,17 @@ class LivePagedListBuilderTest {
         lifecycleOwner.handleEvent(Lifecycle.Event.ON_START)
     }
 
+    @ExperimentalCoroutinesApi
     @After
     fun teardown() {
         lifecycleOwner.handleEvent(Lifecycle.Event.ON_STOP)
         ArchTaskExecutor.getInstance().setDelegate(null)
+        Dispatchers.resetMain()
     }
 
-    class MockDataSourceFactory : DataSource.Factory<Int, String>() {
-        override fun create(): DataSource<Int, String> {
-            return MockDataSource()
+    class MockDataSourceFactory {
+        fun create(): PagedSource<Int, String> {
+            return MockPagedSource()
         }
 
         var throwable: Throwable? = null
@@ -91,39 +107,43 @@ class LivePagedListBuilderTest {
             throwable = RETRYABLE_EXCEPTION
         }
 
-        private inner class MockDataSource : PositionalDataSource<String>() {
-            override fun loadInitial(
-                params: LoadInitialParams,
-                callback: LoadInitialCallback<String>
-            ) {
+        private inner class MockPagedSource : PagedSource<Int, String>() {
+            override val keyProvider = KeyProvider.Positional
+
+            override suspend fun load(params: LoadParams<Int>) = when (params.loadType) {
+                PageLoadType.REFRESH -> loadInitial(params)
+                else -> loadRange()
+            }
+
+            override fun isRetryableError(error: Throwable) = error === RETRYABLE_EXCEPTION
+
+            private fun loadInitial(params: LoadParams<Int>): LoadResult<Int, String> {
                 assertEquals(2, params.pageSize)
 
-                if (throwable != null) {
-
-                    callback.onError(throwable!!)
+                throwable?.let { error ->
                     throwable = null
-                } else {
-                    callback.onResult(listOf("a", "b"), 0, 4)
+                    throw error
                 }
+
+                val data = listOf("a", "b")
+                return LoadResult(
+                    data = data,
+                    itemsBefore = 0,
+                    itemsAfter = 4 - data.size
+                )
             }
 
-            override fun loadRange(params: LoadRangeParams, callback: LoadRangeCallback<String>) {
-                callback.onResult(listOf("c", "d"))
-            }
-
-            override fun isRetryableError(error: Throwable): Boolean {
-                return error === RETRYABLE_EXCEPTION
+            private fun loadRange(): LoadResult<Int, String> {
+                return LoadResult(listOf("c", "d"))
             }
         }
     }
 
     @Test
     fun executorBehavior() {
-        // specify a background executor via builder, and verify it gets used for all loads,
-        // overriding default arch IO executor
-        val livePagedList = LivePagedListBuilder(
-            MockDataSourceFactory(), 2
-        )
+        // specify a background dispatcher via builder, and verify it gets used for all loads,
+        // overriding default IO dispatcher
+        val livePagedList = LivePagedListBuilder(MockDataSourceFactory()::create, 2)
             .setFetchExecutor(backgroundExecutor)
             .build()
 
@@ -138,7 +158,7 @@ class LivePagedListBuilderTest {
         assertTrue(pagedListHolder[0] is InitialPagedList<*, *>)
 
         // flush loadInitial, done with passed executor
-        backgroundExecutor.executeAll()
+        drain()
 
         val pagedList = pagedListHolder[0]
         assertNotNull(pagedList)
@@ -146,25 +166,17 @@ class LivePagedListBuilderTest {
 
         // flush loadRange
         pagedList!!.loadAround(2)
-        backgroundExecutor.executeAll()
+        drain()
 
         assertEquals(listOf("a", "b", "c", "d"), pagedList)
     }
-
-    data class LoadState(
-        val type: PagedList.LoadType,
-        val state: PagedList.LoadState,
-        val error: Throwable?
-    )
 
     @Test
     fun failedLoad() {
         val factory = MockDataSourceFactory()
         factory.enqueueRetryableError()
 
-        val livePagedList = LivePagedListBuilder(
-            factory, 2
-        )
+        val livePagedList = LivePagedListBuilder(factory::create, 2)
             .setFetchExecutor(backgroundExecutor)
             .build()
 
@@ -181,21 +193,23 @@ class LivePagedListBuilderTest {
         assertNotNull(initPagedList!!)
         assertTrue(initPagedList is InitialPagedList<*, *>)
 
-        val loadStateListener = PagedList.LoadStateListener { type, state, error ->
+        val loadStateChangedCallback: LoadStateListener = { type, state ->
             if (type == REFRESH) {
-                loadStates.add(LoadState(type, state, error))
+                loadStates.add(LoadState(type, state))
             }
         }
-        initPagedList.addWeakLoadStateListener(loadStateListener)
+        initPagedList.addWeakLoadStateListener(loadStateChangedCallback)
 
-        // flush loadInitial, done with passed executor
-        backgroundExecutor.executeAll()
+        // flush loadInitial, done with passed dispatcher
+        drain()
 
         assertSame(initPagedList, pagedListHolder[0])
+        // TODO: Investigate removing initial IDLE state from callback updates.
         assertEquals(
             listOf(
-                LoadState(REFRESH, LOADING, null),
-                LoadState(REFRESH, RETRYABLE_ERROR, RETRYABLE_EXCEPTION)
+                LoadState(REFRESH, Idle),
+                LoadState(REFRESH, Loading),
+                LoadState(REFRESH, Error(RETRYABLE_EXCEPTION, true))
             ), loadStates
         )
 
@@ -203,29 +217,41 @@ class LivePagedListBuilderTest {
         assertSame(initPagedList, pagedListHolder[0])
 
         // flush loadInitial, should succeed now
-        backgroundExecutor.executeAll()
+        drain()
+
         assertNotSame(initPagedList, pagedListHolder[0])
         assertEquals(listOf("a", "b", null, null), pagedListHolder[0])
 
         assertEquals(
             listOf(
-                LoadState(REFRESH, LOADING, null),
-                LoadState(REFRESH, RETRYABLE_ERROR, RETRYABLE_EXCEPTION),
-                LoadState(REFRESH, LOADING, null)
+                LoadState(REFRESH, Idle),
+                LoadState(REFRESH, Loading),
+                LoadState(REFRESH, Error(RETRYABLE_EXCEPTION, true)),
+                LoadState(REFRESH, Loading)
             ), loadStates
         )
 
         // the IDLE result shows up on the next PagedList
-        initPagedList.removeWeakLoadStateListener(loadStateListener)
-        pagedListHolder[0]!!.addWeakLoadStateListener(loadStateListener)
+        initPagedList.removeWeakLoadStateListener(loadStateChangedCallback)
+        pagedListHolder[0]!!.addWeakLoadStateListener(loadStateChangedCallback)
         assertEquals(
             listOf(
-                LoadState(REFRESH, LOADING, null),
-                LoadState(REFRESH, RETRYABLE_ERROR, RETRYABLE_EXCEPTION),
-                LoadState(REFRESH, LOADING, null),
-                LoadState(REFRESH, IDLE, null)
-            ), loadStates
+                LoadState(REFRESH, Idle),
+                LoadState(REFRESH, Loading),
+                LoadState(REFRESH, Error(RETRYABLE_EXCEPTION, true)),
+                LoadState(REFRESH, Loading),
+                LoadState(REFRESH, Idle)
+            ),
+            loadStates
         )
+    }
+
+    private fun drain() {
+        var executed: Boolean
+        do {
+            executed = backgroundExecutor.executeAll()
+            mainDispatcher.executeAll()
+        } while (executed || mainDispatcher.queue.isNotEmpty())
     }
 
     companion object {

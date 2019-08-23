@@ -33,16 +33,17 @@ import androidx.annotation.IntRange;
 import androidx.annotation.LayoutRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.RestrictTo;
+import androidx.arch.core.util.Function;
 import androidx.car.R;
 import androidx.car.util.CarUxRestrictionsHelper;
 import androidx.car.util.ListItemBackgroundResolver;
 import androidx.car.uxrestrictions.CarUxRestrictions;
 import androidx.cardview.widget.CardView;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
-import java.util.function.Function;
 
 /**
  * Adapter for {@link PagedListView} to display {@link ListItem}.
@@ -245,8 +246,8 @@ public class ListItemAdapter extends
     /**
      * Registers a custom {@link ListItem} that this adapter will handle. The custom list item will
      * be identified by the unique view id that is passed to this method. The {@code function}
-     * should a reference to the method that will create the {@code ViewHolder} that houses the
-     * custom {@code ListItem}.
+     * should a reference to the method that will create the {@link ListItem.ViewHolder} that houses
+     * the custom {@link ListItem}.
      *
      * <pre>{@code
      * int viewType = -1;
@@ -301,7 +302,7 @@ public class ListItemAdapter extends
 
         TypedArray a = mContext.getTheme().obtainStyledAttributes(R.styleable.ListItem);
         mListItemBackgroundColor = a.getColor(R.styleable.ListItem_listItemBackgroundColor,
-                mContext.getColor(R.color.car_card));
+                ContextCompat.getColor(mContext, R.color.car_card));
         a.recycle();
     }
 
@@ -356,6 +357,7 @@ public class ListItemAdapter extends
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public void onBindViewHolder(ListItem.ViewHolder holder, int position) {
         if (mBackgroundStyle == BACKGROUND_STYLE_PANEL) {
             ListItemBackgroundResolver.setBackground(

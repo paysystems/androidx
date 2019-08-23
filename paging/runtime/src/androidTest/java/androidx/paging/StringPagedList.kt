@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,25 +16,27 @@
 
 package androidx.paging
 
-import androidx.testutils.TestExecutor
+import androidx.testutils.TestDispatcher
+import kotlinx.coroutines.GlobalScope
 
 class StringPagedList constructor(
     leadingNulls: Int,
     trailingNulls: Int,
-    vararg items: String
+    vararg items: String,
+    list: List<String> = items.toList()
 ) : PagedList<String>(
-    PagedStorage<String>(),
-    TestExecutor(),
-    TestExecutor(),
+    GlobalScope,
+    PagedSourceWrapper(ListDataSource(list)),
+    PagedStorage(),
+    TestDispatcher(),
+    TestDispatcher(),
     null,
-    PagedList.Config.Builder().setPageSize(1).build()
+    Config.Builder().setPageSize(1).build()
 ), PagedStorage.Callback {
-    val list = items.toList()
     var detached = false
 
     init {
-        @Suppress("UNCHECKED_CAST")
-        val keyedStorage = mStorage as PagedStorage<String>
+        val keyedStorage = getStorage()
         keyedStorage.init(
             leadingNulls,
             list,
@@ -44,23 +46,18 @@ class StringPagedList constructor(
         )
     }
 
-    internal override fun isContiguous(): Boolean = true
+    override val lastKey: Any? = null
 
-    override fun getLastKey(): Any? = null
-
-    override fun isDetached(): Boolean = detached
+    override val isDetached
+        get() = detached
 
     override fun detach() {
         detached = true
     }
 
-    override fun dispatchUpdatesSinceSnapshot(
-        storageSnapshot: PagedList<String>,
-        callback: Callback
-    ) {
-    }
+    override fun dispatchUpdatesSinceSnapshot(snapshot: PagedList<String>, callback: Callback) {}
 
-    override fun dispatchCurrentLoadState(listener: LoadStateListener?) {}
+    override fun dispatchCurrentLoadState(callback: LoadStateListener) {}
 
     override fun loadAroundInternal(index: Int) {}
 
@@ -74,15 +71,8 @@ class StringPagedList constructor(
 
     override fun onPageInserted(start: Int, count: Int) {}
 
-    override fun getDataSource(): DataSource<*, String> {
-        return ListDataSource<String>(list)
-    }
+    override fun onPagesRemoved(startOfDrops: Int, count: Int) = notifyRemoved(startOfDrops, count)
 
-    override fun onPagesRemoved(startOfDrops: Int, count: Int) {
-        notifyRemoved(startOfDrops, count)
-    }
-
-    override fun onPagesSwappedToPlaceholder(startOfDrops: Int, count: Int) {
+    override fun onPagesSwappedToPlaceholder(startOfDrops: Int, count: Int) =
         notifyChanged(startOfDrops, count)
-    }
 }

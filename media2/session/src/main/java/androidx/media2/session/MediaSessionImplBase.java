@@ -290,11 +290,15 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
                     new VolumeProviderCompat(remotePlayer.getVolumeControlType(),
                             remotePlayer.getMaxVolume(),
                             remotePlayer.getVolume()) {
+                        // TODO(b/138091975) Do not ignore the returned Future.
+                        @SuppressWarnings("FutureReturnValueIgnored")
                         @Override
                         public void onSetVolumeTo(int volume) {
                             remotePlayer.setVolume(volume);
                         }
 
+                        // TODO(b/138091975) Do not ignore the returned Future.
+                        @SuppressWarnings("FutureReturnValueIgnored")
                         @Override
                         public void onAdjustVolume(int direction) {
                             remotePlayer.adjustVolume(direction);
@@ -388,29 +392,34 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
     }
 
     @Override
-    public @NonNull SessionPlayer getPlayer() {
+    @NonNull
+    public SessionPlayer getPlayer() {
         synchronized (mLock) {
             return mPlayer;
         }
     }
 
     @Override
+    @NonNull
     public String getId() {
         return mSessionId;
     }
 
     @Override
+    @NonNull
     public Uri getUri() {
         return mSessionUri;
     }
 
     @Override
-    public @NonNull SessionToken getToken() {
+    @NonNull
+    public SessionToken getToken() {
         return mSessionToken;
     }
 
     @Override
-    public @NonNull List<ControllerInfo> getConnectedControllers() {
+    @NonNull
+    public List<ControllerInfo> getConnectedControllers() {
         List<ControllerInfo> controllers = new ArrayList<>();
         controllers.addAll(mSessionStub.getConnectedControllersManager()
                 .getConnectedControllers());
@@ -420,7 +429,7 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
     }
 
     @Override
-    public boolean isConnected(ControllerInfo controller) {
+    public boolean isConnected(@NonNull ControllerInfo controller) {
         if (controller == null) {
             return false;
         }
@@ -484,10 +493,12 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public ListenableFuture<PlayerResult> play() {
         return dispatchPlayerTask(new PlayerTask<ListenableFuture<PlayerResult>>() {
             @Override
-            public ListenableFuture<PlayerResult> run(SessionPlayer player) throws Exception {
+            public ListenableFuture<PlayerResult> run(@NonNull SessionPlayer player)
+                    throws Exception {
                 if (player.getPlayerState() != PLAYER_STATE_IDLE) {
                     return player.play();
                 }
@@ -507,7 +518,8 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
     public ListenableFuture<PlayerResult> pause() {
         return dispatchPlayerTask(new PlayerTask<ListenableFuture<PlayerResult>>() {
             @Override
-            public ListenableFuture<PlayerResult> run(SessionPlayer player) throws Exception {
+            public ListenableFuture<PlayerResult> run(@NonNull SessionPlayer player)
+                    throws Exception {
                 return player.pause();
             }
         });
@@ -517,7 +529,8 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
     public ListenableFuture<PlayerResult> prepare() {
         return dispatchPlayerTask(new PlayerTask<ListenableFuture<PlayerResult>>() {
             @Override
-            public ListenableFuture<PlayerResult> run(SessionPlayer player) throws Exception {
+            public ListenableFuture<PlayerResult> run(@NonNull SessionPlayer player)
+                    throws Exception {
                 return player.prepare();
             }
         });
@@ -527,16 +540,19 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
     public ListenableFuture<PlayerResult> seekTo(final long pos) {
         return dispatchPlayerTask(new PlayerTask<ListenableFuture<PlayerResult>>() {
             @Override
-            public ListenableFuture<PlayerResult> run(SessionPlayer player) throws Exception {
+            public ListenableFuture<PlayerResult> run(@NonNull SessionPlayer player)
+                    throws Exception {
                 return player.seekTo(pos);
             }
         });
     }
 
-    @Override public @SessionPlayer.PlayerState int getPlayerState() {
+    @Override
+    @SessionPlayer.PlayerState
+    public int getPlayerState() {
         return dispatchPlayerTask(new PlayerTask<Integer>() {
             @Override
-            public Integer run(SessionPlayer player) throws Exception {
+            public Integer run(@NonNull SessionPlayer player) throws Exception {
                 return player.getPlayerState();
             }
         }, SessionPlayer.PLAYER_STATE_ERROR);
@@ -546,7 +562,7 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
     public long getCurrentPosition() {
         return dispatchPlayerTask(new PlayerTask<Long>() {
             @Override
-            public Long run(SessionPlayer player) throws Exception {
+            public Long run(@NonNull SessionPlayer player) throws Exception {
                 if (isInPlaybackState(player)) {
                     return player.getCurrentPosition();
                 }
@@ -559,7 +575,7 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
     public long getDuration() {
         return dispatchPlayerTask(new PlayerTask<Long>() {
             @Override
-            public Long run(SessionPlayer player) throws Exception {
+            public Long run(@NonNull SessionPlayer player) throws Exception {
                 if (isInPlaybackState(player)) {
                     return player.getDuration();
                 }
@@ -572,7 +588,7 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
     public long getBufferedPosition() {
         return dispatchPlayerTask(new PlayerTask<Long>() {
             @Override
-            public Long run(SessionPlayer player) throws Exception {
+            public Long run(@NonNull SessionPlayer player) throws Exception {
                 if (isInPlaybackState(player)) {
                     return player.getBufferedPosition();
                 }
@@ -582,10 +598,11 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
     }
 
     @Override
-    public @SessionPlayer.BuffState int getBufferingState() {
+    @SessionPlayer.BuffState
+    public int getBufferingState() {
         return dispatchPlayerTask(new PlayerTask<Integer>() {
             @Override
-            public Integer run(SessionPlayer player) throws Exception {
+            public Integer run(@NonNull SessionPlayer player) throws Exception {
                 return player.getBufferingState();
             }
         }, SessionPlayer.BUFFERING_STATE_UNKNOWN);
@@ -595,7 +612,7 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
     public float getPlaybackSpeed() {
         return dispatchPlayerTask(new PlayerTask<Float>() {
             @Override
-            public Float run(SessionPlayer player) throws Exception {
+            public Float run(@NonNull SessionPlayer player) throws Exception {
                 if (isInPlaybackState(player)) {
                     return player.getPlaybackSpeed();
                 }
@@ -608,7 +625,8 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
     public ListenableFuture<PlayerResult> setPlaybackSpeed(final float speed) {
         return dispatchPlayerTask(new PlayerTask<ListenableFuture<PlayerResult>>() {
             @Override
-            public ListenableFuture<PlayerResult> run(SessionPlayer player) throws Exception {
+            public ListenableFuture<PlayerResult> run(@NonNull SessionPlayer player)
+                    throws Exception {
                 return player.setPlaybackSpeed(speed);
             }
         });
@@ -618,34 +636,36 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
     public List<MediaItem> getPlaylist() {
         return dispatchPlayerTask(new PlayerTask<List<MediaItem>>() {
             @Override
-            public List<MediaItem> run(SessionPlayer player) throws Exception {
+            public List<MediaItem> run(@NonNull SessionPlayer player) throws Exception {
                 return player.getPlaylist();
             }
         }, null);
     }
 
     @Override
-    public ListenableFuture<PlayerResult> setPlaylist(final @NonNull List<MediaItem> list,
-            final @Nullable MediaMetadata metadata) {
+    public ListenableFuture<PlayerResult> setPlaylist(@NonNull final List<MediaItem> list,
+            @Nullable final MediaMetadata metadata) {
         if (list == null) {
             throw new NullPointerException("list shouldn't be null");
         }
         return dispatchPlayerTask(new PlayerTask<ListenableFuture<PlayerResult>>() {
             @Override
-            public ListenableFuture<PlayerResult> run(SessionPlayer player) throws Exception {
+            public ListenableFuture<PlayerResult> run(@NonNull SessionPlayer player)
+                    throws Exception {
                 return player.setPlaylist(list, metadata);
             }
         });
     }
 
     @Override
-    public ListenableFuture<PlayerResult> setMediaItem(final @NonNull MediaItem item) {
+    public ListenableFuture<PlayerResult> setMediaItem(@NonNull final MediaItem item) {
         if (item == null) {
             throw new NullPointerException("item shouldn't be null");
         }
         return dispatchPlayerTask(new PlayerTask<ListenableFuture<PlayerResult>>() {
             @Override
-            public ListenableFuture<PlayerResult> run(SessionPlayer player) throws Exception {
+            public ListenableFuture<PlayerResult> run(@NonNull SessionPlayer player)
+                    throws Exception {
                 return player.setMediaItem(item);
             }
         });
@@ -658,7 +678,8 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
         }
         return dispatchPlayerTask(new PlayerTask<ListenableFuture<PlayerResult>>() {
             @Override
-            public ListenableFuture<PlayerResult> run(SessionPlayer player) throws Exception {
+            public ListenableFuture<PlayerResult> run(@NonNull SessionPlayer player)
+                    throws Exception {
                 final List<MediaItem> list = player.getPlaylist();
                 if (index >= list.size()) {
                     return PlayerResult.createFuture(RESULT_ERROR_BAD_VALUE);
@@ -672,7 +693,8 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
     public ListenableFuture<PlayerResult> skipToPreviousItem() {
         return dispatchPlayerTask(new PlayerTask<ListenableFuture<PlayerResult>>() {
             @Override
-            public ListenableFuture<PlayerResult> run(SessionPlayer player) throws Exception {
+            public ListenableFuture<PlayerResult> run(@NonNull SessionPlayer player)
+                    throws Exception {
                 return player.skipToPreviousPlaylistItem();
             }
         });
@@ -682,7 +704,8 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
     public ListenableFuture<PlayerResult> skipToNextItem() {
         return dispatchPlayerTask(new PlayerTask<ListenableFuture<PlayerResult>>() {
             @Override
-            public ListenableFuture<PlayerResult> run(SessionPlayer player) throws Exception {
+            public ListenableFuture<PlayerResult> run(@NonNull SessionPlayer player)
+                    throws Exception {
                 return player.skipToNextPlaylistItem();
             }
         });
@@ -692,7 +715,7 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
     public MediaMetadata getPlaylistMetadata() {
         return dispatchPlayerTask(new PlayerTask<MediaMetadata>() {
             @Override
-            public MediaMetadata run(SessionPlayer player) throws Exception {
+            public MediaMetadata run(@NonNull SessionPlayer player) throws Exception {
                 return player.getPlaylistMetadata();
             }
         }, null);
@@ -700,7 +723,7 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
 
     @Override
     public ListenableFuture<PlayerResult> addPlaylistItem(final int index,
-            final @NonNull MediaItem item) {
+            @NonNull final MediaItem item) {
         if (index < 0) {
             throw new IllegalArgumentException("index shouldn't be negative");
         }
@@ -709,7 +732,8 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
         }
         return dispatchPlayerTask(new PlayerTask<ListenableFuture<PlayerResult>>() {
             @Override
-            public ListenableFuture<PlayerResult> run(SessionPlayer player) throws Exception {
+            public ListenableFuture<PlayerResult> run(@NonNull SessionPlayer player)
+                    throws Exception {
                 return player.addPlaylistItem(index, item);
             }
         });
@@ -722,7 +746,8 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
         }
         return dispatchPlayerTask(new PlayerTask<ListenableFuture<PlayerResult>>() {
             @Override
-            public ListenableFuture<PlayerResult> run(SessionPlayer player) throws Exception {
+            public ListenableFuture<PlayerResult> run(@NonNull SessionPlayer player)
+                    throws Exception {
                 final List<MediaItem> list = player.getPlaylist();
                 if (index >= list.size()) {
                     return PlayerResult.createFuture(RESULT_ERROR_BAD_VALUE);
@@ -734,7 +759,7 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
 
     @Override
     public ListenableFuture<PlayerResult> replacePlaylistItem(final int index,
-            final @NonNull MediaItem item) {
+            @NonNull final MediaItem item) {
         if (index < 0) {
             throw new IllegalArgumentException("index shouldn't be negative");
         }
@@ -743,7 +768,8 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
         }
         return dispatchPlayerTask(new PlayerTask<ListenableFuture<PlayerResult>>() {
             @Override
-            public ListenableFuture<PlayerResult> run(SessionPlayer player) throws Exception {
+            public ListenableFuture<PlayerResult> run(@NonNull SessionPlayer player)
+                    throws Exception {
                 return player.replacePlaylistItem(index, item);
             }
         });
@@ -751,10 +777,23 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
     }
 
     @Override
+    public ListenableFuture<PlayerResult> movePlaylistItem(final int fromIndex, final int toIndex) {
+        if (fromIndex < 0 || toIndex < 0) {
+            throw new IllegalArgumentException("indices shouldn't be negative");
+        }
+        return dispatchPlayerTask(new PlayerTask<ListenableFuture<PlayerResult>>() {
+            @Override
+            public ListenableFuture<PlayerResult> run(SessionPlayer player) throws Exception {
+                return player.movePlaylistItem(fromIndex, toIndex);
+            }
+        });
+    }
+
+    @Override
     public MediaItem getCurrentMediaItem() {
         return dispatchPlayerTask(new PlayerTask<MediaItem>() {
             @Override
-            public MediaItem run(SessionPlayer player) throws Exception {
+            public MediaItem run(@NonNull SessionPlayer player) throws Exception {
                 return player.getCurrentMediaItem();
             }
         }, null);
@@ -764,7 +803,7 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
     public int getCurrentMediaItemIndex() {
         return dispatchPlayerTask(new PlayerTask<Integer>() {
             @Override
-            public Integer run(SessionPlayer player) throws Exception {
+            public Integer run(@NonNull SessionPlayer player) throws Exception {
                 return player.getCurrentMediaItemIndex();
             }
         }, ITEM_NONE);
@@ -774,7 +813,7 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
     public int getPreviousMediaItemIndex() {
         return dispatchPlayerTask(new PlayerTask<Integer>() {
             @Override
-            public Integer run(SessionPlayer player) throws Exception {
+            public Integer run(@NonNull SessionPlayer player) throws Exception {
                 return player.getPreviousMediaItemIndex();
             }
         }, ITEM_NONE);
@@ -784,7 +823,7 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
     public int getNextMediaItemIndex() {
         return dispatchPlayerTask(new PlayerTask<Integer>() {
             @Override
-            public Integer run(SessionPlayer player) throws Exception {
+            public Integer run(@NonNull SessionPlayer player) throws Exception {
                 return player.getNextMediaItemIndex();
             }
         }, ITEM_NONE);
@@ -792,20 +831,22 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
 
     @Override
     public ListenableFuture<PlayerResult> updatePlaylistMetadata(
-            final @Nullable MediaMetadata metadata) {
+            @Nullable final MediaMetadata metadata) {
         return dispatchPlayerTask(new PlayerTask<ListenableFuture<PlayerResult>>() {
             @Override
-            public ListenableFuture<PlayerResult> run(SessionPlayer player) throws Exception {
+            public ListenableFuture<PlayerResult> run(@NonNull SessionPlayer player)
+                    throws Exception {
                 return player.updatePlaylistMetadata(metadata);
             }
         });
     }
 
     @Override
-    public @SessionPlayer.RepeatMode int getRepeatMode() {
+    @SessionPlayer.RepeatMode
+    public int getRepeatMode() {
         return dispatchPlayerTask(new PlayerTask<Integer>() {
             @Override
-            public Integer run(SessionPlayer player) throws Exception {
+            public Integer run(@NonNull SessionPlayer player) throws Exception {
                 return player.getRepeatMode();
             }
         }, SessionPlayer.REPEAT_MODE_NONE);
@@ -816,17 +857,19 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
             final @SessionPlayer.RepeatMode int repeatMode) {
         return dispatchPlayerTask(new PlayerTask<ListenableFuture<PlayerResult>>() {
             @Override
-            public ListenableFuture<PlayerResult> run(SessionPlayer player) throws Exception {
+            public ListenableFuture<PlayerResult> run(@NonNull SessionPlayer player)
+                    throws Exception {
                 return player.setRepeatMode(repeatMode);
             }
         });
     }
 
     @Override
-    public @SessionPlayer.ShuffleMode int getShuffleMode() {
+    @SessionPlayer.ShuffleMode
+    public int getShuffleMode() {
         return dispatchPlayerTask(new PlayerTask<Integer>() {
             @Override
-            public Integer run(SessionPlayer player) throws Exception {
+            public Integer run(@NonNull SessionPlayer player) throws Exception {
                 return player.getShuffleMode();
             }
         }, SessionPlayer.SHUFFLE_MODE_NONE);
@@ -837,7 +880,8 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
             final @SessionPlayer.ShuffleMode int shuffleMode) {
         return dispatchPlayerTask(new PlayerTask<ListenableFuture<PlayerResult>>() {
             @Override
-            public ListenableFuture<PlayerResult> run(SessionPlayer player) throws Exception {
+            public ListenableFuture<PlayerResult> run(@NonNull SessionPlayer player)
+                    throws Exception {
                 return player.setShuffleMode(shuffleMode);
             }
         });
@@ -867,7 +911,7 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
     public List<TrackInfo> getTrackInfo() {
         return dispatchPlayerTask(new PlayerTask<List<TrackInfo>>() {
             @Override
-            public List<TrackInfo> run(SessionPlayer player) throws Exception {
+            public List<TrackInfo> run(@NonNull SessionPlayer player) throws Exception {
                 return player.getTrackInfoInternal();
             }
         }, null);
@@ -877,7 +921,8 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
     public ListenableFuture<PlayerResult> selectTrack(final TrackInfo trackInfo) {
         return dispatchPlayerTask(new PlayerTask<ListenableFuture<PlayerResult>>() {
             @Override
-            public ListenableFuture<PlayerResult> run(SessionPlayer player) throws Exception {
+            public ListenableFuture<PlayerResult> run(@NonNull SessionPlayer player)
+                    throws Exception {
                 return player.selectTrackInternal(trackInfo);
             }
         });
@@ -887,17 +932,29 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
     public ListenableFuture<PlayerResult> deselectTrack(final TrackInfo trackInfo) {
         return dispatchPlayerTask(new PlayerTask<ListenableFuture<PlayerResult>>() {
             @Override
-            public ListenableFuture<PlayerResult> run(SessionPlayer player) throws Exception {
+            public ListenableFuture<PlayerResult> run(@NonNull SessionPlayer player)
+                    throws Exception {
                 return player.deselectTrackInternal(trackInfo);
             }
         });
+    }
+
+    @Override
+    public TrackInfo getSelectedTrack(final int trackType) {
+        return dispatchPlayerTask(new PlayerTask<TrackInfo>() {
+            @Override
+            public TrackInfo run(@NonNull SessionPlayer player) throws Exception {
+                return player.getSelectedTrackInternal(trackType);
+            }
+        }, null);
     }
 
     ///////////////////////////////////////////////////
     // package private and private methods
     ///////////////////////////////////////////////////
     @Override
-    public @NonNull MediaSession getInstance() {
+    @NonNull
+    public MediaSession getInstance() {
         return mInstance;
     }
 
@@ -1296,7 +1353,8 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
         }
 
         @Override
-        public void onCurrentMediaItemChanged(final SessionPlayer player, final MediaItem item) {
+        public void onCurrentMediaItemChanged(@NonNull final SessionPlayer player,
+                @NonNull final MediaItem item) {
             final MediaSessionImplBase session = getSession();
             if (session == null || player == null || session.getPlayer() != player) {
                 return;
@@ -1325,7 +1383,7 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
         }
 
         @Override
-        public void onPlayerStateChanged(final SessionPlayer player, final int state) {
+        public void onPlayerStateChanged(@NonNull final SessionPlayer player, final int state) {
             final MediaSessionImplBase session = getSession();
             if (session == null || player == null || session.getPlayer() != player) {
                 return;
@@ -1342,7 +1400,7 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
         }
 
         @Override
-        public void onBufferingStateChanged(final SessionPlayer player,
+        public void onBufferingStateChanged(@NonNull final SessionPlayer player,
                 final MediaItem item, final int state) {
             updateDurationIfNeeded(player, item);
             dispatchRemoteControllerTask(player, new RemoteControllerTask() {
@@ -1355,7 +1413,7 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
         }
 
         @Override
-        public void onPlaybackSpeedChanged(final SessionPlayer player, final float speed) {
+        public void onPlaybackSpeedChanged(@NonNull final SessionPlayer player, final float speed) {
             dispatchRemoteControllerTask(player, new RemoteControllerTask() {
                 @Override
                 public void run(ControllerCb callback, int seq) throws RemoteException {
@@ -1366,7 +1424,7 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
         }
 
         @Override
-        public void onSeekCompleted(final SessionPlayer player, final long position) {
+        public void onSeekCompleted(@NonNull final SessionPlayer player, final long position) {
             dispatchRemoteControllerTask(player, new RemoteControllerTask() {
                 @Override
                 public void run(ControllerCb callback, int seq) throws RemoteException {
@@ -1377,8 +1435,8 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
         }
 
         @Override
-        public void onPlaylistChanged(final SessionPlayer player, final List<MediaItem> list,
-                final MediaMetadata metadata) {
+        public void onPlaylistChanged(@NonNull final SessionPlayer player,
+                final List<MediaItem> list, final MediaMetadata metadata) {
             final MediaSessionImplBase session = getSession();
             if (session == null || player == null || session.getPlayer() != player) {
                 return;
@@ -1409,7 +1467,7 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
         }
 
         @Override
-        public void onPlaylistMetadataChanged(final SessionPlayer player,
+        public void onPlaylistMetadataChanged(@NonNull final SessionPlayer player,
                 final MediaMetadata metadata) {
             dispatchRemoteControllerTask(player, new RemoteControllerTask() {
                 @Override
@@ -1420,7 +1478,7 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
         }
 
         @Override
-        public void onRepeatModeChanged(final SessionPlayer player, final int repeatMode) {
+        public void onRepeatModeChanged(@NonNull final SessionPlayer player, final int repeatMode) {
             final MediaSessionImplBase session = getSession();
             dispatchRemoteControllerTask(player, new RemoteControllerTask() {
                 @Override
@@ -1434,7 +1492,8 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
         }
 
         @Override
-        public void onShuffleModeChanged(final SessionPlayer player, final int shuffleMode) {
+        public void onShuffleModeChanged(@NonNull final SessionPlayer player,
+                final int shuffleMode) {
             final MediaSessionImplBase session = getSession();
             dispatchRemoteControllerTask(player, new RemoteControllerTask() {
                 @Override
@@ -1448,7 +1507,7 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
         }
 
         @Override
-        public void onPlaybackCompleted(SessionPlayer player) {
+        public void onPlaybackCompleted(@NonNull SessionPlayer player) {
             dispatchRemoteControllerTask(player, new RemoteControllerTask() {
                 @Override
                 public void run(ControllerCb callback, int seq) throws RemoteException {
@@ -1458,7 +1517,7 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
         }
 
         @Override
-        public void onAudioAttributesChanged(final SessionPlayer player,
+        public void onAudioAttributesChanged(@NonNull final SessionPlayer player,
                 final AudioAttributesCompat attributes) {
             final MediaSessionImplBase session = getSession();
             if (session == null || player == null || session.getPlayer() != player) {
@@ -1476,27 +1535,40 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
         }
 
         @Override
-        public void onVideoSizeChangedInternal(final @NonNull SessionPlayer player,
-                final @NonNull MediaItem item, final @NonNull VideoSize videoSize) {
+        public void onVideoSizeChanged(@NonNull SessionPlayer player, @NonNull VideoSize size) {
             dispatchRemoteControllerTask(player, new RemoteControllerTask() {
                 @Override
                 public void run(ControllerCb callback, int seq) throws RemoteException {
-                    callback.onVideoSizeChanged(seq, item, videoSize);
-                }
-            });
-        }
-
-        public void onTrackInfoChanged(SessionPlayer player, final List<TrackInfo> trackInfos) {
-            dispatchRemoteControllerTask(player, new RemoteControllerTask() {
-                @Override
-                public void run(ControllerCb callback, int seq) throws RemoteException {
-                    callback.onTrackInfoChanged(seq, trackInfos);
+                    callback.onVideoSizeChanged(seq, size);
                 }
             });
         }
 
         @Override
-        public void onTrackSelected(SessionPlayer player, final TrackInfo trackInfo) {
+        public void onVideoSizeChangedInternal(@NonNull final SessionPlayer player,
+                @NonNull final MediaItem item, @NonNull final VideoSize videoSize) {
+            onVideoSizeChanged(player, videoSize);
+        }
+
+        @Override
+        public void onTrackInfoChanged(@NonNull SessionPlayer player,
+                @NonNull final List<TrackInfo> trackInfos) {
+            final MediaSessionImplBase session = getSession();
+            dispatchRemoteControllerTask(player, new RemoteControllerTask() {
+                @Override
+                public void run(ControllerCb callback, int seq) throws RemoteException {
+                    callback.onTrackInfoChanged(seq, trackInfos,
+                            session.getSelectedTrack(TrackInfo.MEDIA_TRACK_TYPE_VIDEO),
+                            session.getSelectedTrack(TrackInfo.MEDIA_TRACK_TYPE_AUDIO),
+                            session.getSelectedTrack(TrackInfo.MEDIA_TRACK_TYPE_SUBTITLE),
+                            session.getSelectedTrack(TrackInfo.MEDIA_TRACK_TYPE_METADATA));
+                }
+            });
+        }
+
+        @Override
+        public void onTrackSelected(@NonNull SessionPlayer player,
+                @NonNull final TrackInfo trackInfo) {
             dispatchRemoteControllerTask(player, new RemoteControllerTask() {
                 @Override
                 public void run(ControllerCb callback, int seq) throws RemoteException {
@@ -1506,7 +1578,8 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
         }
 
         @Override
-        public void onTrackDeselected(SessionPlayer player, final TrackInfo trackInfo) {
+        public void onTrackDeselected(@NonNull SessionPlayer player,
+                @NonNull final TrackInfo trackInfo) {
             dispatchRemoteControllerTask(player, new RemoteControllerTask() {
                 @Override
                 public void run(ControllerCb callback, int seq) throws RemoteException {
@@ -1516,9 +1589,9 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
         }
 
         @Override
-        public void onSubtitleData(final @NonNull SessionPlayer player,
-                final @NonNull MediaItem item, final @NonNull TrackInfo track,
-                final @NonNull SubtitleData data) {
+        public void onSubtitleData(@NonNull final SessionPlayer player,
+                @NonNull final MediaItem item, @NonNull final TrackInfo track,
+                @NonNull final SubtitleData data) {
             dispatchRemoteControllerTask(player, new RemoteControllerTask() {
                 @Override
                 public void run(ControllerCb callback, int seq) throws RemoteException {
@@ -1671,9 +1744,10 @@ class MediaSessionImplBase implements MediaSession.MediaSessionImpl {
         final ListenableFuture<T>[] mFutures;
         AtomicInteger mSuccessCount = new AtomicInteger(0);
 
-        public static <U extends BaseResult> CombinedCommandResultFuture create(
+        @SafeVarargs
+        public static <U extends BaseResult> CombinedCommandResultFuture<U> create(
                 Executor executor, ListenableFuture<U>... futures) {
-            return new CombinedCommandResultFuture<U>(executor, futures);
+            return new CombinedCommandResultFuture<>(executor, futures);
         }
 
         private CombinedCommandResultFuture(Executor executor,

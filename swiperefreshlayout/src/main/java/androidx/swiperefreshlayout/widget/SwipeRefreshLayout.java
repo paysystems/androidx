@@ -18,6 +18,8 @@ package androidx.swiperefreshlayout.widget;
 
 import android.content.Context;
 import android.content.res.TypedArray;
+import android.os.Parcel;
+import android.os.Parcelable;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -107,8 +109,6 @@ public class SwipeRefreshLayout extends ViewGroup implements NestedScrollingPare
 
     private static final int ANIMATE_TO_START_DURATION = 200;
 
-    // Default background for the progress spinner
-    private static final int CIRCLE_BG_LIGHT = 0xFFFAFAFA;
     // Default offset in dips from the top of the view to where the progress spinner should stop
     private static final int DEFAULT_CIRCLE_TARGET = 64;
 
@@ -231,6 +231,56 @@ public class SwipeRefreshLayout extends ViewGroup implements NestedScrollingPare
         if (!enabled) {
             reset();
         }
+    }
+
+    static class SavedState extends View.BaseSavedState {
+        final boolean mRefreshing;
+
+        /**
+         * Constructor called from {@link SwipeRefreshLayout#onSaveInstanceState()}
+         */
+        SavedState(Parcelable superState, boolean refreshing) {
+            super(superState);
+            this.mRefreshing = refreshing;
+        }
+
+        /**
+         * Constructor called from {@link #CREATOR}
+         */
+        SavedState(Parcel in) {
+            super(in);
+            mRefreshing = in.readByte() != 0;
+        }
+
+        @Override
+        public void writeToParcel(Parcel out, int flags) {
+            super.writeToParcel(out, flags);
+            out.writeByte(mRefreshing ? (byte) 1 : (byte) 0);
+        }
+
+        public static final Parcelable.Creator<SavedState> CREATOR =
+                new Parcelable.Creator<SavedState>() {
+                    public SavedState createFromParcel(Parcel in) {
+                        return new SavedState(in);
+                    }
+
+                    public SavedState[] newArray(int size) {
+                        return new SavedState[size];
+                    }
+                };
+    }
+
+    @Override
+    protected Parcelable onSaveInstanceState() {
+        Parcelable superState = super.onSaveInstanceState();
+        return new SavedState(superState, mRefreshing);
+    }
+
+    @Override
+    protected void onRestoreInstanceState(Parcelable state) {
+        SavedState savedState = (SavedState) state;
+        super.onRestoreInstanceState(savedState.getSuperState());
+        setRefreshing(savedState.mRefreshing);
     }
 
     @Override
@@ -404,7 +454,7 @@ public class SwipeRefreshLayout extends ViewGroup implements NestedScrollingPare
     }
 
     private void createProgressView() {
-        mCircleView = new CircleImageView(getContext(), CIRCLE_BG_LIGHT);
+        mCircleView = new CircleImageView(getContext());
         mProgress = new CircularProgressDrawable(getContext());
         mProgress.setStyle(CircularProgressDrawable.DEFAULT);
         mCircleView.setImageDrawable(mProgress);
@@ -1167,6 +1217,9 @@ public class SwipeRefreshLayout extends ViewGroup implements NestedScrollingPare
                 if (mIsBeingDragged) {
                     final float overscrollTop = (y - mInitialMotionY) * DRAG_RATE;
                     if (overscrollTop > 0) {
+                        // While the spinner is being dragged down, our parent shouldn't try
+                        // to intercept touch events. It will stop the drag gesture abruptly.
+                        getParent().requestDisallowInterceptTouchEvent(true);
                         moveSpinner(overscrollTop);
                     } else {
                         return false;

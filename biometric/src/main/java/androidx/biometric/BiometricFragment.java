@@ -17,18 +17,28 @@
 package androidx.biometric;
 
 import android.annotation.SuppressLint;
+import android.app.KeyguardManager;
+import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.TextUtils;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.annotation.RestrictTo;
+import androidx.annotation.VisibleForTesting;
 import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentActivity;
 
 import java.util.concurrent.Executor;
 
@@ -37,21 +47,28 @@ import java.util.concurrent.Executor;
  * device configuration changes. This class is not meant to be preserved after process death; for
  * security reasons, the BiometricPromptCompat will automatically stop authentication when the
  * activity is no longer in the foreground.
+ *
  * @hide
  */
 @RestrictTo(RestrictTo.Scope.LIBRARY)
-@RequiresApi(28)
+@RequiresApi(Build.VERSION_CODES.P)
 @SuppressLint("SyntheticAccessor")
 public class BiometricFragment extends Fragment {
 
     private static final String TAG = "BiometricFragment";
 
+    // Re-set in onAttach
+    private Context mContext;
+
     // Set whenever the support library's authenticate is called.
     private Bundle mBundle;
 
     // Re-set by the application, through BiometricPromptCompat upon orientation changes.
+    @VisibleForTesting
     Executor mClientExecutor;
+    @VisibleForTesting
     DialogInterface.OnClickListener mClientNegativeButtonListener;
+    @VisibleForTesting
     BiometricPrompt.AuthenticationCallback mClientAuthenticationCallback;
 
     // Set once and retained.
@@ -62,14 +79,11 @@ public class BiometricFragment extends Fragment {
     private boolean mShowing;
     private android.hardware.biometrics.BiometricPrompt mBiometricPrompt;
     private CancellationSignal mCancellationSignal;
+    private boolean mStartRespectingCancel;
+
     // Do not rely on the application's executor when calling into the framework's code.
     private final Handler mHandler = new Handler(Looper.getMainLooper());
-    private final Executor mExecutor = new Executor() {
-        @Override
-        public void execute(Runnable runnable) {
-            mHandler.post(runnable);
-        }
-    };
+    private final Executor mExecutor = mHandler::post;
 
     // Also created once and retained.
     private final android.hardware.biometrics.BiometricPrompt.AuthenticationCallback
@@ -78,17 +92,15 @@ public class BiometricFragment extends Fragment {
                 @Override
                 public void onAuthenticationError(final int errorCode,
                         final CharSequence errString) {
-                    mClientExecutor.execute(new Runnable() {
-                        @Override
-                        public void run() {
-                            CharSequence error = errString;
-                            if (error == null) {
-                                error = getContext().getString(R.string.default_error_msg) + " "
-                                        + errorCode;
-                            }
-                            mClientAuthenticationCallback
-                                    .onAuthenticationError(errorCode, error);
+                    mClientExecutor.execute(() -> {
+                        CharSequence error = errString;
+                        if (error == null) {
+                            error = mContext.getString(R.string.default_error_msg) + " "
+                                    + errorCode;
                         }
+                        mClientAuthenticationCallback
+                                .onAuthenticationError(Utils.isUnknownError(errorCode)
+                                        ? BiometricPrompt.ERROR_VENDOR : errorCode, error);
                     });
                     cleanup();
                 }
@@ -103,30 +115,21 @@ public class BiometricFragment extends Fragment {
                 public void onAuthenticationSucceeded(
                         final android.hardware.biometrics.BiometricPrompt.AuthenticationResult
                                 result) {
-                    mClientExecutor.execute(new Runnable() {
-                        @Override
-                        public void run() {
-                            mClientAuthenticationCallback.onAuthenticationSucceeded(
+                    mClientExecutor.execute(
+                            () -> mClientAuthenticationCallback.onAuthenticationSucceeded(
                                     new BiometricPrompt.AuthenticationResult(
-                                            unwrapCryptoObject(result.getCryptoObject())));
-                        }
-                    });
+                                            unwrapCryptoObject(result.getCryptoObject()))));
                     cleanup();
                 }
 
                 @Override
                 public void onAuthenticationFailed() {
-                    mClientExecutor.execute(new Runnable() {
-                        @Override
-                        public void run() {
-                            mClientAuthenticationCallback.onAuthenticationFailed();
-                        }
-                    });
+                    mClientExecutor.execute(mClientAuthenticationCallback::onAuthenticationFailed);
                 }
             };
 
     // Also created once and retained.
-    private DialogInterface.OnClickListener mNegativeButtonListener =
+    private final DialogInterface.OnClickListener mNegativeButtonListener =
             new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
@@ -134,23 +137,61 @@ public class BiometricFragment extends Fragment {
                 }
             };
 
+    // Also created once and retained.
+    @SuppressWarnings("deprecation")
+    private final DialogInterface.OnClickListener mDeviceCredentialButtonListener =
+            (dialog, which) -> {
+                if (which == DialogInterface.BUTTON_NEGATIVE) {
+                    final FragmentActivity activity = getActivity();
+                    if (!(activity instanceof DeviceCredentialHandlerActivity)) {
+                        Log.e(TAG, "Failed to check device credential. Parent handler not found.");
+                        return;
+                    }
+
+                    final KeyguardManager km = activity.getSystemService(KeyguardManager.class);
+                    if (km == null) {
+                        Log.e(TAG, "Failed to check device credential. KeyguardManager was null.");
+                        return;
+                    }
+
+                    // Pass along the title and subtitle from the biometric prompt.
+                    final CharSequence title;
+                    final CharSequence subtitle;
+                    if (mBundle != null) {
+                        title = mBundle.getCharSequence(BiometricPrompt.KEY_TITLE);
+                        subtitle = mBundle.getCharSequence(BiometricPrompt.KEY_SUBTITLE);
+                    } else {
+                        title = null;
+                        subtitle = null;
+                    }
+
+                    // Prevent the bridge from resetting until the confirmation activity finishes.
+                    DeviceCredentialHandlerBridge bridge =
+                            DeviceCredentialHandlerBridge.getInstanceIfNotNull();
+                    if (bridge != null) {
+                        bridge.startIgnoringReset();
+                    }
+
+                    // Launch a new instance of the confirm device credential Settings activity.
+                    final Intent intent = km.createConfirmDeviceCredentialIntent(title, subtitle);
+                    intent.setFlags(
+                            Intent.FLAG_ACTIVITY_MULTIPLE_TASK | Intent.FLAG_ACTIVITY_NEW_DOCUMENT);
+                    activity.startActivityForResult(intent, 0 /* requestCode */);
+                }
+            };
+
     /**
      * Creates a new instance of the {@link BiometricFragment}.
-     * @return
      */
-    public static BiometricFragment newInstance() {
-        BiometricFragment biometricFragment = new BiometricFragment();
-        return biometricFragment;
+    static BiometricFragment newInstance() {
+        return new BiometricFragment();
     }
 
     /**
      * Sets the client's callback. This should be done whenever the lifecycle changes (orientation
      * changes).
-     * @param executor
-     * @param onClickListener
-     * @param authenticationCallback
      */
-    protected void setCallbacks(Executor executor, DialogInterface.OnClickListener onClickListener,
+    void setCallbacks(Executor executor, DialogInterface.OnClickListener onClickListener,
             BiometricPrompt.AuthenticationCallback authenticationCallback) {
         mClientExecutor = executor;
         mClientNegativeButtonListener = onClickListener;
@@ -160,16 +201,21 @@ public class BiometricFragment extends Fragment {
     /**
      * Sets the crypto object to be associated with the authentication. Should be called before
      * adding the fragment to guarantee that it's ready in onCreate().
-     * @param crypto
      */
-    protected void setCryptoObject(BiometricPrompt.CryptoObject crypto) {
+    void setCryptoObject(BiometricPrompt.CryptoObject crypto) {
         mCryptoObject = crypto;
     }
 
     /**
      * Cancel the authentication.
      */
-    protected void cancel() {
+    void cancel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && isDeviceCredentialAllowed()) {
+            if (!mStartRespectingCancel) {
+                Log.w(TAG, "Ignoring fast cancel signal");
+                return;
+            }
+        }
         if (mCancellationSignal != null) {
             mCancellationSignal.cancel();
         }
@@ -181,12 +227,14 @@ public class BiometricFragment extends Fragment {
      */
     void cleanup() {
         mShowing = false;
-        if (getActivity() != null) {
-            getActivity().getSupportFragmentManager().beginTransaction().detach(this)
-                    .commitAllowingStateLoss();
+        FragmentActivity activity = getActivity();
+        if (getFragmentManager() != null) {
+            getFragmentManager().beginTransaction().detach(this).commitAllowingStateLoss();
         }
+        Utils.maybeFinishHandler(activity);
     }
 
+    @Nullable
     protected CharSequence getNegativeButtonText() {
         return mNegativeButtonText;
     }
@@ -201,19 +249,59 @@ public class BiometricFragment extends Fragment {
         mBundle = bundle;
     }
 
+    boolean isDeviceCredentialAllowed() {
+        return mBundle.getBoolean(BiometricPrompt.KEY_ALLOW_DEVICE_CREDENTIAL, false);
+    }
+
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-            Bundle savedInstanceState) {
+    public void onAttach(@NonNull Context context) {
+        super.onAttach(context);
+        mContext = context;
+    }
+
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+            @Nullable Bundle savedInstanceState) {
         // Start the actual authentication when the fragment is attached.
         if (!mShowing) {
             mNegativeButtonText = mBundle.getCharSequence(BiometricPrompt.KEY_NEGATIVE_TEXT);
-            mBiometricPrompt = new android.hardware.biometrics.BiometricPrompt.Builder(getContext())
-                    .setTitle(mBundle.getCharSequence(BiometricPrompt.KEY_TITLE))
+
+            final android.hardware.biometrics.BiometricPrompt.Builder builder =
+                    new android.hardware.biometrics.BiometricPrompt.Builder(getContext());
+            builder.setTitle(mBundle.getCharSequence(BiometricPrompt.KEY_TITLE))
                     .setSubtitle(mBundle.getCharSequence(BiometricPrompt.KEY_SUBTITLE))
-                    .setDescription(mBundle.getCharSequence(BiometricPrompt.KEY_DESCRIPTION))
-                    .setNegativeButton(mBundle.getCharSequence(BiometricPrompt.KEY_NEGATIVE_TEXT),
-                            mClientExecutor, mNegativeButtonListener)
-                    .build();
+                    .setDescription(mBundle.getCharSequence(BiometricPrompt.KEY_DESCRIPTION));
+
+            final boolean allowDeviceCredential =
+                    mBundle.getBoolean(BiometricPrompt.KEY_ALLOW_DEVICE_CREDENTIAL);
+
+            // Provide our own negative button text if allowing device credential on <= P.
+            if (allowDeviceCredential && Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+                mNegativeButtonText = getString(R.string.confirm_device_credential_password);
+                builder.setNegativeButton(
+                        mNegativeButtonText, mClientExecutor, mDeviceCredentialButtonListener);
+            } else if (!TextUtils.isEmpty(mNegativeButtonText)) {
+                builder.setNegativeButton(
+                        mNegativeButtonText, mClientExecutor, mNegativeButtonListener);
+            }
+
+            // Set builder flags introduced in Q.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                builder.setConfirmationRequired(
+                        mBundle.getBoolean((BiometricPrompt.KEY_REQUIRE_CONFIRMATION), true));
+                builder.setDeviceCredentialAllowed(allowDeviceCredential);
+            }
+
+            if (allowDeviceCredential) {
+                mStartRespectingCancel = false;
+                mHandler.postDelayed(() -> {
+                    // Hack almost over 9000, ignore cancel signal if it's within the first quarter
+                    // second.
+                    mStartRespectingCancel = true;
+                }, 250 /* ms */);
+            }
+
+            mBiometricPrompt = builder.build();
             mCancellationSignal = new CancellationSignal();
             if (mCryptoObject == null) {
                 mBiometricPrompt.authenticate(mCancellationSignal, mExecutor,
@@ -227,7 +315,7 @@ public class BiometricFragment extends Fragment {
         return super.onCreateView(inflater, container, savedInstanceState);
     }
 
-    static BiometricPrompt.CryptoObject unwrapCryptoObject(
+    private static BiometricPrompt.CryptoObject unwrapCryptoObject(
             android.hardware.biometrics.BiometricPrompt.CryptoObject cryptoObject) {
         if (cryptoObject == null) {
             return null;
@@ -242,7 +330,7 @@ public class BiometricFragment extends Fragment {
         }
     }
 
-    static android.hardware.biometrics.BiometricPrompt.CryptoObject wrapCryptoObject(
+    private static android.hardware.biometrics.BiometricPrompt.CryptoObject wrapCryptoObject(
             BiometricPrompt.CryptoObject cryptoObject) {
         if (cryptoObject == null) {
             return null;

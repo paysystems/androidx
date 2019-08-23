@@ -35,6 +35,8 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
 import androidx.annotation.ColorInt;
+import androidx.annotation.ColorRes;
+import androidx.annotation.DrawableRes;
 import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -46,6 +48,9 @@ import androidx.car.widget.itemdecorators.BottomOffsetDecoration;
 import androidx.car.widget.itemdecorators.DividerDecoration;
 import androidx.car.widget.itemdecorators.ItemSpacingDecoration;
 import androidx.car.widget.itemdecorators.TopOffsetDecoration;
+import androidx.core.content.ContextCompat;
+import androidx.core.util.Preconditions;
+import androidx.core.view.ViewCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.OrientationHelper;
 import androidx.recyclerview.widget.RecyclerView;
@@ -113,6 +118,7 @@ public class PagedListView extends FrameLayout {
 
     private int mRowsPerPage = -1;
     private RecyclerView.Adapter<? extends RecyclerView.ViewHolder> mAdapter;
+    private AlphaJumpAdapter mAlphaJumpAdapter;
 
     /** Maximum number of pages to show. */
     private int mMaxPages = UNLIMITED_PAGES;
@@ -296,10 +302,10 @@ public class PagedListView extends FrameLayout {
 
             int listDividerColorRes = a.getResourceId(R.styleable.PagedListView_listDividerColor,
                     R.color.car_list_divider);
+            int listDividerColor = ContextCompat.getColor(context, listDividerColorRes);
 
             mRecyclerView.addItemDecoration(new DividerDecoration(context, dividerStartMargin,
-                    dividerEndMargin, dividerStartId, dividerEndId,
-                    context.getColor(listDividerColorRes)));
+                    dividerEndMargin, dividerStartId, dividerEndId, listDividerColor));
         }
 
         int itemSpacing = a.getDimensionPixelSize(R.styleable.PagedListView_itemSpacing, 0);
@@ -350,11 +356,6 @@ public class PagedListView extends FrameLayout {
                     default:
                         Log.e(TAG, "Unknown pagination direction (" + direction + ")");
                 }
-            }
-
-            @Override
-            public void onAlphaJump() {
-                setAlphaJumpVisible(true);
             }
         });
 
@@ -428,6 +429,20 @@ public class PagedListView extends FrameLayout {
     }
 
     /**
+     * Returns a {@link Gutter} value that identifies which sides the gutter applies to.
+     *
+     * <p>The gutter is the space to the start/end of the list view items and will be equal in size
+     * to the scroll bars. By default, there is a gutter to both the left and right of the list
+     * view items, to account for the scroll bar.
+     *
+     * @return gutter The {@link Gutter} value that identifies which sides to apply the gutter to.
+     */
+    @Gutter
+    public int getGutter() {
+        return mGutter;
+    }
+
+    /**
      * Set the gutter to the specified value.
      *
      * <p>The gutter is the space to the start/end of the list view items and will be equal in size
@@ -438,19 +453,38 @@ public class PagedListView extends FrameLayout {
      */
     public void setGutter(@Gutter int gutter) {
         mGutter = gutter;
+        FrameLayout.LayoutParams scrollBarViewLayoutParams =
+                (FrameLayout.LayoutParams) mScrollBarView.getLayoutParams();
+        int scrollBarGravity = scrollBarViewLayoutParams.gravity;
 
-        // Default starting margin is either the width of the scroll bar if it's enabled or just
-        // flush to the edge.
-        int startMargin = mScrollBarEnabled ? mScrollBarView.getLayoutParams().width : 0;
+        boolean isLTR = ViewCompat.getLayoutDirection(this) == ViewCompat.LAYOUT_DIRECTION_LTR;
+        boolean isScrollBarGravityStart =
+                (scrollBarGravity == Gravity.START)
+                        || (scrollBarGravity == Gravity.LEFT && isLTR)
+                        || (scrollBarGravity == Gravity.RIGHT && !isLTR);
+        boolean isScrollBarGravityEnd =
+                (scrollBarGravity == Gravity.END)
+                        || (scrollBarGravity == Gravity.RIGHT && isLTR)
+                        || (scrollBarGravity == Gravity.LEFT && !isLTR);
+
+        // Default starting margin is either the width of the scroll bar, if present at the start,
+        // or just flush to the edge.
+        int startMargin = mScrollBarEnabled && isScrollBarGravityStart
+                ? mScrollBarView.getLayoutParams().width : 0;
         if ((mGutter & Gutter.START) != 0) {
             // Ensure that the gutter value is large enough so that the RecyclerView does not
             // overlap the scroll bar, if it's enabled.
             startMargin = Math.max(mGutterSize, startMargin);
         }
 
-        int endMargin = 0;
+        // Default end margin is either the width of the scroll bar, if present at the end, or
+        // just flush to the edge.
+        int endMargin = mScrollBarEnabled && isScrollBarGravityEnd
+                ? mScrollBarView.getLayoutParams().width : 0;
         if ((mGutter & Gutter.END) != 0) {
-            endMargin = mGutterSize;
+            // Ensure that the gutter value is large enough so that the RecyclerView does not
+            // overlap the scroll bar, if it's enabled.
+            endMargin = Math.max(mGutterSize, endMargin);
         }
 
         MarginLayoutParams layoutParams = (MarginLayoutParams) mRecyclerView.getLayoutParams();
@@ -484,12 +518,42 @@ public class PagedListView extends FrameLayout {
     }
 
     /**
+     * Sets the gravity of the scrollbar, which determines its position within the PagedListView.
+     * Only horizontal gravities are supported.
+     *
+     * @param gravity The {@link Gravity} value to be applied to the scrollbar.
+     *
+     * {@link R.attr#scrollBarGravity}
+     */
+    public void setScrollBarGravity(int gravity) {
+        Preconditions.checkArgument(Gravity.isHorizontal(gravity));
+        FrameLayout.LayoutParams layoutParams =
+                (FrameLayout.LayoutParams) mScrollBarView.getLayoutParams();
+        layoutParams.gravity = gravity;
+        mScrollBarView.requestLayout();
+
+        // Call setGutter to reset the gutter.
+        setGutter(mGutter);
+    }
+
+    /**
+     * Returns the width of the container that holds the scrollbar. The scrollbar will be centered
+     * within this width.
+     *
+     * @return width The width of the scrollbar container.
+     */
+    @Px
+    public int getScrollBarContainerWidth() {
+        return mScrollBarView.getLayoutParams().width;
+    }
+
+    /**
      * Sets the width of the container that holds the scrollbar. The scrollbar will be centered
      * within this width.
      *
      * @param width The width of the scrollbar container.
      */
-    public void setScrollBarContainerWidth(int width) {
+    public void setScrollBarContainerWidth(@Px int width) {
         ViewGroup.LayoutParams layoutParams = mScrollBarView.getLayoutParams();
         layoutParams.width = width;
         mScrollBarView.requestLayout();
@@ -527,19 +591,26 @@ public class PagedListView extends FrameLayout {
     }
 
     /**
-     * Set the visibility of the scroll bar.
+     * Sets whether the scroll bar is enabled.
      *
-     * @param enabled Whether the scrollbar is visible or not.
+     * If enabled, a scroll bar will appear when the number of items causes the PagedListView to
+     * be scrollable. Otherwise, the scroll bar is hidden regardless of item count.
+     *
+     * @param enabled {@code true} to enable the scroll bar.
      */
-    public void setScrollBarEnabled(boolean enabled) {
+    public final void setScrollBarEnabled(boolean enabled) {
         mScrollBarEnabled = enabled;
         mScrollBarView.setVisibility(mScrollBarEnabled ? VISIBLE : GONE);
+
+        // Ensure that the gutter is updated so that the RecyclerView does not overlap the scroll
+        // bar.
+        setGutter(mGutter);
     }
 
     /**
-     * Returns {@code true} if the scroll bar is visible.
+     * Returns {@code true} if the scroll bar is enabled.
      */
-    public boolean isScrollBarEnabled() {
+    public final boolean isScrollBarEnabled() {
         return mScrollBarEnabled;
     }
 
@@ -549,7 +620,7 @@ public class PagedListView extends FrameLayout {
      *
      * @param offset The top offset to add in pixels.
      *
-     * {@link R.attr#listContentTopOffset}
+     *               {@link R.attr#listContentTopOffset}
      */
     public void setListContentTopOffset(@Px int offset) {
         TopOffsetDecoration existing = null;
@@ -731,7 +802,17 @@ public class PagedListView extends FrameLayout {
         mRecyclerView.setAdapter(adapter);
 
         updateMaxItems();
-        updateAlphaJump();
+    }
+
+    /**
+     * Sets the alpha jump adapter for the list.
+     *
+     * @param adapter The alpha jump adapter to set for the list.
+     */
+    public void setAlphaJumpAdapter(@NonNull AlphaJumpAdapter adapter) {
+        mAlphaJumpAdapter = adapter;
+        mScrollBarView.setOnAlphaJumpListener(() -> setAlphaJumpVisible(true));
+        mScrollBarView.setShowAlphaJump(true);
     }
 
     /**
@@ -767,7 +848,7 @@ public class PagedListView extends FrameLayout {
      * PagedListView needs to implement {@link ItemCap}.
      *
      * @param maxPages The maximum number of pages that fit on the screen. Should be positive or
-     * {@link #UNLIMITED_PAGES}.
+     *                 {@link #UNLIMITED_PAGES}.
      */
     public void setMaxPages(int maxPages) {
         mMaxPages = Math.max(UNLIMITED_PAGES, maxPages);
@@ -880,6 +961,34 @@ public class PagedListView extends FrameLayout {
                 ((DividerDecoration) decor).setDividerColor(dividerColor);
             }
         }
+    }
+
+    /**
+     * Sets the color of the scrollbar thumb.
+     *
+     * @param color Resource identifier of the color.
+     */
+    public void setScrollbarThumbColor(@ColorRes int color) {
+        mScrollBarView.setScrollbarThumbColor(color);
+    }
+
+    /**
+     * Sets the tint color for the up and down buttons of the scrollbar.
+     *
+     * @param tintResId Resource identifier of the tint color.
+     */
+    public void setScrollBarButtonTintColor(@ColorRes int tintResId) {
+        mScrollBarView.setButtonTintColor(tintResId);
+    }
+
+    /**
+     * Sets the drawable that will function as the background for the buttons of the scrollbar. This
+     * background should provide the ripple.
+     *
+     * @param backgroundResId The drawable resource identifier for the ripple background.
+     */
+    public void setScrollBarButtonRippleBackground(@DrawableRes int backgroundResId) {
+        mScrollBarView.setButtonRippleBackground(backgroundResId);
     }
 
     /**
@@ -1308,11 +1417,6 @@ public class PagedListView extends FrameLayout {
         // will manually handle passing the state. See the comment in dispatchSaveInstanceState()
         // for more information.
         dispatchThawSelfOnly(container);
-    }
-
-    private void updateAlphaJump() {
-        boolean supportsAlphaJump = (mAdapter instanceof AlphaJumpAdapter);
-        mScrollBarView.setShowAlphaJump(supportsAlphaJump);
     }
 
     /**

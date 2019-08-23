@@ -1,18 +1,8 @@
 // Baseline format: 1.0
-RemovedClass: androidx.slice.SliceItemHolderParcelizer:
-    Removed class androidx.slice.SliceItemHolderParcelizer
-RemovedClass: androidx.slice.SliceItemParcelizer:
-    Removed class androidx.slice.SliceItemParcelizer
-RemovedClass: androidx.slice.SliceParcelizer:
-    Removed class androidx.slice.SliceParcelizer
-RemovedClass: androidx.slice.SliceSpecParcelizer:
-    Removed class androidx.slice.SliceSpecParcelizer
+AddedAbstractMethod: androidx.slice.SliceManager#getPinnedSpecs(android.net.Uri):
+    Added method androidx.slice.SliceManager.getPinnedSpecs(android.net.Uri)
 
 
-RemovedMethod: androidx.slice.SliceItem#getTimestamp():
-    Removed method androidx.slice.SliceItem.getTimestamp()
-RemovedMethod: androidx.slice.SliceItemHolder#SliceItemHolder():
-    Removed constructor androidx.slice.SliceItemHolder()
 RemovedMethod: androidx.slice.SliceProvider#createPermissionIntent(android.content.Context, android.net.Uri, String):
     Removed method androidx.slice.SliceProvider.createPermissionIntent(android.content.Context,android.net.Uri,String)
 RemovedMethod: androidx.slice.SliceProvider#createPermissionSlice(android.content.Context, android.net.Uri, String):
@@ -23,5 +13,3 @@ RemovedMethod: androidx.slice.core.SliceQuery#stream(androidx.slice.Slice):
     Removed method androidx.slice.core.SliceQuery.stream(androidx.slice.Slice)
 RemovedMethod: androidx.slice.core.SliceQuery#stream(androidx.slice.SliceItem):
     Removed method androidx.slice.core.SliceQuery.stream(androidx.slice.SliceItem)
-
-

@@ -50,7 +50,10 @@ import java.util.UUID;
  */
 @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
 @Entity(
-        indices = {@Index(value = {"schedule_requested_at"})}
+        indices = {
+                @Index(value = {"schedule_requested_at"}),
+                @Index(value = {"period_start_time"})
+        }
 )
 public class WorkSpec {
     private static final String TAG = Logger.tagWithPrefix("WorkSpec");
@@ -338,6 +341,7 @@ public class WorkSpec {
         return result;
     }
 
+    @NonNull
     @Override
     public String toString() {
         return "{WorkSpec: " + id + "}";
@@ -397,13 +401,33 @@ public class WorkSpec {
                 projection = {"tag"})
         public List<String> tags;
 
+        // This is actually a 1-1 relationship. However Room 2.1 models the type as a List.
+        // This will change in Room 2.2
+        @Relation(
+                parentColumn = "id",
+                entityColumn = "work_spec_id",
+                entity = WorkProgress.class,
+                projection = {"progress"})
+        public List<Data> progress;
+
         /**
          * Converts this POJO to a {@link WorkInfo}.
          *
          * @return The {@link WorkInfo} represented by this POJO
          */
+        @NonNull
         public WorkInfo toWorkInfo() {
-            return new WorkInfo(UUID.fromString(id), state, output, tags, runAttemptCount);
+            Data progress = this.progress != null && !this.progress.isEmpty()
+                    ? this.progress.get(0)
+                    : Data.EMPTY;
+
+            return new WorkInfo(
+                    UUID.fromString(id),
+                    state,
+                    output,
+                    tags,
+                    progress,
+                    runAttemptCount);
         }
 
         @Override
@@ -417,7 +441,8 @@ public class WorkSpec {
             if (id != null ? !id.equals(that.id) : that.id != null) return false;
             if (state != that.state) return false;
             if (output != null ? !output.equals(that.output) : that.output != null) return false;
-            return tags != null ? tags.equals(that.tags) : that.tags == null;
+            if (tags != null ? !tags.equals(that.tags) : that.tags != null) return false;
+            return progress != null ? progress.equals(that.progress) : that.progress == null;
         }
 
         @Override
@@ -427,6 +452,7 @@ public class WorkSpec {
             result = 31 * result + (output != null ? output.hashCode() : 0);
             result = 31 * result + runAttemptCount;
             result = 31 * result + (tags != null ? tags.hashCode() : 0);
+            result = 31 * result + (progress != null ? progress.hashCode() : 0);
             return result;
         }
     }
