@@ -30,14 +30,15 @@ import android.os.Looper;
 import androidx.annotation.NonNull;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.filters.LargeTest;
 import androidx.test.filters.SdkSuppress;
-import androidx.test.filters.SmallTest;
 import androidx.work.Configuration;
 import androidx.work.Constraints;
 import androidx.work.Data;
 import androidx.work.DatabaseTest;
 import androidx.work.ListenableWorker;
 import androidx.work.OneTimeWorkRequest;
+import androidx.work.ProgressUpdater;
 import androidx.work.WorkInfo;
 import androidx.work.WorkerFactory;
 import androidx.work.WorkerParameters;
@@ -68,7 +69,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 @RunWith(AndroidJUnit4.class)
-@SmallTest
+@LargeTest
 public class ConstraintTrackingWorkerTest extends DatabaseTest {
 
     private static final long DELAY_IN_MS = 100;
@@ -85,6 +86,7 @@ public class ConstraintTrackingWorkerTest extends DatabaseTest {
     private Configuration mConfiguration;
     private TaskExecutor mWorkTaskExecutor;
     private Scheduler mScheduler;
+    private ProgressUpdater mProgressUpdater;
     private Trackers mTracker;
     private BatteryChargingTracker mBatteryChargingTracker;
     private BatteryNotLowTracker mBatteryNotLowTracker;
@@ -102,14 +104,16 @@ public class ConstraintTrackingWorkerTest extends DatabaseTest {
 
         mWorkManagerImpl = mock(WorkManagerImpl.class);
         mScheduler = mock(Scheduler.class);
+        mProgressUpdater = mock(ProgressUpdater.class);
         when(mWorkManagerImpl.getWorkDatabase()).thenReturn(mDatabase);
+        when(mWorkManagerImpl.getWorkTaskExecutor()).thenReturn(mWorkTaskExecutor);
         when(mWorkManagerImpl.getConfiguration()).thenReturn(mConfiguration);
 
-        mBatteryChargingTracker = spy(new BatteryChargingTracker(mContext));
-        mBatteryNotLowTracker = spy(new BatteryNotLowTracker(mContext));
+        mBatteryChargingTracker = spy(new BatteryChargingTracker(mContext, mWorkTaskExecutor));
+        mBatteryNotLowTracker = spy(new BatteryNotLowTracker(mContext, mWorkTaskExecutor));
         // Requires API 24+ types.
         mNetworkStateTracker = mock(NetworkStateTracker.class);
-        mStorageNotLowTracker = spy(new StorageNotLowTracker(mContext));
+        mStorageNotLowTracker = spy(new StorageNotLowTracker(mContext, mWorkTaskExecutor));
         mTracker = mock(Trackers.class);
 
         when(mTracker.getBatteryChargingTracker()).thenReturn(mBatteryChargingTracker);
@@ -260,7 +264,8 @@ public class ConstraintTrackingWorkerTest extends DatabaseTest {
                         1,
                         executor,
                         mWorkTaskExecutor,
-                        workerFactory));
+                        workerFactory,
+                        mProgressUpdater));
 
         assertThat(worker, is(notNullValue()));
         assertThat(worker,

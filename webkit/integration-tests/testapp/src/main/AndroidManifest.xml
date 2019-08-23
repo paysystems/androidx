@@ -83,7 +83,11 @@
             android:name=".AssetLoaderAjaxActivity"
             android:exported="true" />
         <activity
+            android:name=".AssetLoaderInternalStorageActivity"
+            android:exported="true" />
+        <activity
             android:name=".ForceDarkActivity"
+            android:theme="@style/AppDayNightTheme"
             android:exported="true" />
         <activity
             android:name=".MultiProcessEnabledActivity"

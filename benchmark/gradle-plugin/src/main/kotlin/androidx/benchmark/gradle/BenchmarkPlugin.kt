@@ -17,11 +17,10 @@
 package androidx.benchmark.gradle
 
 import com.android.build.gradle.AppExtension
-import com.android.build.gradle.BaseExtension
 import com.android.build.gradle.LibraryExtension
+import com.android.build.gradle.TestedExtension
 import org.gradle.api.Plugin
 import org.gradle.api.Project
-import org.gradle.api.Task
 import org.gradle.api.tasks.StopExecutionException
 
 class BenchmarkPlugin : Plugin<Project> {
@@ -58,18 +57,54 @@ class BenchmarkPlugin : Plugin<Project> {
     private fun configureWithAndroidPlugin(project: Project) {
         if (!foundAndroidPlugin) {
             foundAndroidPlugin = true
-            val extension = project.extensions.getByType(BaseExtension::class.java)
+            val extension = project.extensions.getByType(TestedExtension::class.java)
             configureWithAndroidExtension(project, extension)
         }
     }
 
-    private fun configureWithAndroidExtension(project: Project, extension: BaseExtension) {
-        val adb = Adb(project)
-        project.tasks.register("lockClocks", LockClocksTask::class.java, adb)
-        project.tasks.register("unlockClocks", UnlockClocksTask::class.java, adb)
-        val benchmarkReportTask =
-            project.tasks.register("benchmarkReport", BenchmarkReportTask::class.java)
-        benchmarkReportTask.configure { it.dependsOn("connectedAndroidTest") }
+    private fun configureWithAndroidExtension(project: Project, extension: TestedExtension) {
+        val defaultConfig = extension.defaultConfig
+        val testInstrumentationArgs = defaultConfig.testInstrumentationRunnerArguments
+
+        defaultConfig.testInstrumentationRunner = "androidx.benchmark.junit4.AndroidBenchmarkRunner"
+
+        // disable overhead from test coverage by default, even if we use a debug variant
+        extension.buildTypes.getByName("debug").isTestCoverageEnabled = false
+
+        // Registering this block as a configureEach callback is only necessary because Studio skips
+        // Gradle if there are no changes, which stops this plugin from being re-applied.
+        var enabledOutput = false
+        project.configurations.configureEach {
+            if (!enabledOutput &&
+                !project.rootProject.hasProperty("android.injected.invoked.from.ide") &&
+                !testInstrumentationArgs.containsKey("androidx.benchmark.output.enable")
+            ) {
+                enabledOutput = true
+
+                // NOTE: This argument is checked by ResultWriter to enable CI reports.
+                defaultConfig.testInstrumentationRunnerArgument(
+                    "androidx.benchmark.output.enable",
+                    "true"
+                )
+
+                if (!testInstrumentationArgs.containsKey("additionalTestOutputDir")) {
+                    defaultConfig.testInstrumentationRunnerArgument("no-isolated-storage", "1")
+                }
+            }
+        }
+
+        if (project.rootProject.tasks.findByName("lockClocks") == null) {
+            project.rootProject.tasks.register("lockClocks", LockClocksTask::class.java).configure {
+                it.adbPath.set(extension.adbExecutable.absolutePath)
+            }
+        }
+
+        if (project.rootProject.tasks.findByName("unlockClocks") == null) {
+            project.rootProject.tasks.register("unlockClocks", UnlockClocksTask::class.java)
+                .configure {
+                    it.adbPath.set(extension.adbExecutable.absolutePath)
+                }
+        }
 
         val extensionVariants = when (extension) {
             is AppExtension -> extension.applicationVariants
@@ -88,47 +123,24 @@ class BenchmarkPlugin : Plugin<Project> {
         // extension variants have been resolved.
         var applied = false
         extensionVariants.all {
-            if (!applied) {
+            if (!applied && !testInstrumentationArgs.containsKey("additionalTestOutputDir")) {
                 applied = true
+
+                // Only enable pulling benchmark data through this plugin on older versions of AGP
+                // that do not yet enable this flag.
+                project.tasks.register("benchmarkReport", BenchmarkReportTask::class.java)
+                    .configure {
+                        it.adbPath.set(extension.adbExecutable.absolutePath)
+                        it.dependsOn(project.tasks.named("connectedAndroidTest"))
+                    }
+
                 project.tasks.named("connectedAndroidTest").configure {
-                    // NOTE: This argument is checked by ResultWriter to enable CI reports.
-                    extension.defaultConfig.testInstrumentationRunnerArgument(
-                        "androidx.benchmark.output.enable",
-                        "true"
-                    )
-
-                    configureWithConnectedAndroidTest(project, it)
+                    // The task benchmarkReport must be registered by this point, and is responsible
+                    // for pulling report data from all connected devices onto host machine through
+                    // adb.
+                    it.finalizedBy("benchmarkReport")
                 }
             }
-        }
-    }
-
-    private fun configureWithConnectedAndroidTest(project: Project, connectedAndroidTest: Task) {
-        // The task benchmarkReport must be registered by this point, and is responsible for
-        // pulling report data from all connected devices onto host machine through adb.
-        connectedAndroidTest.finalizedBy("benchmarkReport")
-
-        var hasJetpackBenchmark = false
-
-        project.configurations.matching { it.name.contains("androidTest") }.all {
-            it.allDependencies.all { dependency ->
-                if (dependency.name == "benchmark" && dependency.group == "androidx.benchmark") {
-                    hasJetpackBenchmark = true
-                }
-            }
-        }
-
-        if (!hasJetpackBenchmark) {
-            throw StopExecutionException(
-                """Project ${project.name} missing required project dependency,
-                    androidx.benchmark:benchmark. The androidx.benchmark plugin is meant to be
-                    used in conjunction with the androix.benchmark library, but it was not found
-                    within this project's dependencies. You can add the androidx.benchmark library
-                    to your project by including androidTestImplementation
-                    'androidx.benchmark:benchmark:<version>' in the dependencies block of the
-                    project build.gradle file"""
-                    .trimIndent()
-            )
         }
     }
 }

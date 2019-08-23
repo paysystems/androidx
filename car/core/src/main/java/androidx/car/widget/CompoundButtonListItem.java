@@ -36,6 +36,7 @@ import androidx.annotation.DrawableRes;
 import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.arch.core.util.Function;
 import androidx.car.R;
 import androidx.car.widget.ListItemAdapter.ListItemType;
 import androidx.constraintlayout.widget.ConstraintLayout;
@@ -44,7 +45,6 @@ import androidx.constraintlayout.widget.Guideline;
 import java.lang.annotation.Retention;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Function;
 
 /**
  * Class to build a list item with {@link CompoundButton}.
@@ -166,6 +166,7 @@ public abstract class CompoundButtonListItem<VH extends CompoundButtonListItem.V
      * Hides all views in {@link ViewHolder} then applies ViewBinders to adjust view layout params.
      */
     @Override
+    @SuppressWarnings("unchecked")
     public void onBind(@NonNull VH viewHolder) {
         hideSubViews(viewHolder);
         for (ViewBinder binder : mBinders) {
@@ -185,12 +186,40 @@ public abstract class CompoundButtonListItem<VH extends CompoundButtonListItem.V
     }
 
     /**
-     * Sets whether the item is clickable. If {@code true}, clicking item toggles the compound
-     * button.
+     * Sets whether a click anywhere on the list toggles the state of compound button. The
+     * default state of {@code false} requires an explicit click on the compound button to toggle
+     * its state.
+     *
+     * @param isClickable {@code true} for a click anywhere on the list to toggle the state of
+     *                    the compound button.
+     * @deprecated Use {@link #setEntireItemClickable(boolean)} instead.
      */
+    @Deprecated
     public void setClickable(boolean isClickable) {
         mIsClickable = isClickable;
         markDirty();
+    }
+
+    /**
+     * Sets whether a click anywhere on the list item toggles the state of compound button. The
+     * default state of {@code false} means an explicit click on the compound button is required to
+     * toggle its state.
+     *
+     * @param isClickable {@code true} for a click anywhere on the list to toggle the state of
+     *                    the compound button.
+     */
+    public void setEntireItemClickable(boolean isClickable) {
+        mIsClickable = isClickable;
+        markDirty();
+    }
+
+    /**
+     * Returns whether a click anywhere on the list item toggles the state of compound button. The
+     * default state of {@code false} means an explicit click on the compound button is required to
+     * toggle its state.
+     */
+    public boolean isEntireItemClickable() {
+        return mIsClickable;
     }
 
     /**

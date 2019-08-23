@@ -79,11 +79,11 @@ public abstract class VersionedParcel {
 
     protected final ArrayMap<String, Method> mReadCache;
     protected final ArrayMap<String, Method> mWriteCache;
-    protected final ArrayMap<String, Class> mParcelizerCache;
+    protected final ArrayMap<String, Class<?>> mParcelizerCache;
 
     public VersionedParcel(ArrayMap<String, Method> readCache,
             ArrayMap<String, Method> writeCache,
-            ArrayMap<String, Class> parcelizerCache) {
+            ArrayMap<String, Class<?>> parcelizerCache) {
         mReadCache = readCache;
         mWriteCache = writeCache;
         mParcelizerCache = parcelizerCache;
@@ -861,8 +861,8 @@ public abstract class VersionedParcel {
         if (size == 0) {
             return;
         }
-        List<K> keySet = new ArrayList<>();
-        List<V> valueSet = new ArrayList<>();
+        List<K> keySet = new ArrayList<>(size);
+        List<V> valueSet = new ArrayList<>(size);
         for (Map.Entry<K, V> entry : val.entrySet()) {
             keySet.add(entry.getKey());
             valueSet.add(entry.getValue());
@@ -1037,7 +1037,7 @@ public abstract class VersionedParcel {
     }
 
     private void writeVersionedParcelableCreator(VersionedParcelable p) {
-        Class name = null;
+        Class<?> name;
         try {
             name = findParcelClass(p.getClass());
         } catch (ClassNotFoundException e) {
@@ -1340,6 +1340,7 @@ public abstract class VersionedParcel {
         return readCollection(new ArrayList<T>());
     }
 
+    @SuppressWarnings("unchecked")
     private <T, S extends Collection<T>> S readCollection(S list) {
         int n = readInt();
         if (n < 0) {
@@ -1405,12 +1406,12 @@ public abstract class VersionedParcel {
         if (size < 0) {
             return null;
         }
-        Map<K, V> map = new ArrayMap<>();
+        Map<K, V> map = new ArrayMap<>(size);
         if (size == 0) {
             return map;
         }
-        List<K> keyList = new ArrayList<>();
-        List<V> valueList = new ArrayList<>();
+        List<K> keyList = new ArrayList<>(size);
+        List<V> valueList = new ArrayList<>(size);
         readCollection(keyList);
         readCollection(valueList);
         for (int i = 0; i < size; i++) {
@@ -1440,6 +1441,7 @@ public abstract class VersionedParcel {
 
     /**
      */
+    @SuppressWarnings("unchecked")
     protected <T> T[] readArray(T[] def) {
         int n = readInt();
         if (n < 0) {
@@ -1504,7 +1506,7 @@ public abstract class VersionedParcel {
      * @throws BadParcelableException Throws BadVersionedParcelableException if there
      *                                was an error trying to instantiate the VersionedParcelable.
      */
-    @SuppressWarnings({"unchecked", "TypeParameterUnusedInFormals"})
+    @SuppressWarnings("TypeParameterUnusedInFormals")
     protected <T extends VersionedParcelable> T readVersionedParcelable() {
         String name = readString();
         if (name == null) {
@@ -1546,13 +1548,11 @@ public abstract class VersionedParcel {
             };
             return (Serializable) ois.readObject();
         } catch (IOException ioe) {
-            throw new RuntimeException("VersionedParcelable encountered "
-                    + "IOException reading a Serializable object (name = " + name
-                    + ")", ioe);
+            throw new RuntimeException("Unable to read Serializable object (name = " + name + ")",
+                    ioe);
         } catch (ClassNotFoundException cnfe) {
-            throw new RuntimeException("VersionedParcelable encountered "
-                    + "ClassNotFoundException reading a Serializable object (name = "
-                    + name + ")", cnfe);
+            throw new RuntimeException("Unable to read Serializable object (name = " + name + ")",
+                    cnfe);
         }
     }
 
@@ -1565,16 +1565,20 @@ public abstract class VersionedParcel {
             Method m = getReadMethod(parcelCls);
             return (T) m.invoke(null, versionedParcel);
         } catch (IllegalAccessException e) {
-            throw new RuntimeException("VersionedParcel encountered IllegalAccessException", e);
+            throw new RuntimeException(e);
         } catch (InvocationTargetException e) {
-            if (e.getCause() instanceof RuntimeException) {
-                throw (RuntimeException) e.getCause();
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException) {
+                throw (RuntimeException) cause;
             }
-            throw new RuntimeException("VersionedParcel encountered InvocationTargetException", e);
+            if (cause instanceof Error) {
+                throw (Error) cause;
+            }
+            throw new RuntimeException(e);
         } catch (NoSuchMethodException e) {
-            throw new RuntimeException("VersionedParcel encountered NoSuchMethodException", e);
+            throw new RuntimeException(e);
         } catch (ClassNotFoundException e) {
-            throw new RuntimeException("VersionedParcel encountered ClassNotFoundException", e);
+            throw new RuntimeException(e);
         }
     }
 
@@ -1586,16 +1590,20 @@ public abstract class VersionedParcel {
             Method m = getWriteMethod(val.getClass());
             m.invoke(null, val, versionedParcel);
         } catch (IllegalAccessException e) {
-            throw new RuntimeException("VersionedParcel encountered IllegalAccessException", e);
+            throw new RuntimeException(e);
         } catch (InvocationTargetException e) {
-            if (e.getCause() instanceof RuntimeException) {
-                throw (RuntimeException) e.getCause();
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException) {
+                throw (RuntimeException) cause;
             }
-            throw new RuntimeException("VersionedParcel encountered InvocationTargetException", e);
+            if (cause instanceof Error) {
+                throw (Error) cause;
+            }
+            throw new RuntimeException(e);
         } catch (NoSuchMethodException e) {
-            throw new RuntimeException("VersionedParcel encountered NoSuchMethodException", e);
+            throw new RuntimeException(e);
         } catch (ClassNotFoundException e) {
-            throw new RuntimeException("VersionedParcel encountered ClassNotFoundException", e);
+            throw new RuntimeException(e);
         }
     }
 
@@ -1603,29 +1611,27 @@ public abstract class VersionedParcel {
             NoSuchMethodException, ClassNotFoundException {
         Method m = mReadCache.get(parcelCls);
         if (m == null) {
-            long start = System.currentTimeMillis();
-            Class cls = Class.forName(parcelCls, true, VersionedParcel.class.getClassLoader());
+            Class<?> cls = Class.forName(parcelCls, true, VersionedParcel.class.getClassLoader());
             m = cls.getDeclaredMethod("read", VersionedParcel.class);
             mReadCache.put(parcelCls, m);
         }
         return m;
     }
 
-    private Method getWriteMethod(Class baseCls) throws IllegalAccessException,
+    private Method getWriteMethod(Class<?> baseCls) throws IllegalAccessException,
             NoSuchMethodException, ClassNotFoundException {
         Method m = mWriteCache.get(baseCls.getName());
         if (m == null) {
-            Class cls = findParcelClass(baseCls);
-            long start = System.currentTimeMillis();
+            Class<?> cls = findParcelClass(baseCls);
             m = cls.getDeclaredMethod("write", baseCls, VersionedParcel.class);
             mWriteCache.put(baseCls.getName(), m);
         }
         return m;
     }
 
-    private Class findParcelClass(Class<? extends VersionedParcelable> cls)
+    private Class<?> findParcelClass(Class<?> cls)
             throws ClassNotFoundException {
-        Class ret = mParcelizerCache.get(cls.getName());
+        Class<?> ret = mParcelizerCache.get(cls.getName());
         if (ret == null) {
             String pkg = cls.getPackage().getName();
             String c = String.format("%s.%sParcelizer", pkg, cls.getSimpleName());

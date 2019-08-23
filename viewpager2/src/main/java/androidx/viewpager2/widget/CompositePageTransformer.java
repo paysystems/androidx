@@ -18,7 +18,6 @@ package androidx.viewpager2.widget;
 
 import android.view.View;
 
-import androidx.annotation.FloatRange;
 import androidx.annotation.NonNull;
 import androidx.viewpager2.widget.ViewPager2.PageTransformer;
 
@@ -39,18 +38,17 @@ public final class CompositePageTransformer implements PageTransformer {
      * <p>
      * Transformers will be executed in the order that they were added.
      */
-    public boolean addTransformer(@NonNull PageTransformer transformer) {
-        return mTransformers.add(transformer);
+    public void addTransformer(@NonNull PageTransformer transformer) {
+        mTransformers.add(transformer);
     }
 
     /** Removes a page transformer from the list. */
-    public boolean removeTransformer(@NonNull PageTransformer transformer) {
-        return mTransformers.remove(transformer);
+    public void removeTransformer(@NonNull PageTransformer transformer) {
+        mTransformers.remove(transformer);
     }
 
     @Override
-    public void transformPage(@NonNull View page,
-            @FloatRange(from = -1.0, to = 1.0) float position) {
+    public void transformPage(@NonNull View page, float position) {
         for (PageTransformer transformer : mTransformers) {
             transformer.transformPage(page, position);
         }

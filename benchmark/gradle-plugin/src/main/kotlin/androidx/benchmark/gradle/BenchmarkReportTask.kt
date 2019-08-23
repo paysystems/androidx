@@ -18,8 +18,11 @@ package androidx.benchmark.gradle
 
 import com.android.ddmlib.Log
 import org.gradle.api.DefaultTask
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.StopExecutionException
 import org.gradle.api.tasks.TaskAction
+import org.gradle.kotlin.dsl.property
 import java.io.File
 
 open class BenchmarkReportTask : DefaultTask() {
@@ -40,11 +43,14 @@ open class BenchmarkReportTask : DefaultTask() {
         outputs.upToDateWhen { false }
     }
 
+    @Input
+    val adbPath: Property<String> = project.objects.property()
+
     @TaskAction
     fun exec() {
         // Fetch reports from all available devices as the default behaviour of connectedAndroidTest
         // is to run on all available devices.
-        getReportsForDevices(Adb(project))
+        getReportsForDevices(Adb(adbPath.get(), logger))
     }
 
     private fun getReportsForDevices(adb: Adb) {
@@ -63,9 +69,7 @@ open class BenchmarkReportTask : DefaultTask() {
         for (deviceId in deviceIds) {
             val dataDir = getReportDirForDevice(adb, deviceId)
             if (dataDir.isBlank()) {
-                throw StopExecutionException(
-                    "Failed to find benchmark reports on device: $deviceId"
-                )
+                throw StopExecutionException("Failed to find benchmark report on device: $deviceId")
             }
 
             val outDir = File(benchmarkReportDir, deviceId)

@@ -48,13 +48,24 @@ public final class Configuration {
      */
     public static final int MIN_SCHEDULER_LIMIT = 20;
 
-    private final @NonNull Executor mExecutor;
-    private final @NonNull Executor mTaskExecutor;
-    private final @NonNull WorkerFactory mWorkerFactory;
-    private final int mLoggingLevel;
-    private final int mMinJobSchedulerId;
-    private final int mMaxJobSchedulerId;
-    private final int mMaxSchedulerLimit;
+    // Synthetic access
+    @SuppressWarnings("WeakerAccess")
+    final @NonNull Executor mExecutor;
+    @SuppressWarnings("WeakerAccess")
+    final @NonNull Executor mTaskExecutor;
+    @SuppressWarnings("WeakerAccess")
+    final @NonNull WorkerFactory mWorkerFactory;
+    @SuppressWarnings("WeakerAccess")
+    final @NonNull InputMergerFactory mInputMergerFactory;
+    @SuppressWarnings("WeakerAccess")
+    final int mLoggingLevel;
+    @SuppressWarnings("WeakerAccess")
+    final int mMinJobSchedulerId;
+    @SuppressWarnings("WeakerAccess")
+    final int mMaxJobSchedulerId;
+    @SuppressWarnings("WeakerAccess")
+    final int mMaxSchedulerLimit;
+    private final boolean mIsUsingDefaultTaskExecutor;
 
     Configuration(@NonNull Configuration.Builder builder) {
         if (builder.mExecutor == null) {
@@ -64,11 +75,13 @@ public final class Configuration {
         }
 
         if (builder.mTaskExecutor == null) {
+            mIsUsingDefaultTaskExecutor = true;
             // This executor is used for *both* WorkManager's tasks and Room's query executor.
             // So this should not be a single threaded executor. Writes will still be serialized
             // as this will be wrapped with an SerialExecutor.
             mTaskExecutor = createDefaultExecutor();
         } else {
+            mIsUsingDefaultTaskExecutor = false;
             mTaskExecutor = builder.mTaskExecutor;
         }
 
@@ -78,6 +91,12 @@ public final class Configuration {
             mWorkerFactory = builder.mWorkerFactory;
         }
 
+        if (builder.mInputMergerFactory == null) {
+            mInputMergerFactory = InputMergerFactory.getDefaultInputMergerFactory();
+        } else {
+            mInputMergerFactory = builder.mInputMergerFactory;
+        }
+
         mLoggingLevel = builder.mLoggingLevel;
         mMinJobSchedulerId = builder.mMinJobSchedulerId;
         mMaxJobSchedulerId = builder.mMaxJobSchedulerId;
@@ -85,6 +104,8 @@ public final class Configuration {
     }
 
     /**
+     * Gets the {@link Executor} used by {@link WorkManager} to execute {@link Worker}s.
+     *
      * @return The {@link Executor} used by {@link WorkManager} to execute {@link Worker}s
      */
     public @NonNull Executor getExecutor() {
@@ -92,7 +113,9 @@ public final class Configuration {
     }
 
     /**
-     * @return The {@link Executor} used by {@link WorkManager} for all its internal book-keeping.
+     * Gets the {@link Executor} used by {@link WorkManager} for all its internal business logic.
+     *
+     * @return The {@link Executor} used by {@link WorkManager} for all its internal business logic
      */
     @NonNull
     public Executor getTaskExecutor() {
@@ -100,6 +123,9 @@ public final class Configuration {
     }
 
     /**
+     * Gets the {@link WorkerFactory} used by {@link WorkManager} to create
+     * {@link ListenableWorker}s.
+     *
      * @return The {@link WorkerFactory} used by {@link WorkManager} to create
      *         {@link ListenableWorker}s
      */
@@ -108,15 +134,28 @@ public final class Configuration {
     }
 
     /**
-     * @return The minimum logging level.
+     * @return The {@link InputMergerFactory} used by {@link WorkManager} to create instances of
+     * {@link InputMerger}s.
+     */
+    public @NonNull InputMergerFactory getInputMergerFactory() {
+        return mInputMergerFactory;
+    }
+
+    /**
+     * Gets the minimum logging level for {@link WorkManager}.
+     *
+     * @return The minimum logging level, corresponding to the constants found in
+     * {@link android.util.Log}
      * @hide
      */
-    @RestrictTo(RestrictTo.Scope.LIBRARY)
+    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
     public int getMinimumLoggingLevel() {
         return mLoggingLevel;
     }
 
     /**
+     * Gets the first valid id used when scheduling work with {@link android.app.job.JobScheduler}.
+     *
      * @return The first valid id (inclusive) used by {@link WorkManager} when creating new
      *         instances of {@link android.app.job.JobInfo}s.  If the current {@code jobId} goes
      *         beyond the bounds of the defined range of
@@ -129,6 +168,8 @@ public final class Configuration {
     }
 
     /**
+     * Gets the last valid id when scheduling work with {@link android.app.job.JobScheduler}.
+     *
      * @return The last valid id (inclusive) used by {@link WorkManager} when
      *         creating new instances of {@link android.app.job.JobInfo}s.  If the current
      *         {@code jobId} goes beyond the bounds of the defined range of
@@ -141,6 +182,9 @@ public final class Configuration {
     }
 
     /**
+     * Gets the maximum number of system requests that can be made by {@link WorkManager} when using
+     * {@link android.app.job.JobScheduler} or {@link android.app.AlarmManager}.
+     *
      * @return The maximum number of system requests which can be enqueued by {@link WorkManager}
      *         when using {@link android.app.job.JobScheduler} or {@link android.app.AlarmManager}
      * @hide
@@ -156,6 +200,15 @@ public final class Configuration {
         }
     }
 
+    /**
+     * @return {@code true} If the default task {@link Executor} is being used
+     * @hide
+     */
+    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+    public boolean isUsingDefaultTaskExecutor() {
+        return mIsUsingDefaultTaskExecutor;
+    }
+
     private @NonNull Executor createDefaultExecutor() {
         return Executors.newFixedThreadPool(
                 // This value is the same as the core pool size for AsyncTask#THREAD_POOL_EXECUTOR.
@@ -169,12 +222,44 @@ public final class Configuration {
 
         Executor mExecutor;
         WorkerFactory mWorkerFactory;
+        InputMergerFactory mInputMergerFactory;
         Executor mTaskExecutor;
 
-        int mLoggingLevel = Log.INFO;
-        int mMinJobSchedulerId = IdGenerator.INITIAL_ID;
-        int mMaxJobSchedulerId = Integer.MAX_VALUE;
-        int mMaxSchedulerLimit = MIN_SCHEDULER_LIMIT;
+        int mLoggingLevel;
+        int mMinJobSchedulerId;
+        int mMaxJobSchedulerId;
+        int mMaxSchedulerLimit;
+
+        /**
+         * Creates a new {@link Configuration.Builder}.
+         */
+        public Builder() {
+            mLoggingLevel = Log.INFO;
+            mMinJobSchedulerId = IdGenerator.INITIAL_ID;
+            mMaxJobSchedulerId = Integer.MAX_VALUE;
+            mMaxSchedulerLimit = MIN_SCHEDULER_LIMIT;
+        }
+
+        /**
+         * Creates a new {@link Configuration.Builder} with an existing {@link Configuration} as its
+         * template.
+         *
+         * @param configuration An existing {@link Configuration} to use as a template
+         * @hide
+         */
+        @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+        public Builder(@NonNull Configuration configuration) {
+            // Note that these must be accessed through fields and not the getters, which can
+            // otherwise manipulate the returned value (see getMaxSchedulerLimit(), for example).
+            mExecutor = configuration.mExecutor;
+            mWorkerFactory = configuration.mWorkerFactory;
+            mInputMergerFactory = configuration.mInputMergerFactory;
+            mTaskExecutor = configuration.mTaskExecutor;
+            mLoggingLevel = configuration.mLoggingLevel;
+            mMinJobSchedulerId = configuration.mMinJobSchedulerId;
+            mMaxJobSchedulerId = configuration.mMaxJobSchedulerId;
+            mMaxSchedulerLimit = configuration.mMaxSchedulerLimit;
+        }
 
         /**
          * Specifies a custom {@link WorkerFactory} for WorkManager.
@@ -184,6 +269,17 @@ public final class Configuration {
          */
         public @NonNull Builder setWorkerFactory(@NonNull WorkerFactory workerFactory) {
             mWorkerFactory = workerFactory;
+            return this;
+        }
+
+        /**
+         * Specifies a custom {@link InputMergerFactory} for WorkManager.
+         * @param inputMergerFactory A {@link InputMergerFactory} for creating {@link InputMerger}s
+         * @return This {@link Builder} instance
+         */
+        @NonNull
+        public Builder setInputMergerFactory(@NonNull InputMergerFactory inputMergerFactory) {
+            mInputMergerFactory = inputMergerFactory;
             return this;
         }
 
@@ -202,8 +298,7 @@ public final class Configuration {
          * Specifies a {@link Executor} which will be used by WorkManager for all its
          * internal book-keeping.
          *
-         * For best performance this {@link Executor} should be bounded. This {@link Executor}
-         * should *not* be a single threaded executor.
+         * For best performance this {@link Executor} should be bounded.
          *
          * For more information look at
          * {@link androidx.room.RoomDatabase.Builder#setQueryExecutor(Executor)}.

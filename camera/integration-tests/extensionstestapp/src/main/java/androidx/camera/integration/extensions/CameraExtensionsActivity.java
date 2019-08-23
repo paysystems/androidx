@@ -23,6 +23,8 @@ import android.graphics.SurfaceTexture;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.StrictMode;
 import android.util.Log;
 import android.view.TextureView;
@@ -31,6 +33,8 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.VisibleForTesting;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.camera.core.CameraX;
 import androidx.camera.core.CameraX.LensFacing;
@@ -39,12 +43,21 @@ import androidx.camera.core.ImageCaptureConfig;
 import androidx.camera.core.Preview;
 import androidx.camera.core.PreviewConfig;
 import androidx.camera.core.UseCase;
+import androidx.camera.extensions.AutoImageCaptureExtender;
+import androidx.camera.extensions.AutoPreviewExtender;
+import androidx.camera.extensions.BeautyImageCaptureExtender;
+import androidx.camera.extensions.BeautyPreviewExtender;
 import androidx.camera.extensions.BokehImageCaptureExtender;
 import androidx.camera.extensions.BokehPreviewExtender;
+import androidx.camera.extensions.ExtensionsErrorListener;
+import androidx.camera.extensions.ExtensionsManager;
 import androidx.camera.extensions.HdrImageCaptureExtender;
 import androidx.camera.extensions.HdrPreviewExtender;
+import androidx.camera.extensions.NightImageCaptureExtender;
+import androidx.camera.extensions.NightPreviewExtender;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.test.espresso.idling.CountingIdlingResource;
 
 import java.io.File;
 import java.text.Format;
@@ -75,8 +88,14 @@ public class CameraExtensionsActivity extends AppCompatActivity
     private ImageCapture mImageCapture;
     private ImageCaptureType mCurrentImageCaptureType = ImageCaptureType.IMAGE_CAPTURE_TYPE_HDR;
 
+    private HandlerThread mHandlerThread = new HandlerThread("CameraExtensionsActivityHandler");
+
+    // Espresso testing variables
+    @VisibleForTesting
+    CountingIdlingResource mTakePictureIdlingResource = new CountingIdlingResource("TakePicture");
+
     /**
-     * Creates a view finder use case.
+     * Creates a preview use case.
      *
      * <p>This use case observes a {@link SurfaceTexture}. The texture is connected to a {@link
      * TextureView} to display a camera preview.
@@ -96,18 +115,39 @@ public class CameraExtensionsActivity extends AppCompatActivity
                         .setLensFacing(LensFacing.BACK)
                         .setTargetName("Preview");
 
-        Log.d(TAG, "Enabling the extended view finder");
+        Log.d(TAG, "Enabling the extended preview");
         if (mCurrentImageCaptureType == ImageCaptureType.IMAGE_CAPTURE_TYPE_BOKEH) {
-            Log.d(TAG, "Enabling the extended view finder in bokeh mode.");
+            Log.d(TAG, "Enabling the extended preview in bokeh mode.");
 
             BokehPreviewExtender extender = BokehPreviewExtender.create(builder);
             if (extender.isExtensionAvailable()) {
                 extender.enableExtension();
             }
         } else if (mCurrentImageCaptureType == ImageCaptureType.IMAGE_CAPTURE_TYPE_HDR) {
-            Log.d(TAG, "Enabling the extended view finder in HDR mode.");
+            Log.d(TAG, "Enabling the extended preview in HDR mode.");
 
             HdrPreviewExtender extender = HdrPreviewExtender.create(builder);
+            if (extender.isExtensionAvailable()) {
+                extender.enableExtension();
+            }
+        } else if (mCurrentImageCaptureType == ImageCaptureType.IMAGE_CAPTURE_TYPE_NIGHT) {
+            Log.d(TAG, "Enabling the extended preview in night mode.");
+
+            NightPreviewExtender extender = NightPreviewExtender.create(builder);
+            if (extender.isExtensionAvailable()) {
+                extender.enableExtension();
+            }
+        } else if (mCurrentImageCaptureType == ImageCaptureType.IMAGE_CAPTURE_TYPE_BEAUTY) {
+            Log.d(TAG, "Enabling the extended preview in beauty mode.");
+
+            BeautyPreviewExtender extender = BeautyPreviewExtender.create(builder);
+            if (extender.isExtensionAvailable()) {
+                extender.enableExtension();
+            }
+        } else if (mCurrentImageCaptureType == ImageCaptureType.IMAGE_CAPTURE_TYPE_AUTO) {
+            Log.d(TAG, "Enabling the extended preview in auto mode.");
+
+            AutoPreviewExtender extender = AutoPreviewExtender.create(builder);
             if (extender.isExtensionAvailable()) {
                 extender.enableExtension();
             }
@@ -134,6 +174,9 @@ public class CameraExtensionsActivity extends AppCompatActivity
     enum ImageCaptureType {
         IMAGE_CAPTURE_TYPE_HDR,
         IMAGE_CAPTURE_TYPE_BOKEH,
+        IMAGE_CAPTURE_TYPE_NIGHT,
+        IMAGE_CAPTURE_TYPE_BEAUTY,
+        IMAGE_CAPTURE_TYPE_AUTO,
         IMAGE_CAPTURE_TYPE_DEFAULT,
         IMAGE_CAPTURE_TYPE_NONE,
     }
@@ -158,6 +201,18 @@ public class CameraExtensionsActivity extends AppCompatActivity
                                 enablePreview();
                                 break;
                             case IMAGE_CAPTURE_TYPE_BOKEH:
+                                enableImageCapture(ImageCaptureType.IMAGE_CAPTURE_TYPE_NIGHT);
+                                enablePreview();
+                                break;
+                            case IMAGE_CAPTURE_TYPE_NIGHT:
+                                enableImageCapture(ImageCaptureType.IMAGE_CAPTURE_TYPE_BEAUTY);
+                                enablePreview();
+                                break;
+                            case IMAGE_CAPTURE_TYPE_BEAUTY:
+                                enableImageCapture(ImageCaptureType.IMAGE_CAPTURE_TYPE_AUTO);
+                                enablePreview();
+                                break;
+                            case IMAGE_CAPTURE_TYPE_AUTO:
                                 enableImageCapture(ImageCaptureType.IMAGE_CAPTURE_TYPE_DEFAULT);
                                 enablePreview();
                                 break;
@@ -171,6 +226,7 @@ public class CameraExtensionsActivity extends AppCompatActivity
                                 break;
                         }
                         bindUseCases();
+                        showTakePictureButton();
                     }
                 });
 
@@ -192,6 +248,7 @@ public class CameraExtensionsActivity extends AppCompatActivity
                         builder);
                 if (hdrImageCaptureExtender.isExtensionAvailable()) {
                     hdrImageCaptureExtender.enableExtension();
+                    builder.setCallbackHandler(new Handler(mHandlerThread.getLooper()));
                 }
                 break;
             case IMAGE_CAPTURE_TYPE_BOKEH:
@@ -199,6 +256,27 @@ public class CameraExtensionsActivity extends AppCompatActivity
                         builder);
                 if (bokehImageCapture.isExtensionAvailable()) {
                     bokehImageCapture.enableExtension();
+                }
+                break;
+            case IMAGE_CAPTURE_TYPE_NIGHT:
+                NightImageCaptureExtender nightImageCapture = NightImageCaptureExtender.create(
+                        builder);
+                if (nightImageCapture.isExtensionAvailable()) {
+                    nightImageCapture.enableExtension();
+                }
+                break;
+            case IMAGE_CAPTURE_TYPE_BEAUTY:
+                BeautyImageCaptureExtender beautyImageCapture = BeautyImageCaptureExtender.create(
+                        builder);
+                if (beautyImageCapture.isExtensionAvailable()) {
+                    beautyImageCapture.enableExtension();
+                }
+                break;
+            case IMAGE_CAPTURE_TYPE_AUTO:
+                AutoImageCaptureExtender autoImageCapture = AutoImageCaptureExtender.create(
+                        builder);
+                if (autoImageCapture.isExtensionAvailable()) {
+                    autoImageCapture.enableExtension();
                 }
                 break;
             case IMAGE_CAPTURE_TYPE_DEFAULT:
@@ -223,6 +301,7 @@ public class CameraExtensionsActivity extends AppCompatActivity
                 new View.OnClickListener() {
                     @Override
                     public void onClick(View view) {
+                        mTakePictureIdlingResource.increment();
                         mImageCapture.takePicture(
                                 new File(
                                         dir,
@@ -231,8 +310,12 @@ public class CameraExtensionsActivity extends AppCompatActivity
                                                 + ".jpg"),
                                 new ImageCapture.OnImageSavedListener() {
                                     @Override
-                                    public void onImageSaved(File file) {
+                                    public void onImageSaved(@NonNull File file) {
                                         Log.d(TAG, "Saved image to " + file);
+
+                                        if (!mTakePictureIdlingResource.isIdleNow()) {
+                                            mTakePictureIdlingResource.decrement();
+                                        }
 
                                         // Trigger MediaScanner to scan the file
                                         Intent intent = new Intent(
@@ -247,8 +330,8 @@ public class CameraExtensionsActivity extends AppCompatActivity
 
                                     @Override
                                     public void onError(
-                                            ImageCapture.UseCaseError useCaseError,
-                                            String message,
+                                            @NonNull ImageCapture.ImageCaptureError error,
+                                            @NonNull String message,
                                             Throwable cause) {
                                         Log.e(TAG, "Failed to save image - " + message, cause);
                                     }
@@ -264,14 +347,22 @@ public class CameraExtensionsActivity extends AppCompatActivity
         }
 
         Button button = findViewById(R.id.Picture);
+        button.setVisibility(View.INVISIBLE);
         button.setOnClickListener(null);
     }
 
     /** Creates all the use cases. */
     private void createUseCases() {
+        ExtensionsManager.setExtensionsErrorListener(new ExtensionsErrorListener() {
+            @Override
+            public void onError(@NonNull ExtensionsErrorCode errorCode) {
+                Log.d(TAG, "Extensions error in error code: " + errorCode);
+            }
+        });
         createImageCapture();
         createPreview();
         bindUseCases();
+        showTakePictureButton();
     }
 
     private void bindUseCases() {
@@ -284,6 +375,14 @@ public class CameraExtensionsActivity extends AppCompatActivity
         CameraX.bindToLifecycle(this, useCases.toArray(new UseCase[useCases.size()]));
     }
 
+    private void showTakePictureButton() {
+        if (mImageCapture != null) {
+            // Set the TakePicture button visible after bindToLifeCycle.
+            Button captureButton = findViewById(R.id.Picture);
+            captureButton.setVisibility(View.VISIBLE);
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -292,6 +391,8 @@ public class CameraExtensionsActivity extends AppCompatActivity
         StrictMode.VmPolicy policy =
                 new StrictMode.VmPolicy.Builder().detectAll().penaltyLog().build();
         StrictMode.setVmPolicy(policy);
+
+        mHandlerThread.start();
 
         // Get params from adb extra string
         Bundle bundle = getIntent().getExtras();
@@ -311,6 +412,12 @@ public class CameraExtensionsActivity extends AppCompatActivity
                 })
                 .start();
         setupPermissions();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        mHandlerThread.quitSafely();
     }
 
     private void setupCamera() {
@@ -393,9 +500,21 @@ public class CameraExtensionsActivity extends AppCompatActivity
         }
     }
 
+    public Preview getPreview() {
+        return mPreview;
+    }
+
+    public ImageCapture getImageCapture() {
+        return mImageCapture;
+    }
+
+    public ImageCaptureType getCurrentImageCaptureType() {
+        return mCurrentImageCaptureType;
+    }
+
     @Override
     public void onRequestPermissionsResult(
-            int requestCode, String[] permissions, int[] grantResults) {
+            int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         switch (requestCode) {
             case PERMISSIONS_REQUEST_CODE: {
                 // If request is cancelled, the result arrays are empty.

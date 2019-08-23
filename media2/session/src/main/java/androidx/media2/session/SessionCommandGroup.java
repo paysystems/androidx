@@ -18,6 +18,7 @@ package androidx.media2.session;
 
 import static androidx.media2.session.SessionCommand.COMMAND_CODE_CUSTOM;
 import static androidx.media2.session.SessionCommand.COMMAND_VERSION_1;
+import static androidx.media2.session.SessionCommand.COMMAND_VERSION_CURRENT;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -93,7 +94,8 @@ public final class SessionCommandGroup implements VersionedParcelable {
     /**
      * Gets all commands of this command group.
      */
-    public @NonNull Set<SessionCommand> getCommands() {
+    @NonNull
+    public Set<SessionCommand> getCommands() {
         return new HashSet<>(mCommands);
     }
 
@@ -141,7 +143,8 @@ public final class SessionCommandGroup implements VersionedParcelable {
          *
          * @param command A command to add. Shouldn't be {@code null}.
          */
-        public @NonNull Builder addCommand(@NonNull SessionCommand command) {
+        @NonNull
+        public Builder addCommand(@NonNull SessionCommand command) {
             if (command == null) {
                 throw new NullPointerException("command shouldn't be null");
             }
@@ -160,10 +163,12 @@ public final class SessionCommandGroup implements VersionedParcelable {
          *
          * @param version command version
          * @see SessionCommand#COMMAND_VERSION_1
+         * @see SessionCommand#COMMAND_VERSION_2
          * @see MediaSession.SessionCallback#onConnect(MediaSession, MediaSession.ControllerInfo)
          */
-        public @NonNull Builder addAllPredefinedCommands(@CommandVersion int version) {
-            if (version != COMMAND_VERSION_1) {
+        @NonNull
+        public Builder addAllPredefinedCommands(@CommandVersion int version) {
+            if (version < COMMAND_VERSION_1 || version > COMMAND_VERSION_CURRENT) {
                 throw new IllegalArgumentException("Unknown command version " + version);
             }
             addAllPlayerCommands(version, /* includeHidden= */ true);
@@ -178,7 +183,8 @@ public final class SessionCommandGroup implements VersionedParcelable {
          *
          * @param command A command to find. Shouldn't be {@code null}.
          */
-        public @NonNull Builder removeCommand(@NonNull SessionCommand command) {
+        @NonNull
+        public Builder removeCommand(@NonNull SessionCommand command) {
             if (command == null) {
                 throw new NullPointerException("command shouldn't be null");
             }
@@ -186,39 +192,46 @@ public final class SessionCommandGroup implements VersionedParcelable {
             return this;
         }
 
-        @NonNull Builder addAllPlayerCommands(@CommandVersion int version, boolean includeHidden) {
+        @NonNull
+        Builder addAllPlayerCommands(@CommandVersion int version, boolean includeHidden) {
             addAllPlayerBasicCommands(version);
             addAllPlayerPlaylistCommands(version);
             if (includeHidden) addAllPlayerHiddenCommands(version);
             return this;
         }
 
-        @NonNull Builder addAllPlayerBasicCommands(@CommandVersion int version) {
+        @NonNull
+        Builder addAllPlayerBasicCommands(@CommandVersion int version) {
             addCommands(version, SessionCommand.VERSION_PLAYER_BASIC_COMMANDS_MAP);
             return this;
         }
 
-        @NonNull Builder addAllPlayerPlaylistCommands(@CommandVersion int version) {
+        @NonNull
+        Builder addAllPlayerPlaylistCommands(@CommandVersion int version) {
             addCommands(version, SessionCommand.VERSION_PLAYER_PLAYLIST_COMMANDS_MAP);
             return this;
         }
 
-        @NonNull Builder addAllPlayerHiddenCommands(@CommandVersion int version) {
+        @NonNull
+        Builder addAllPlayerHiddenCommands(@CommandVersion int version) {
             addCommands(version, SessionCommand.VERSION_PLAYER_HIDDEN_COMMANDS_MAP);
             return this;
         }
 
-        @NonNull Builder addAllVolumeCommands(@CommandVersion int version) {
+        @NonNull
+        Builder addAllVolumeCommands(@CommandVersion int version) {
             addCommands(version, SessionCommand.VERSION_VOLUME_COMMANDS_MAP);
             return this;
         }
 
-        @NonNull Builder addAllSessionCommands(@CommandVersion int version) {
+        @NonNull
+        Builder addAllSessionCommands(@CommandVersion int version) {
             addCommands(version, SessionCommand.VERSION_SESSION_COMMANDS_MAP);
             return this;
         }
 
-        @NonNull Builder addAllLibraryCommands(@CommandVersion int version) {
+        @NonNull
+        Builder addAllLibraryCommands(@CommandVersion int version) {
             addCommands(version, SessionCommand.VERSION_LIBRARY_COMMANDS_MAP);
             return this;
         }
@@ -226,18 +239,21 @@ public final class SessionCommandGroup implements VersionedParcelable {
         private void addCommands(@CommandVersion int version, ArrayMap<Integer, Range> map) {
             for (int i = COMMAND_VERSION_1; i <= version; i++) {
                 Range range = map.get(i);
-                for (int code = range.lower; code <= range.upper; code++) {
-                    addCommand(new SessionCommand(code));
+                if (range != null) {
+                    for (int code = range.lower; code <= range.upper; code++) {
+                        addCommand(new SessionCommand(code));
+                    }
                 }
             }
         }
 
         /**
-         * Builds {@link SessionCommandGroup}.
+         * Builds a {@link SessionCommandGroup}.
          *
-         * @return a new {@link SessionCommandGroup}.
+         * @return a new {@link SessionCommandGroup}
          */
-        public @NonNull SessionCommandGroup build() {
+        @NonNull
+        public SessionCommandGroup build() {
             return new SessionCommandGroup(mCommands);
         }
     }

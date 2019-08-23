@@ -43,7 +43,7 @@ public final class MediaTimestamp {
     /**
      * An unknown media timestamp value
      */
-    public static final @NonNull MediaTimestamp TIMESTAMP_UNKNOWN =
+    public static @NonNull final MediaTimestamp TIMESTAMP_UNKNOWN =
             new MediaTimestamp(-1, -1, 0.0f);
 
     /**
@@ -103,8 +103,12 @@ public final class MediaTimestamp {
 
     @Override
     public boolean equals(Object obj) {
-        if (this == obj) return true;
-        if (obj == null || getClass() != obj.getClass()) return false;
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
 
         final MediaTimestamp that = (MediaTimestamp) obj;
         return (this.mMediaTimeUs == that.mMediaTimeUs)

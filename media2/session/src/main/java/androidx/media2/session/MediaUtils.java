@@ -35,12 +35,14 @@ import static androidx.media2.common.MediaMetadata.METADATA_KEY_MEDIA_URI;
 import static androidx.media2.common.MediaMetadata.METADATA_KEY_PLAYABLE;
 import static androidx.media2.common.MediaMetadata.METADATA_KEY_TITLE;
 import static androidx.media2.session.SessionCommand.COMMAND_CODE_PLAYER_SET_SPEED;
+import static androidx.media2.session.SessionCommand.COMMAND_VERSION_1;
 import static androidx.media2.session.SessionCommand.COMMAND_VERSION_CURRENT;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.net.Uri;
+import android.os.BadParcelableException;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Parcel;
@@ -54,6 +56,7 @@ import android.support.v4.media.session.MediaSessionCompat.QueueItem;
 import android.support.v4.media.session.PlaybackStateCompat;
 import android.support.v4.media.session.PlaybackStateCompat.CustomAction;
 import android.text.TextUtils;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -124,6 +127,24 @@ public class MediaUtils {
     }
 
     private MediaUtils() {
+    }
+
+    /**
+     * Upcasts a {@link MediaItem} to the {@link MediaItem} type for pre-parceling. Note that
+     * {@link MediaItem}'s subclass object cannot be parceled due to the security issue.
+     *
+     * @param item an item
+     * @return
+     */
+    // TODO(b/139255697): Provide the functionality in the media2-common.
+    public static MediaItem upcastForPreparceling(MediaItem item) {
+        if (item == null || item.getClass() == MediaItem.class) {
+            return item;
+        }
+        return new MediaItem.Builder()
+                .setStartPosition(item.getStartPosition())
+                .setEndPosition(item.getEndPosition())
+                .setMetadata(item.getMetadata()).build();
     }
 
     /**
@@ -802,12 +823,13 @@ public class MediaUtils {
      */
     @NonNull
     public static SessionCommandGroup convertToSessionCommandGroup(long sessionFlags,
-            PlaybackStateCompat state) {
+            @Nullable PlaybackStateCompat state) {
         SessionCommandGroup.Builder commandsBuilder = new SessionCommandGroup.Builder();
         commandsBuilder.addAllPlayerBasicCommands(COMMAND_VERSION_CURRENT);
         boolean includePlaylistCommands = (sessionFlags & FLAG_HANDLES_QUEUE_COMMANDS) != 0;
         if (includePlaylistCommands) {
-            commandsBuilder.addAllPlayerPlaylistCommands(COMMAND_VERSION_CURRENT);
+            // MediaSessionCompat only support playlist COMMAND_VERSION_1.
+            commandsBuilder.addAllPlayerPlaylistCommands(COMMAND_VERSION_1);
         }
         commandsBuilder.addAllVolumeCommands(COMMAND_VERSION_CURRENT);
         commandsBuilder.addAllSessionCommands(COMMAND_VERSION_CURRENT);
@@ -832,7 +854,7 @@ public class MediaUtils {
      * @return custom layout. Always non-null.
      */
     @NonNull
-    public static List<CommandButton> convertToCustomLayout(PlaybackStateCompat state) {
+    public static List<CommandButton> convertToCustomLayout(@Nullable PlaybackStateCompat state) {
         List<CommandButton> layout = new ArrayList<>();
         if (state == null) {
             return layout;
@@ -846,5 +868,27 @@ public class MediaUtils {
             layout.add(button);
         }
         return layout;
+    }
+
+    @SuppressWarnings("ParcelClassLoader")
+    static boolean doesBundleHaveCustomParcelable(@NonNull Bundle bundle) {
+        // Try writing the bundle to parcel, and read it with framework classloader.
+        Parcel parcel = Parcel.obtain();
+        try {
+            parcel.writeBundle(bundle);
+            parcel.setDataPosition(0);
+            Bundle out = parcel.readBundle(null);
+
+            if (out != null) {
+                // Calling Bundle#isEmpty() will trigger Bundle#unparcel().
+                out.isEmpty();
+            }
+            return false;
+        } catch (BadParcelableException e) {
+            Log.d(TAG, "Custom parcelables are not allowed", e);
+            return true;
+        } finally {
+            parcel.recycle();
+        }
     }
 }

@@ -24,16 +24,16 @@ def chooseOutDir(subdir = "") {
     def outDir = System.env.OUT_DIR
     if (outDir == null) {
         outDir = new File("${buildscript.getSourceFile().parent}/../../../out${subdir}")
+    } else {
+        outDir = new File(outDir)
     }
+    project.ext.outDir = outDir
     buildDir = new File(outDir, "$project.name/build")
                 .getCanonicalFile()
     subprojects {
         // Change buildDir first so that all plugins pick up the new value.
         project.buildDir = new File("$project.parent.buildDir/../$project.name/build")
     }
-    ext.supportRepoOut = new File(buildDir, 'support_repo')
-    ext.supportRepoOut.mkdirs()
-    ext.docsDir = new File(buildDir, 'javadoc')
 }
 
 ext.init.chooseOutDir = this.&chooseOutDir

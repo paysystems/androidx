@@ -17,7 +17,6 @@
 package androidx.viewpager2.widget
 
 import android.widget.TextView
-import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.test.filters.LargeTest
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.testutils.SwipeToLocation.flingToCenter
@@ -68,11 +67,6 @@ class DragWhileSmoothScrollTest(private val config: TestConfig) : BaseTest() {
 
     private lateinit var test: Context
 
-    override fun setUp() {
-        super.setUp()
-        assumeApiBeforeQ()
-    }
-
     @Test
     fun test() {
         // given
@@ -88,7 +82,7 @@ class DragWhileSmoothScrollTest(private val config: TestConfig) : BaseTest() {
         // when we are close enough
         val waitTillCloseEnough = test.viewPager.addWaitForDistanceToTarget(config.targetPage,
             config.distanceToTargetWhenStartDrag)
-        test.runOnUiThread { test.viewPager.setCurrentItem(config.targetPage, true) }
+        test.runOnUiThreadSync { test.viewPager.setCurrentItem(config.targetPage, true) }
         waitTillCloseEnough.await(2, SECONDS)
 
         // then perform a swipe
@@ -163,8 +157,8 @@ class DragWhileSmoothScrollTest(private val config: TestConfig) : BaseTest() {
         // Find the view on the UI thread, as RV may be in layout
         val pageText = "$pageToSnapTo"
         var viewFound = false
-        test.activityTestRule.runOnUiThread {
-            val llm = test.viewPager.recyclerView.layoutManager as LinearLayoutManager
+        test.runOnUiThreadSync {
+            val llm = test.viewPager.linearLayoutManager
             var i = 0
             while (!viewFound && i < llm.childCount) {
                 val view = llm.getChildAt(i++) as TextView

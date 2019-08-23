@@ -65,8 +65,8 @@ public abstract class RemoteSessionPlayer extends SessionPlayer {
     public static final int VOLUME_CONTROL_ABSOLUTE = 2;
 
     /**
-     * Adjust player volume with the direction. Override this API to customize volume change in
-     * remote device
+     * Adjusts player volume with the direction. Override this API to customize volume change in
+     * remote device.
      * <p>
      * This would be ignored when volume control type is {@link #VOLUME_CONTROL_FIXED}.
      *
@@ -120,7 +120,8 @@ public abstract class RemoteSessionPlayer extends SessionPlayer {
      * @see #VOLUME_CONTROL_RELATIVE
      * @see #VOLUME_CONTROL_ABSOLUTE
      */
-    public abstract @VolumeControlType int getVolumeControlType();
+    @VolumeControlType
+    public abstract int getVolumeControlType();
 
     /**
      * A callback class to receive notifications for events on the remote session player. See

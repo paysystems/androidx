@@ -23,6 +23,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
+import kotlin.test.assertTrue
 
 @RunWith(JUnit4::class)
 class RxPagedListBuilderTest {
@@ -36,7 +37,7 @@ class RxPagedListBuilderTest {
             override fun create(): DataSource<Int, String> {
                 val currentList = localData.first()
                 localData = localData.drop(1)
-                return ListDataSource<String>(currentList)
+                return ListDataSource(currentList)
             }
         }
     }
@@ -46,9 +47,9 @@ class RxPagedListBuilderTest {
         val factory = testDataSourceSequence(listOf(listOf("a", "b"), listOf("c", "d")))
         val scheduler = TestScheduler()
         val observable = RxPagedListBuilder(factory, 10)
-                .setFetchScheduler(scheduler)
-                .setNotifyScheduler(scheduler)
-                .buildObservable()
+            .setFetchScheduler(scheduler)
+            .setNotifyScheduler(scheduler)
+            .buildObservable()
         val observer = TestObserver<PagedList<String>>()
 
         observable.subscribe(observer)
@@ -63,9 +64,11 @@ class RxPagedListBuilderTest {
         assertEquals(listOf("a", "b"), observer.values().first())
 
         // invalidate triggers second load
+        @Suppress("DEPRECATION")
         observer.values().first().dataSource.invalidate()
         scheduler.triggerActions()
         observer.assertValueCount(2)
+        assertTrue { observer.values().first().pagedSource.invalid }
         assertEquals(listOf("c", "d"), observer.values().last())
     }
 
@@ -75,10 +78,11 @@ class RxPagedListBuilderTest {
         val notifyScheduler = TestScheduler()
         val fetchScheduler = TestScheduler()
         val observable: Observable<PagedList<String>> = RxPagedListBuilder(
-                factory, 10)
-                .setFetchScheduler(fetchScheduler)
-                .setNotifyScheduler(notifyScheduler)
-                .buildObservable()
+            factory, 10
+        )
+            .setFetchScheduler(fetchScheduler)
+            .setNotifyScheduler(notifyScheduler)
+            .buildObservable()
         val observer = TestObserver<PagedList<String>>()
         observable.subscribe(observer)
 
