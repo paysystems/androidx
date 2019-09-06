@@ -22,6 +22,7 @@ import androidx.build.gitclient.GitClient
 import androidx.build.gitclient.GitClientImpl
 import androidx.build.gitclient.GitClientImpl.Companion.CHANGED_FILES_CMD_PREFIX
 import androidx.build.gitclient.GitClientImpl.Companion.PREV_MERGE_CMD
+import androidx.build.gitclient.GitCommitRange
 import junit.framework.TestCase.assertEquals
 import junit.framework.TestCase.assertNull
 import org.junit.Rule
@@ -385,8 +386,10 @@ class GitClientImplTest {
         )
 
         val gitLogList: List<Commit> = client.getGitLog(
-            top = "topSha",
-            sha = "sha",
+            GitCommitRange(
+                fromExclusive = "sha",
+                untilInclusive = "topSha"
+            ),
             keepMerges = false,
             fullProjectDir = File(projectDir)
         )
@@ -398,6 +401,24 @@ class GitClientImplTest {
                 else -> throw RuntimeException("Incorrectly parsed commit: $commit")
             }
         }
+    }
+
+    @Test
+    fun checkLatestCommitExists() {
+        /* Do not use the MockCommandRunner because it's a better test to check the validity of
+         * the git command against the actual git in the repo
+         */
+        val commitList: List<Commit> = GitClientImpl(File(System.getProperty("user.dir")))
+            .getGitLog(
+                GitCommitRange(
+                    fromExclusive = "",
+                    untilInclusive = "HEAD",
+                    n = 1
+                ),
+                keepMerges = true,
+                fullProjectDir = File(System.getProperty("user.dir"))
+        )
+        assertEquals(1, commitList.size)
     }
 
     fun assertCommitsAreEqual(commitA: Commit, commitB: Commit) {
