@@ -64,14 +64,15 @@ open class CreateLibraryBuildInfoFileTask : DefaultTask() {
     }
 
     private fun getCommitShaAtHead(): String {
-        val commitList: List<Commit> = GitClientImpl(project.rootDir).getGitLog(
+        val supportRoot = getSupportRoot(project)
+        val commitList: List<Commit> = GitClientImpl(supportRoot, logger).getGitLog(
             GitCommitRange(
                 fromExclusive = "",
                 untilInclusive = "HEAD",
                 n = 1
             ),
             keepMerges = true,
-            fullProjectDir = project.projectDir
+            fullProjectDir = supportRoot
         )
         return commitList.first().sha
     }
