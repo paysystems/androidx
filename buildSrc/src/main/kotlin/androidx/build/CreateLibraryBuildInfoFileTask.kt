@@ -16,6 +16,7 @@
 
 package androidx.build
 
+import androidx.build.SupportConfig.getSupportRoot
 import androidx.build.gitclient.Commit
 import androidx.build.gitclient.GitClientImpl
 import androidx.build.gitclient.GitCommitRange
