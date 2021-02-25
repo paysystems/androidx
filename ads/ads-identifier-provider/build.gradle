@@ -22,31 +22,24 @@ import androidx.build.Publish
 plugins {
     id("AndroidXPlugin")
     id("com.android.library")
-    id("kotlin-android")
 }
 
 dependencies {
-    implementation("androidx.annotation:annotation:1.1.0")
+    api("androidx.annotation:annotation:1.1.0")
     implementation("androidx.core:core:1.1.0")
     implementation(AUTO_VALUE_ANNOTATIONS)
     annotationProcessor(AUTO_VALUE)
 
     implementation(project(":ads-identifier-common"))
 
+    androidTestImplementation(project(":ads-identifier-testing"))
     androidTestImplementation(JUNIT)
     androidTestImplementation(TRUTH)
-    androidTestImplementation(MOCKITO_CORE, libs.exclude_bytebuddy) // DexMaker has it"s own MockMaker
-    androidTestImplementation(DEXMAKER_MOCKITO, libs.exclude_bytebuddy) // DexMaker has it"s own MockMaker
     androidTestImplementation(ANDROIDX_TEST_EXT_JUNIT)
     androidTestImplementation(ANDROIDX_TEST_CORE)
     androidTestImplementation(ANDROIDX_TEST_RUNNER)
     androidTestImplementation(ANDROIDX_TEST_RULES)
-}
-
-android {
-    defaultConfig {
-        minSdkVersion 14
-    }
+    androidTestImplementation(DEXMAKER_MOCKITO, libs.exclude_bytebuddy)
 }
 
 androidx {

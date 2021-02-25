@@ -16,6 +16,8 @@
 
 package androidx.camera.core.impl.utils.futures;
 
+import static androidx.core.util.Preconditions.checkNotNull;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.arch.core.util.Function;
@@ -25,6 +27,7 @@ import androidx.core.util.Preconditions;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CancellationException;
@@ -99,7 +102,9 @@ public final class Futures {
             @NonNull ListenableFuture<I> input,
             @NonNull AsyncFunction<? super I, ? extends O> function,
             @NonNull Executor executor) {
-        return AbstractTransformFuture.create(input, function, executor);
+        ChainingListenableFuture<I, O> output = new ChainingListenableFuture<I, O>(function, input);
+        input.addListener(output, executor);
+        return output;
     }
 
     /**
@@ -115,9 +120,17 @@ public final class Futures {
      */
     @NonNull
     public static <I, O> ListenableFuture<O> transform(
-            @NonNull ListenableFuture<I> input, @NonNull Function<? super I, ? extends O> function,
+            @NonNull ListenableFuture<I> input,
+            @NonNull Function<? super I, ? extends O> function,
             @NonNull Executor executor) {
-        return AbstractTransformFuture.create(input, function, executor);
+        checkNotNull(function);
+        return transformAsync(input, new AsyncFunction<I, O>() {
+
+            @Override
+            public ListenableFuture<O> apply(I input) {
+                return immediateFuture(function.apply(input));
+            }
+        }, executor);
     }
 
     private static final Function<?, ?> IDENTITY_FUNCTION = new Function<Object, Object>() {
@@ -165,6 +178,31 @@ public final class Futures {
             @NonNull final Function<? super I, ? extends O> function,
             @NonNull final CallbackToFutureAdapter.Completer<O> completer,
             @NonNull Executor executor) {
+        propagateTransform(true, input, function, completer, executor);
+    }
+
+    /**
+     * Propagates the result of the given {@code ListenableFuture} to the given {@link
+     * CallbackToFutureAdapter.Completer} by applying the provided transformation function.
+     *
+     * <p>If {@code input} fails, the failure will be propagated to the {@code completer} (and the
+     * function is not invoked)
+     *
+     * @param propagateCancellation {@code true} to propagate the cancellation from completer to
+     *                              input future.
+     * @param input                 The future to transform.
+     * @param function              A function to transform the results of the provided future to
+     *                              the results of the provided completer.
+     * @param completer             The completer which will receive the result of the provided
+     *                              future.
+     * @param executor              Executor to run the function in.
+     */
+    private static <I, O> void propagateTransform(
+            boolean propagateCancellation,
+            @NonNull final ListenableFuture<I> input,
+            @NonNull final Function<? super I, ? extends O> function,
+            @NonNull final CallbackToFutureAdapter.Completer<O> completer,
+            @NonNull Executor executor) {
         Preconditions.checkNotNull(input);
         Preconditions.checkNotNull(function);
         Preconditions.checkNotNull(completer);
@@ -186,13 +224,43 @@ public final class Futures {
             }
         }, executor);
 
-        // Propagate cancellation from completer to input future
-        completer.addCancellationListener(new Runnable() {
-            @Override
-            public void run() {
-                input.cancel(true);
-            }
-        }, CameraXExecutors.directExecutor());
+        if (propagateCancellation) {
+            // Propagate cancellation from completer to input future
+            completer.addCancellationListener(new Runnable() {
+                @Override
+                public void run() {
+                    input.cancel(true);
+                }
+            }, CameraXExecutors.directExecutor());
+        }
+    }
+
+    /**
+     * Returns a {@code ListenableFuture} whose result is set from the supplied future when it
+     * completes.
+     *
+     * <p>Cancelling the supplied future will also cancel the returned future, but
+     * cancelling the returned future will have no effect on the supplied future.
+     */
+    @NonNull
+    public static <V> ListenableFuture<V> nonCancellationPropagating(
+            @NonNull ListenableFuture<V> future) {
+        Preconditions.checkNotNull(future);
+
+        if (future.isDone()) {
+            return future;
+        }
+
+        ListenableFuture<V> output = CallbackToFutureAdapter.getFuture(
+                completer -> {
+                    @SuppressWarnings({"unchecked"}) // Input of function is same as output
+                            Function<? super V, ? extends V> identityTransform =
+                            (Function<? super V, ? extends V>) IDENTITY_FUNCTION;
+                    propagateTransform(false, future, identityTransform, completer,
+                            CameraXExecutors.directExecutor());
+                    return "nonCancellationPropagating[" + future + "]";
+                });
+        return output;
     }
 
     /**
@@ -210,7 +278,8 @@ public final class Futures {
     @NonNull
     public static <V> ListenableFuture<List<V>> successfulAsList(
             @NonNull Collection<? extends ListenableFuture<? extends V>> futures) {
-        return new CollectionFuture.ListFuture<V>(futures, false);
+        return new ListFuture<V>(new ArrayList<>(futures), false,
+                CameraXExecutors.directExecutor());
     }
 
     /**
@@ -228,7 +297,7 @@ public final class Futures {
     @NonNull
     public static <V> ListenableFuture<List<V>> allAsList(
             @NonNull Collection<? extends ListenableFuture<? extends V>> futures) {
-        return new CollectionFuture.ListFuture<V>(futures, true);
+        return new ListFuture<V>(new ArrayList<>(futures), true, CameraXExecutors.directExecutor());
     }
 
     /**

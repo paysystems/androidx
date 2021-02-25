@@ -17,16 +17,14 @@
 package androidx.paging
 
 import androidx.annotation.AnyThread
-import androidx.annotation.RestrictTo
 import androidx.annotation.VisibleForTesting
 import androidx.annotation.WorkerThread
 import androidx.arch.core.util.Function
-import androidx.paging.PagedSource.LoadResult.Companion.COUNT_UNDEFINED
+import androidx.paging.PagingSource.LoadResult.Page.Companion.COUNT_UNDEFINED
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicBoolean
-
-typealias OnInvalidated = () -> Unit
 
 /**
  * Base class for loading pages of snapshot data into a [PagedList].
@@ -35,7 +33,7 @@ typealias OnInvalidated = () -> Unit
  * it loads more data, but the data loaded cannot be updated. If the underlying data set is
  * modified, a new PagedList / DataSource pair must be created to represent the new data.
  *
- * <h4>Loading Pages</h4>
+ * ### Loading Pages
  *
  * PagedList queries data from its DataSource in response to loading hints. PagedListAdapter
  * calls [PagedList.loadAround] to load content as the user scrolls in a RecyclerView.
@@ -43,7 +41,7 @@ typealias OnInvalidated = () -> Unit
  * To control how and when a PagedList queries data from its DataSource, see
  * [PagedList.Config]. The Config object defines things like load sizes and prefetch distance.
  *
- * <h4>Updating Paged Data</h4>
+ * ### Updating Paged Data
  *
  * A PagedList / DataSource pair are a snapshot of the data set. A new pair of
  * PagedList / DataSource must be created if an update occurs, such as a reorder, insert, delete, or
@@ -70,7 +68,7 @@ typealias OnInvalidated = () -> Unit
  * copy changes, invalidate the previous DataSource, and a new one wrapping the new state of the
  * snapshot can be created.
  *
- * <h4>Implementing a DataSource</h4>
+ * ### Implementing a DataSource
  *
  * To implement, extend one of the subclasses: [PageKeyedDataSource], [ItemKeyedDataSource], or
  * [PositionalDataSource].
@@ -107,32 +105,13 @@ internal constructor(internal val type: KeyType) {
     internal val onInvalidatedCallbacks = CopyOnWriteArrayList<InvalidatedCallback>()
 
     private val _invalid = AtomicBoolean(false)
+
     /**
      * @return `true` if the data source is invalid, and can no longer be queried for data.
      */
     open val isInvalid
         @WorkerThread
         get() = _invalid.get()
-
-    private var _executor: Executor? = null
-    /**
-     * `null` until `loadInitial` is called by [PagedList] construction.
-     *
-     * This backing variable is necessary for back-compatibility with paging-common:2.1.0 Java API,
-     * while still providing synthetic accessors for Kotlin API.
-     */
-    protected val executor: Executor
-        get() = _executor ?: throw IllegalStateException(
-            "This DataSource has not been passed to a PagedList, has no executor yet."
-        )
-
-    /**
-     * @hide
-     */
-    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
-    fun initExecutor(executor: Executor) {
-        _executor = executor
-    }
 
     /**
      * Factory for DataSources.
@@ -205,6 +184,7 @@ internal constructor(internal val type: KeyType) {
          * @see DataSource.map
          * @see DataSource.mapByPage
          */
+        @JvmSynthetic // hidden to preserve Java source compat with arch.core.util.Function variant
         open fun <ToValue : Any> map(function: (Value) -> ToValue): Factory<Key, ToValue> =
             mapByPage(Function { list -> list.map(function) })
 
@@ -245,9 +225,20 @@ internal constructor(internal val type: KeyType) {
          * @see DataSource.map
          * @see DataSource.mapByPage
          */
+        @JvmSynthetic // hidden to preserve Java source compat with arch.core.util.Function variant
         open fun <ToValue : Any> mapByPage(
             function: (List<Value>) -> List<ToValue>
         ): Factory<Key, ToValue> = mapByPage(Function { function(it) })
+
+        @JvmOverloads
+        fun asPagingSourceFactory(
+            fetchDispatcher: CoroutineDispatcher = Dispatchers.IO
+        ): () -> PagingSource<Key, Value> = SuspendingPagingSourceFactory(
+            delegate = {
+                LegacyPagingSource(fetchDispatcher, create())
+            },
+            dispatcher = fetchDispatcher
+        )
     }
 
     /**
@@ -284,6 +275,7 @@ internal constructor(internal val type: KeyType) {
      * @see DataSource.Factory.map
      * @see DataSource.Factory.mapByPage
      */
+    @JvmSynthetic // hidden to preserve Java source compat with arch.core.util.Function variant
     open fun <ToValue : Any> mapByPage(
         function: (List<Value>) -> List<ToValue>
     ): DataSource<Key, ToValue> = mapByPage(Function { function(it) })
@@ -321,6 +313,7 @@ internal constructor(internal val type: KeyType) {
      * @see DataSource.Factory.map
      *
      */
+    @JvmSynthetic // hidden to preserve Java source compat with arch.core.util.Function variant
     open fun <ToValue : Any> map(
         function: (Value) -> ToValue
     ): DataSource<Key, ToValue> = map(Function { function(it) })
@@ -339,7 +332,7 @@ internal constructor(internal val type: KeyType) {
      * Used to signal when a [DataSource] a data source has become invalid, and that a new data
      * source is needed to continue loading data.
      */
-    interface InvalidatedCallback {
+    fun interface InvalidatedCallback {
         /**
          * Called when the data backing the list has become invalid. This callback is typically used
          * to signal that a new data source is needed.
@@ -353,14 +346,6 @@ internal constructor(internal val type: KeyType) {
     }
 
     /**
-     * Wrapper for [OnInvalidated] which holds a reference to allow removal by referential equality
-     * of Kotlin functions within [removeInvalidatedCallback].
-     */
-    private class OnInvalidatedWrapper(val callback: OnInvalidated) : InvalidatedCallback {
-        override fun onInvalidated() = callback()
-    }
-
-    /**
      * Add a callback to invoke when the DataSource is first invalidated.
      *
      * Once invalidated, a data source will not become valid again.
@@ -372,50 +357,20 @@ internal constructor(internal val type: KeyType) {
      * [DataSource].
      */
     @AnyThread
+    @Suppress("RegistrationName")
     open fun addInvalidatedCallback(onInvalidatedCallback: InvalidatedCallback) {
         onInvalidatedCallbacks.add(onInvalidatedCallback)
     }
 
     /**
-     * Add a callback to invoke when the DataSource is first invalidated.
-     *
-     * Once invalidated, a data source will not become valid again.
-     *
-     * A data source will only invoke its callbacks once - the first time [invalidate] is called, on
-     * that thread.
-     *
-     * This is a redundant override of [addInvalidatedCallback], which accepts Kotlin functions.
-     *
-     * @param onInvalidatedCallback The callback, will be invoked on thread that invalidates the
-     * [DataSource].
-     */
-    @AnyThread
-    fun addInvalidatedCallback(onInvalidatedCallback: OnInvalidated) {
-        onInvalidatedCallbacks.add(OnInvalidatedWrapper(onInvalidatedCallback))
-    }
-
-    /**
      * Remove a previously added invalidate callback.
      *
      * @param onInvalidatedCallback The previously added callback.
      */
     @AnyThread
+    @Suppress("RegistrationName")
     open fun removeInvalidatedCallback(onInvalidatedCallback: InvalidatedCallback) {
         onInvalidatedCallbacks.remove(onInvalidatedCallback)
-    }
-
-    /**
-     * Remove a previously added invalidate callback.
-     *
-     * This is a redundant override of [removeInvalidatedCallback], which accepts Kotlin functions.
-     *
-     * @param onInvalidatedCallback The previously added callback.
-     */
-    @AnyThread
-    fun removeInvalidatedCallback(onInvalidatedCallback: OnInvalidated) {
-        onInvalidatedCallbacks.removeAll {
-            it is OnInvalidatedWrapper && it.callback === onInvalidatedCallback
-        }
     }
 
     /**
@@ -434,106 +389,90 @@ internal constructor(internal val type: KeyType) {
      * @param K Type of the key used to query the [DataSource].
      * @property key Can be `null` for init, otherwise non-null
      */
-    class Params<K : Any> internal constructor(
-        internal val type: PageLoadType,
+    internal class Params<K : Any> internal constructor(
+        internal val type: LoadType,
         val key: K?,
         val initialLoadSize: Int,
         val placeholdersEnabled: Boolean,
         val pageSize: Int
-    )
+    ) {
+        init {
+            if (type != LoadType.REFRESH && key == null) {
+                throw IllegalArgumentException("Key must be non-null for prepend/append")
+            }
+        }
+    }
 
     /**
      * @param Value Type of the data produced by a [DataSource].
-     * @property counted Set to true if the result is an initial load that is passed totalCount
      */
-    open class BaseResult<Value : Any> internal constructor(
+    internal class BaseResult<Value : Any> internal constructor(
         @JvmField
         val data: List<Value>,
         val prevKey: Any?,
         val nextKey: Any?,
-        val leadingNulls: Int,
-        val trailingNulls: Int,
-        val offset: Int,
-        val counted: Boolean
+        val itemsBefore: Int = COUNT_UNDEFINED,
+        val itemsAfter: Int = COUNT_UNDEFINED
     ) {
         init {
-            if (leadingNulls < 0 || offset < 0) {
+            if (itemsBefore < 0 && itemsBefore != COUNT_UNDEFINED) {
                 throw IllegalArgumentException("Position must be non-negative")
             }
-            if (data.isEmpty() && (leadingNulls != 0 || trailingNulls != 0)) {
+            if (data.isEmpty() && (itemsBefore > 0 || itemsAfter > 0)) {
+                // If non-initial, itemsBefore, itemsAfter are COUNT_UNDEFINED
                 throw IllegalArgumentException(
                     "Initial result cannot be empty if items are present in data set."
                 )
             }
-            if (trailingNulls < 0) {
+            if (itemsAfter < 0 && itemsAfter != COUNT_UNDEFINED) {
                 throw IllegalArgumentException(
                     "List size + position too large, last item in list beyond totalCount."
                 )
             }
         }
 
-        // only one of leadingNulls / offset may be used
-        private fun position() = leadingNulls + offset
-
-        internal fun totalCount() = when {
-            // only one of leadingNulls / offset may be used
-            counted -> position() + data.size + trailingNulls
-            else -> TOTAL_COUNT_UNKNOWN
-        }
-
-        // TODO: Delete now that tiling is gone?
+        /**
+         * While it may seem unnecessary to do this validation now that tiling is gone, we do
+         * this to ensure consistency with 2.1, and to ensure all loadRanges have the same page
+         * size.
+         */
         internal fun validateForInitialTiling(pageSize: Int) {
-            if (!counted) {
+            if (itemsBefore == COUNT_UNDEFINED || itemsAfter == COUNT_UNDEFINED) {
                 throw IllegalStateException(
                     "Placeholders requested, but totalCount not provided. Please call the" +
-                            " three-parameter onResult method, or disable placeholders in the" +
-                            " PagedList.Config"
+                        " three-parameter onResult method, or disable placeholders in the" +
+                        " PagedList.Config"
                 )
             }
-            if (trailingNulls != 0 && data.size % pageSize != 0) {
-                val totalCount = leadingNulls + data.size + trailingNulls
+
+            if (itemsAfter > 0 && data.size % pageSize != 0) {
+                val totalCount = itemsBefore + data.size + itemsAfter
                 throw IllegalArgumentException(
                     "PositionalDataSource requires initial load size to be a multiple of page" +
-                            " size to support internal tiling. loadSize ${data.size}, position" +
-                            " $leadingNulls, totalCount $totalCount, pageSize $pageSize"
+                        " size to support internal tiling. loadSize ${data.size}, position" +
+                        " $itemsBefore, totalCount $totalCount, pageSize $pageSize"
                 )
             }
-            if (position() % pageSize != 0) {
+            if (itemsBefore % pageSize != 0) {
                 throw IllegalArgumentException(
-                    "Initial load must be pageSize aligned.Position = ${position()}, pageSize =" +
-                            " $pageSize"
+                    "Initial load must be pageSize aligned.Position = $itemsBefore, pageSize =" +
+                        " $pageSize"
                 )
             }
         }
 
-        /**
-         * Assumes that nextKey and prevKey returned by this [BaseResult] matches the expected type
-         * in [PagedSource.LoadResult].
-         */
-        @Suppress("UNCHECKED_CAST") // Guaranteed to be the correct Key type.
-        internal fun <Key : Any> toLoadResult() = PagedSource.LoadResult(
-            data,
-            if (counted) leadingNulls else offset,
-            if (counted) trailingNulls else COUNT_UNDEFINED,
-            nextKey as Key?,
-            prevKey as Key?
-        )
-
         override fun equals(other: Any?) = when (other) {
-            is BaseResult<*> -> data == other.data &&
+            is BaseResult<*> ->
+                data == other.data &&
                     prevKey == other.prevKey &&
                     nextKey == other.nextKey &&
-                    leadingNulls == other.leadingNulls &&
-                    trailingNulls == other.trailingNulls &&
-                    offset == other.offset &&
-                    counted == other.counted
+                    itemsBefore == other.itemsBefore &&
+                    itemsAfter == other.itemsAfter
             else -> false
         }
 
         internal companion object {
-            internal fun <T : Any> empty() = BaseResult(emptyList<T>(), null, null, 0, 0, 0, true)
-
-            internal const val TOTAL_COUNT_UNKNOWN = -1
+            internal fun <T : Any> empty() = BaseResult(emptyList<T>(), null, null, 0, 0)
 
             internal fun <ToValue : Any, Value : Any> convert(
                 result: BaseResult<ToValue>,
@@ -542,10 +481,8 @@ internal constructor(internal val type: KeyType) {
                 data = convert(function, result.data),
                 prevKey = result.prevKey,
                 nextKey = result.nextKey,
-                leadingNulls = result.leadingNulls,
-                trailingNulls = result.trailingNulls,
-                offset = result.offset,
-                counted = result.counted
+                itemsBefore = result.itemsBefore,
+                itemsAfter = result.itemsAfter
             )
         }
     }
@@ -559,14 +496,6 @@ internal constructor(internal val type: KeyType) {
     internal abstract suspend fun load(params: Params<Key>): BaseResult<Value>
 
     internal abstract fun getKeyInternal(item: Value): Key
-
-    /**
-     * Determine whether an error passed to a loading method is retryable.
-     *
-     * @param error Throwable returned from an attempted load from this DataSource.
-     * @return `true` if the error is retryable, otherwise false.
-     */
-    open fun isRetryableError(error: Throwable) = false
 
     internal companion object {
         internal fun <A, B> convert(

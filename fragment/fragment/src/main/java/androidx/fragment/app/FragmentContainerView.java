@@ -18,7 +18,9 @@ package androidx.fragment.app;
 
 import android.animation.LayoutTransition;
 import android.content.Context;
+import android.content.res.TypedArray;
 import android.graphics.Canvas;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
@@ -30,6 +32,7 @@ import android.widget.FrameLayout;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
+import androidx.fragment.R;
 
 import java.util.ArrayList;
 /**
@@ -50,23 +53,48 @@ import java.util.ArrayList;
  * &lt;/androidx.fragment.app.FragmentContainerView&gt;
  * </pre>
  *
+ * <p> FragmentContainerView can also be used to add a Fragment by using the
+ * <code>android:name</code> attribute. FragmentContainerView will perform a one time operation
+ * that:
+ *
+ * <ul>
+ * <li>Creates a new instance of the Fragment</li>
+ * <li>Calls {@link Fragment#onInflate(Context, AttributeSet, Bundle)}</li>
+ * <li>Executes a FragmentTransaction to add the Fragment to the appropriate FragmentManager</li>
+ * </ul>
+ *
+ * <p> You can optionally include an <code>android:tag</code> which allows you to use
+ * {@link FragmentManager#findFragmentByTag(String)} to retrieve the added Fragment.
+ *
+ * <pre class="prettyprint">
+ * &lt;androidx.fragment.app.FragmentContainerView
+ *        xmlns:android="http://schemas.android.com/apk/res/android"
+ *        xmlns:app="http://schemas.android.com/apk/res-auto"
+ *        android:id="@+id/fragment_container_view"
+ *        android:layout_width="match_parent"
+ *        android:layout_height="match_parent"
+ *        android:name="com.example.MyFragment"
+ *        android:tag="my_tag"&gt;
+ * &lt;/androidx.fragment.app.FragmentContainerView&gt;
+ * </pre>
+ *
  * <p>FragmentContainerView should not be used as a replacement for other ViewGroups (FrameLayout,
  * LinearLayout, etc) outside of Fragment use cases.
  *
- * <p>FragmentContainerView will only allow views to returned by a Fragment's
+ * <p>FragmentContainerView will only allow views returned by a Fragment's
  * {@link Fragment#onCreateView(LayoutInflater, ViewGroup, Bundle)}. Attempting to add any other
  * view will result in an {@link IllegalStateException}.
  *
- * <p>Layout animations and transitions are disabled for FragmentContainerView. Animations should be
- * done through {@link FragmentTransaction#setCustomAnimations(int, int, int, int)}. If
- * animateLayoutChanges is set to <code>true</code> or
- * {@link #setLayoutTransition(LayoutTransition)} is called directly an
+ * <p>Layout animations and transitions are disabled for FragmentContainerView for APIs above 17.
+ * Otherwise, Animations should be done through
+ * {@link FragmentTransaction#setCustomAnimations(int, int, int, int)}. If animateLayoutChanges is
+ * set to <code>true</code> or {@link #setLayoutTransition(LayoutTransition)} is called directly an
  * {@link UnsupportedOperationException} will be thrown.
  *
  * <p>Fragments using exit animations are drawn before all others for FragmentContainerView. This
  * ensures that exiting Fragments do not appear on top of the view.
  */
-public class FragmentContainerView extends FrameLayout {
+public final class FragmentContainerView extends FrameLayout {
 
     private ArrayList<View> mDisappearingFragmentChildren;
 
@@ -77,26 +105,87 @@ public class FragmentContainerView extends FrameLayout {
     private boolean mDrawDisappearingViewsFirst = true;
 
     public FragmentContainerView(@NonNull Context context) {
-        this(context, null);
+        super(context);
     }
 
+    /**
+     * Do not call this constructor directly. Doing so will result in an
+     * {@link UnsupportedOperationException}.
+     */
     public FragmentContainerView(@NonNull Context context, @Nullable AttributeSet attrs) {
         this(context, attrs, 0);
     }
 
+    /**
+     * Do not call this constructor directly. Doing so will result in an
+     * {@link UnsupportedOperationException}.
+     */
     public FragmentContainerView(
             @NonNull Context context,
             @Nullable AttributeSet attrs,
             int defStyleAttr) {
         super(context, attrs, defStyleAttr);
+        if (attrs != null) {
+            String name = attrs.getClassAttribute();
+            String attribute = "class";
+            TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.FragmentContainerView);
+            if (name == null) {
+                name = a.getString(R.styleable.FragmentContainerView_android_name);
+                attribute = "android:name";
+            }
+            a.recycle();
+            if (name != null && !isInEditMode()) {
+                throw new UnsupportedOperationException("FragmentContainerView must be within "
+                        + "a FragmentActivity to use " + attribute + "=\"" + name + "\"");
+            }
+        }
+    }
+
+    FragmentContainerView(
+            @NonNull Context context,
+            @NonNull AttributeSet attrs,
+            @NonNull FragmentManager fm) {
+        super(context, attrs);
+
+        String name = attrs.getClassAttribute();
+        TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.FragmentContainerView);
+        if (name == null) {
+            name = a.getString(R.styleable.FragmentContainerView_android_name);
+        }
+        String tag = a.getString(R.styleable.FragmentContainerView_android_tag);
+        a.recycle();
+
+        int id = getId();
+        Fragment existingFragment = fm.findFragmentById(id);
+        // If there is a name and there is no existing fragment,
+        // we should add an inflated Fragment to the view.
+        if (name != null && existingFragment == null) {
+            if (id <= 0) {
+                final String tagMessage = tag != null
+                        ? " with tag " + tag
+                        : "";
+                throw new IllegalStateException("FragmentContainerView must have an android:id to "
+                        + "add Fragment " + name + tagMessage);
+            }
+            Fragment containerFragment =
+                    fm.getFragmentFactory().instantiate(context.getClassLoader(), name);
+            containerFragment.onInflate(context, attrs, null);
+            fm.beginTransaction()
+                    .setReorderingAllowed(true)
+                    .add(this, containerFragment, tag)
+                    .commitNowAllowingStateLoss();
+        }
+        fm.onContainerAvailable(this);
     }
 
     /**
-     * When called, this method throws a {@link UnsupportedOperationException}. This can be called
-     * either explicitly, or implicitly by setting animateLayoutChanges to <code>true</code>.
+     * When called, this method throws a {@link UnsupportedOperationException} on APIs above 17.
+     * On APIs 17 and below, it calls {@link FrameLayout#setLayoutTransition(LayoutTransition)}
+     * This can be called either explicitly, or implicitly by setting animateLayoutChanges to
+     * <code>true</code>.
      *
-     * <p>View animations and transitions are disabled for FragmentContainerView. Use
-     * {@link FragmentTransaction#setCustomAnimations(int, int, int, int)} and
+     * <p>View animations and transitions are disabled for FragmentContainerView for APIs above 17.
+     * Use {@link FragmentTransaction#setCustomAnimations(int, int, int, int)} and
      * {@link FragmentTransaction#setTransition(int)}.
      *
      * @param transition The LayoutTransition object that will animated changes in layout. A value
@@ -105,6 +194,14 @@ public class FragmentContainerView extends FrameLayout {
      */
     @Override
     public void setLayoutTransition(@Nullable LayoutTransition transition) {
+        if (Build.VERSION.SDK_INT < 18) {
+            // Transitions on APIs below 18 are using an empty LayoutTransition as a replacement
+            // for suppressLayout(true) and null LayoutTransition to then unsuppress it. If the
+            // API is below 18, we should allow FrameLayout to handle this call.
+            super.setLayoutTransition(transition);
+            return;
+        }
+
         throw new UnsupportedOperationException(
                 "FragmentContainerView does not support Layout Transitions or "
                         + "animateLayoutChanges=\"true\".");
@@ -178,7 +275,7 @@ public class FragmentContainerView extends FrameLayout {
     }
 
     /**
-     * <p>FragmentContainerView will only allow views to returned by a Fragment's
+     * <p>FragmentContainerView will only allow views returned by a Fragment's
      * {@link Fragment#onCreateView(LayoutInflater, ViewGroup, Bundle)}. Attempting to add any
      *  other view will result in an {@link IllegalStateException}.
      *
@@ -195,7 +292,7 @@ public class FragmentContainerView extends FrameLayout {
     }
 
     /**
-     * <p>FragmentContainerView will only allow views to returned by a Fragment's
+     * <p>FragmentContainerView will only allow views returned by a Fragment's
      * {@link Fragment#onCreateView(LayoutInflater, ViewGroup, Bundle)}. Attempting to add any
      *  other view will result in an {@link IllegalStateException}.
      *
@@ -273,15 +370,11 @@ public class FragmentContainerView extends FrameLayout {
      * @param v {@link View} that might be added to list of disappearing views
      */
     private void addDisappearingFragmentView(@NonNull View v) {
-        if (v.getAnimation() != null || (mTransitioningFragmentViews != null
-                && mTransitioningFragmentViews.contains(v))) {
+        if (mTransitioningFragmentViews != null && mTransitioningFragmentViews.contains(v)) {
             if (mDisappearingFragmentChildren == null) {
                 mDisappearingFragmentChildren = new ArrayList<>();
             }
             mDisappearingFragmentChildren.add(v);
         }
     }
-
-
-
 }

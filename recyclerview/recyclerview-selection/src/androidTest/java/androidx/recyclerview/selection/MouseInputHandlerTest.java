@@ -51,15 +51,15 @@ import org.junit.runner.RunWith;
 @SmallTest
 public final class MouseInputHandlerTest {
 
-    private MouseInputHandler mInputDelegate;
+    private MouseInputHandler<String> mInputDelegate;
 
     private TestOnContextClickListener mMouseCallbacks;
-    private TestOnItemActivatedListener mActivationCallbacks;
-    private TestFocusDelegate mFocusCallbacks;
+    private TestOnItemActivatedListener<String> mActivationCallbacks;
+    private TestFocusDelegate<String> mFocusCallbacks;
 
     private TestItemDetailsLookup mDetailsLookup;
     private SelectionProbe mSelection;
-    private SelectionTracker mSelectionMgr;
+    private SelectionTracker<String> mSelectionMgr;
 
     private TestEvents.Builder mEvent;
 
@@ -71,14 +71,14 @@ public final class MouseInputHandlerTest {
         mSelection = new SelectionProbe(mSelectionMgr);
 
         mMouseCallbacks = new TestOnContextClickListener();
-        mActivationCallbacks = new TestOnItemActivatedListener();
-        mFocusCallbacks = new TestFocusDelegate();
+        mActivationCallbacks = new TestOnItemActivatedListener<>();
+        mFocusCallbacks = new TestFocusDelegate<>();
 
-        mInputDelegate = new MouseInputHandler(
+        mInputDelegate = new MouseInputHandler<>(
                 mSelectionMgr,
-                new TestItemKeyProvider(
+                new TestItemKeyProvider<>(
                         ItemKeyProvider.SCOPE_MAPPED,
-                        new TestAdapter(TestData.createStringData(100))),
+                        new TestAdapter<>(TestData.createStringData(100))),
                 mDetailsLookup,
                 mMouseCallbacks,
                 mActivationCallbacks,

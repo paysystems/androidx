@@ -17,7 +17,6 @@
 package androidx.benchmark
 
 import android.util.Log
-
 import java.util.concurrent.TimeUnit
 
 /**
@@ -33,12 +32,12 @@ internal class WarmupManager {
     private var slowMovingAvg: Float = 0f
     private var similarIterationCount: Int = 0
 
-    val estimatedIterationTime: Float get() = fastMovingAvg
+    val estimatedIterationTimeNs: Float get() = fastMovingAvg
 
     var iteration = 0
         private set
 
-    var totalDuration: Long = 0
+    var totalDurationNs: Long = 0
         private set
 
     /**
@@ -53,7 +52,7 @@ internal class WarmupManager {
      */
     fun onNextIteration(durationNs: Long): Boolean {
         iteration++
-        totalDuration += durationNs
+        totalDurationNs += durationNs
 
         if (iteration == 1) {
             fastMovingAvg = durationNs.toFloat()
@@ -72,23 +71,30 @@ internal class WarmupManager {
             similarIterationCount = 0
         }
 
-        if (iteration >= MIN_ITERATIONS && totalDuration >= MIN_DURATION_NS) {
+        if (iteration >= MIN_ITERATIONS && totalDurationNs >= MIN_DURATION_NS) {
             if (similarIterationCount > MIN_SIMILAR_ITERATIONS ||
-                totalDuration >= MAX_DURATION_NS) {
+                totalDurationNs >= MAX_DURATION_NS
+            ) {
                 // benchmark has stabilized, or we're out of time
-                Log.d(
-                    "WarmupManager", String.format(
-                        "Complete: t=%.3f, iter=%d, fastAvg=%3.0f, slowAvg=%3.0f",
-                        totalDuration / 1e9,
-                        iteration,
-                        fastMovingAvg,
-                        slowMovingAvg
-                    )
-                )
                 return true
             }
         }
         return false
+    }
+
+    fun logInfo() {
+        if (iteration > 0) {
+            Log.d(
+                BenchmarkState.TAG,
+                "Warmup: t=%.3f, iter=%d, fastAvg=%3.0f, slowAvg=%3.0f"
+                    .format(
+                        totalDurationNs / 1e9,
+                        iteration,
+                        fastMovingAvg,
+                        slowMovingAvg
+                    )
+            )
+        }
     }
 
     companion object {

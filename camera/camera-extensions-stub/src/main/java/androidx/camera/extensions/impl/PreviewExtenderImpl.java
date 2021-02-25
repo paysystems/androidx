@@ -16,11 +16,20 @@
 
 package androidx.camera.extensions.impl;
 
+import android.graphics.ImageFormat;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.TotalCaptureResult;
+import android.util.Pair;
+import android.util.Size;
+
+import androidx.annotation.Nullable;
+
+import java.util.List;
 
 /**
  * Provides abstract methods that the OEM needs to implement to enable extensions in the preview.
+ *
+ * @since 1.0
  */
 public interface PreviewExtenderImpl extends ExtenderStateListener {
     /** The different types of the preview processing. */
@@ -72,8 +81,31 @@ public interface PreviewExtenderImpl extends ExtenderStateListener {
     /**
      * Returns a processor which only updates the {@link CaptureStageImpl}.
      *
-     * <p>The type of processor is dependent on the return of {@link #getProcessorType()}. If it
+     * <p>The type of processor is dependent on the return of {@link #getProcessorType()}. The
+     * type of ProcessorImpl returned will be according to the following table.
      *
+     * <table>
+     * <tr><th> ProcessorType </th> <th> ProcessorImpl </th> </tr>
+     * <tr><td> PROCESSOR_TYPE_REQUEST_UPDATE_ONLY </td> <td> RequestUpdateProcessorImpl </td> </tr>
+     * <tr><td> PROCESSOR_TYPE_IMAGE_PROCESSOR </td> <td> PreviewImageProcessorImpl </td> </tr>
+     * <tr><td> PROCESSOR_TYPE_NONE </td> <td> null </td> </tr>
+     * </table>
      */
     ProcessorImpl getProcessor();
+
+    /**
+     * Returns the customized supported resolutions.
+     *
+     * <p>Pair list composed with {@link ImageFormat} and {@link Size} array will be returned.
+     *
+     * <p>The returned resolutions should be subset of the supported sizes retrieved from
+     * {@link android.hardware.camera2.params.StreamConfigurationMap} for the camera device. If the
+     * returned list is not null, it will be used to find the best resolutions combination for
+     * the bound use cases.
+     *
+     * @return the customized supported resolutions.
+     * @since 1.1
+     */
+    @Nullable
+    List<Pair<Integer, Size[]>> getSupportedResolutions();
 }

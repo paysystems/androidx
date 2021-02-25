@@ -30,10 +30,12 @@ import org.junit.runner.RunWith
 class DataTest {
     @Test
     fun testDataExtensions() {
-        val data = workDataOf("one" to 1,
-                "two" to 2L,
-                "three" to "Three",
-                "four" to longArrayOf(1L, 2L))
+        val data = workDataOf(
+            "one" to 1,
+            "two" to 2L,
+            "three" to "Three",
+            "four" to longArrayOf(1L, 2L)
+        )
         assertEquals(data.getInt("one", 0), 1)
         assertEquals(data.getLong("two", 0L), 2L)
         assertEquals(data.getString("three"), "Three")
@@ -42,11 +44,11 @@ class DataTest {
         assertEquals(longArray!!.size, 2)
         assertEquals(longArray[0], 1L)
         assertEquals(longArray[1], 2L)
-        assertTrue(data.containsKey<Int>("one"))
-        assertTrue(data.containsKey<Long>("two"))
-        assertTrue(data.containsKey<String>("three"))
-        assertTrue(data.containsKey<Array<Long>>("four"))
-        assertFalse(data.containsKey<Any>("nothing"))
-        assertFalse(data.containsKey<Float>("two"))
+        assertTrue(data.hasKeyWithValueOfType<Int>("one"))
+        assertTrue(data.hasKeyWithValueOfType<Long>("two"))
+        assertTrue(data.hasKeyWithValueOfType<String>("three"))
+        assertTrue(data.hasKeyWithValueOfType<Array<Long>>("four"))
+        assertFalse(data.hasKeyWithValueOfType<Any>("nothing"))
+        assertFalse(data.hasKeyWithValueOfType<Float>("two"))
     }
 }

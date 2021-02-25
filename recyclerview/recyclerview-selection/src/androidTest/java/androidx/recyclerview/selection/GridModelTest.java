@@ -51,7 +51,7 @@ public class GridModelTest {
 
     private GridModel<String> mModel;
     private TestHost mHost;
-    private TestAdapter mAdapter;
+    private TestAdapter<String> mAdapter;
     private Set<String> mLastSelection;
     private int mViewWidth;
 
@@ -219,6 +219,7 @@ public class GridModelTest {
         assertEquals(0, mModel.getPositionNearestOrigin());
     }
 
+    @SuppressWarnings("unchecked")
     private void initData(final int numChildren, int numColumns) {
         mHost = new TestHost(numChildren, numColumns);
         mAdapter = new TestAdapter() {

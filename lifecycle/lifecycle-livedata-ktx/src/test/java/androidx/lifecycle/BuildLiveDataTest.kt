@@ -1,4 +1,4 @@
-/*
+ /*
  * Copyright 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
+@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+
 package androidx.lifecycle
 
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineExceptionHandler
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -34,7 +35,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.coroutineContext
 
-@ExperimentalCoroutinesApi
 @RunWith(JUnit4::class)
 class BuildLiveDataTest {
     @get:Rule
@@ -419,6 +419,40 @@ class BuildLiveDataTest {
         ld.addObserver().assertItems(3, 4)
         // re-observe, get latest value only
         ld.addObserver().assertItems(4)
+    }
+
+    @Test
+    fun raceTest() {
+        val subLiveData = MutableLiveData(1)
+        val subject = liveData(testScope.coroutineContext) {
+            emitSource(subLiveData)
+            emitSource(subLiveData)
+            emit(2)
+        }
+        subject.addObserver().apply {
+            scopes.triggerAllActions()
+            assertItems(1, 1, 2)
+            subLiveData.value = 3
+            scopes.triggerAllActions()
+            // we do not expect 3 because it is disposed
+            assertItems(1, 1, 2)
+        }
+    }
+
+    @Test
+    fun raceTest_withCustomDispose() {
+        val subLiveData = MutableLiveData(1)
+        val subject = liveData(testScope.coroutineContext) {
+            emitSource(subLiveData).dispose()
+            emitSource(subLiveData)
+        }
+        subject.addObserver().apply {
+            scopes.triggerAllActions()
+            assertItems(1, 1)
+            subLiveData.value = 3
+            scopes.triggerAllActions()
+            assertItems(1, 1, 3)
+        }
     }
 
     private fun <T> LiveData<T>.addObserver() = this.addObserver(scopes)

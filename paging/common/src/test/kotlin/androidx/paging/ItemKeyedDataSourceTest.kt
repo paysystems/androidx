@@ -16,11 +16,10 @@
 
 package androidx.paging
 
-import androidx.paging.futures.DirectExecutor
-import androidx.paging.futures.DirectDispatcher
+import androidx.paging.PagingSource.LoadResult.Page.Companion.COUNT_UNDEFINED
 import com.nhaarman.mockitokotlin2.capture
 import com.nhaarman.mockitokotlin2.mock
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -33,6 +32,7 @@ import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoMoreInteractions
 import kotlin.test.assertFailsWith
 
+@Suppress("DEPRECATION")
 @RunWith(JUnit4::class)
 class ItemKeyedDataSourceTest {
 
@@ -44,7 +44,6 @@ class ItemKeyedDataSourceTest {
         initialLoadSize: Int,
         enablePlaceholders: Boolean
     ): DataSource.BaseResult<Item> {
-        dataSource.initExecutor(DirectExecutor)
         return dataSource.loadInitial(
             ItemKeyedDataSource.LoadInitialParams(key, initialLoadSize, enablePlaceholders)
         )
@@ -55,9 +54,9 @@ class ItemKeyedDataSourceTest {
         val dataSource = ItemDataSource()
         val result = loadInitial(dataSource, dataSource.getKey(ITEMS_BY_NAME_ID[49]), 10, true)
 
-        assertEquals(45, result.leadingNulls)
+        assertEquals(45, result.itemsBefore)
         assertEquals(ITEMS_BY_NAME_ID.subList(45, 55), result.data)
-        assertEquals(45, result.trailingNulls)
+        assertEquals(45, result.itemsAfter)
     }
 
     @Test
@@ -67,9 +66,9 @@ class ItemKeyedDataSourceTest {
         // this is tricky, since load after and load before with the passed key will fail
         val result = loadInitial(dataSource, dataSource.getKey(ITEMS_BY_NAME_ID[0]), 20, true)
 
-        assertEquals(0, result.leadingNulls)
+        assertEquals(0, result.itemsBefore)
         assertEquals(ITEMS_BY_NAME_ID.subList(0, 1), result.data)
-        assertEquals(0, result.trailingNulls)
+        assertEquals(0, result.itemsAfter)
     }
 
     @Test
@@ -80,9 +79,9 @@ class ItemKeyedDataSourceTest {
         val key = dataSource.getKey(ITEMS_BY_NAME_ID.last())
         val result = loadInitial(dataSource, key, 20, true)
 
-        assertEquals(90, result.leadingNulls)
+        assertEquals(90, result.itemsBefore)
         assertEquals(ITEMS_BY_NAME_ID.subList(90, 100), result.data)
-        assertEquals(0, result.trailingNulls)
+        assertEquals(0, result.itemsAfter)
     }
 
     @Test
@@ -91,9 +90,9 @@ class ItemKeyedDataSourceTest {
 
         val result = loadInitial(dataSource, null, 10, true)
 
-        assertEquals(0, result.leadingNulls)
+        assertEquals(0, result.itemsBefore)
         assertEquals(ITEMS_BY_NAME_ID.subList(0, 10), result.data)
-        assertEquals(90, result.trailingNulls)
+        assertEquals(90, result.itemsAfter)
     }
 
     @Test
@@ -107,9 +106,9 @@ class ItemKeyedDataSourceTest {
         // NOTE: ideally we'd load 10 items here, but it adds complexity and unpredictability to
         // do: load after was empty, so pass full size to load before, since this can incur larger
         // loads than requested (see keyMatchesLastItem test)
-        assertEquals(95, result.leadingNulls)
+        assertEquals(95, result.itemsBefore)
         assertEquals(ITEMS_BY_NAME_ID.subList(95, 100), result.data)
-        assertEquals(0, result.trailingNulls)
+        assertEquals(0, result.itemsAfter)
     }
 
     // ----- UNCOUNTED -----
@@ -122,9 +121,9 @@ class ItemKeyedDataSourceTest {
         val key = dataSource.getKey(ITEMS_BY_NAME_ID[49])
         val result = loadInitial(dataSource, key, 10, false)
 
-        assertEquals(0, result.leadingNulls)
+        assertEquals(COUNT_UNDEFINED, result.itemsBefore)
         assertEquals(ITEMS_BY_NAME_ID.subList(45, 55), result.data)
-        assertEquals(0, result.trailingNulls)
+        assertEquals(COUNT_UNDEFINED, result.itemsAfter)
     }
 
     @Test
@@ -135,9 +134,9 @@ class ItemKeyedDataSourceTest {
         val key = dataSource.getKey(ITEMS_BY_NAME_ID[49])
         val result = loadInitial(dataSource, key, 10, true)
 
-        assertEquals(0, result.leadingNulls)
+        assertEquals(COUNT_UNDEFINED, result.itemsBefore)
         assertEquals(ITEMS_BY_NAME_ID.subList(45, 55), result.data)
-        assertEquals(0, result.trailingNulls)
+        assertEquals(COUNT_UNDEFINED, result.itemsAfter)
     }
 
     @Test
@@ -147,9 +146,9 @@ class ItemKeyedDataSourceTest {
         // dispatchLoadInitial(null, count) == dispatchLoadInitial(count)
         val result = loadInitial(dataSource, null, 10, true)
 
-        assertEquals(0, result.leadingNulls)
+        assertEquals(COUNT_UNDEFINED, result.itemsBefore)
         assertEquals(ITEMS_BY_NAME_ID.subList(0, 10), result.data)
-        assertEquals(0, result.trailingNulls)
+        assertEquals(COUNT_UNDEFINED, result.itemsAfter)
     }
 
     // ----- EMPTY -----
@@ -162,9 +161,9 @@ class ItemKeyedDataSourceTest {
         val key = dataSource.getKey(ITEMS_BY_NAME_ID[49])
         val result = loadInitial(dataSource, key, 10, true)
 
-        assertEquals(0, result.leadingNulls)
+        assertEquals(0, result.itemsBefore)
         assertTrue(result.data.isEmpty())
-        assertEquals(0, result.trailingNulls)
+        assertEquals(0, result.itemsAfter)
     }
 
     @Test
@@ -172,9 +171,9 @@ class ItemKeyedDataSourceTest {
         val dataSource = ItemDataSource(items = ArrayList())
         val result = loadInitial(dataSource, null, 10, true)
 
-        assertEquals(0, result.leadingNulls)
+        assertEquals(0, result.itemsBefore)
         assertTrue(result.data.isEmpty())
-        assertEquals(0, result.trailingNulls)
+        assertEquals(0, result.itemsAfter)
     }
 
     // ----- Other behavior -----
@@ -288,20 +287,12 @@ class ItemKeyedDataSourceTest {
             }
         }
 
-        runBlocking {
-            PagedList.create(
-                PagedSourceWrapper(dataSource),
-                GlobalScope,
-                FailDispatcher(),
-                DirectDispatcher,
-                DirectDispatcher,
-                null,
-                PagedList.Config.Builder()
-                    .setPageSize(10)
-                    .build(),
-                ""
-            )
-        }
+        @Suppress("DEPRECATION")
+        PagedList.Builder(dataSource, 10)
+            .setNotifyDispatcher(FailDispatcher())
+            .setFetchDispatcher(Dispatchers.IO)
+            .setInitialKey("")
+            .build()
     }
 
     @Test
@@ -376,31 +367,40 @@ class ItemKeyedDataSourceTest {
             get() = source.isInvalid
 
         override fun loadInitial(params: LoadInitialParams<K>, callback: LoadInitialCallback<B>) {
-            source.loadInitial(params, object : LoadInitialCallback<A>() {
-                override fun onResult(data: List<A>, position: Int, totalCount: Int) {
-                    callback.onResult(convert(data), position, totalCount)
-                }
+            source.loadInitial(
+                params,
+                object : LoadInitialCallback<A>() {
+                    override fun onResult(data: List<A>, position: Int, totalCount: Int) {
+                        callback.onResult(convert(data), position, totalCount)
+                    }
 
-                override fun onResult(data: List<A>) {
-                    callback.onResult(convert(data))
+                    override fun onResult(data: List<A>) {
+                        callback.onResult(convert(data))
+                    }
                 }
-            })
+            )
         }
 
         override fun loadAfter(params: LoadParams<K>, callback: LoadCallback<B>) {
-            source.loadAfter(params, object : LoadCallback<A>() {
-                override fun onResult(data: List<A>) {
-                    callback.onResult(convert(data))
+            source.loadAfter(
+                params,
+                object : LoadCallback<A>() {
+                    override fun onResult(data: List<A>) {
+                        callback.onResult(convert(data))
+                    }
                 }
-            })
+            )
         }
 
         override fun loadBefore(params: LoadParams<K>, callback: LoadCallback<B>) {
-            source.loadBefore(params, object : LoadCallback<A>() {
-                override fun onResult(data: List<A>) {
-                    callback.onResult(convert(data))
+            source.loadBefore(
+                params,
+                object : LoadCallback<A>() {
+                    override fun onResult(data: List<A>) {
+                        callback.onResult(convert(data))
+                    }
                 }
-            })
+            )
         }
 
         protected abstract fun convert(source: List<A>): List<B>

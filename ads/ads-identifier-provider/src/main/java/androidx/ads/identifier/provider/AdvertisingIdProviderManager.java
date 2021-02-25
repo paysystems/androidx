@@ -105,28 +105,28 @@ public class AdvertisingIdProviderManager {
      * user of the device can manager all the providers' settings together.
      */
     @NonNull
+    @SuppressWarnings("MixedMutabilityReturnType")
     public static List<AdvertisingIdProviderInfo> getAdvertisingIdProviders(
             @NonNull Context context) {
         PackageManager packageManager = context.getPackageManager();
-        List<ResolveInfo> resolveInfos =
+        List<ServiceInfo> serviceInfos =
                 AdvertisingIdUtils.getAdvertisingIdProviderServices(packageManager);
-        if (resolveInfos.isEmpty()) {
+        if (serviceInfos.isEmpty()) {
             return Collections.emptyList();
         }
 
         Map<String, String> activityMap = getOpenSettingsActivities(packageManager);
         ServiceInfo highestPriorityServiceInfo =
-                AdvertisingIdUtils.selectServiceByPriority(resolveInfos, packageManager);
+                AdvertisingIdUtils.selectServiceByPriority(serviceInfos, packageManager);
 
         List<AdvertisingIdProviderInfo> providerInfos = new ArrayList<>();
-        for (ResolveInfo resolveInfo : resolveInfos) {
-            String packageName = resolveInfo.serviceInfo.packageName;
+        for (ServiceInfo serviceInfo : serviceInfos) {
+            String packageName = serviceInfo.packageName;
 
             AdvertisingIdProviderInfo.Builder builder =
                     AdvertisingIdProviderInfo.builder()
                             .setPackageName(packageName)
-                            .setHighestPriority(
-                                    resolveInfo.serviceInfo == highestPriorityServiceInfo);
+                            .setHighestPriority(serviceInfo == highestPriorityServiceInfo);
             String activityName = activityMap.get(packageName);
             if (activityName != null) {
                 builder.setSettingsIntent(
@@ -143,6 +143,7 @@ public class AdvertisingIdProviderManager {
      * <p>This is achieved by looking up which activities can handle {@link #OPEN_SETTINGS_ACTION}
      * intent action.
      */
+    @SuppressWarnings("MixedMutabilityReturnType")
     private static Map<String, String> getOpenSettingsActivities(PackageManager packageManager) {
         Intent settingsIntent = new Intent(OPEN_SETTINGS_ACTION);
         List<ResolveInfo> settingsResolveInfos = packageManager.queryIntentActivities(

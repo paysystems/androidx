@@ -18,49 +18,66 @@ package androidx.paging.integration.testapp.custom
 
 import android.graphics.Color
 import androidx.annotation.ColorInt
-import androidx.paging.PageLoadType
-import androidx.paging.PagedSource
-import java.util.ArrayList
+import androidx.paging.PagingSource
+import androidx.paging.PagingState
+import kotlinx.coroutines.delay
 import java.util.concurrent.atomic.AtomicBoolean
 
 val dataSourceError = AtomicBoolean(false)
 
 /**
- * Sample data source with artificial data.
+ * Sample position-based PagingSource with artificial data.
  */
-internal class ItemDataSource : PagedSource<Int, Item>() {
-    override val keyProvider = KeyProvider.Positional
-
-    override suspend fun load(params: LoadParams<Int>) = when (params.loadType) {
-        PageLoadType.REFRESH -> loadInitial(params)
-        else -> loadRange(params)
-    }
-
+internal class ItemDataSource : PagingSource<Int, Item>() {
     class RetryableItemError : Exception()
 
-    private val mGenerationId = sGenerationId++
+    private val generationId = sGenerationId++
 
-    private fun loadRangeInternal(startPosition: Int, loadCount: Int): List<Item> {
-        val items = ArrayList<Item>()
-        val end = minOf(COUNT, startPosition + loadCount)
-        val bgColor = COLORS[mGenerationId % COLORS.size]
+    override fun getRefreshKey(state: PagingState<Int, Item>): Int? = state.anchorPosition
 
-        Thread.sleep(1000)
-
-        if (end < startPosition) {
-            throw IllegalStateException()
+    override suspend fun load(params: LoadParams<Int>): LoadResult<Int, Item> =
+        when (params) {
+            is LoadParams.Refresh ->
+                loadInternal(
+                    position = ((params.key ?: 0) - params.loadSize / 2).coerceAtLeast(0),
+                    loadSize = params.loadSize
+                )
+            is LoadParams.Prepend -> {
+                val loadSize = minOf(params.key, params.loadSize)
+                loadInternal(
+                    position = params.key - loadSize,
+                    loadSize = loadSize
+                )
+            }
+            is LoadParams.Append ->
+                loadInternal(
+                    position = params.key,
+                    loadSize = params.loadSize
+                )
         }
-        for (i in startPosition until end) {
-            items.add(Item(i, "item $i", bgColor))
-        }
+
+    private suspend fun loadInternal(
+        position: Int,
+        loadSize: Int
+    ): LoadResult<Int, Item> {
+        delay(1000)
         if (dataSourceError.compareAndSet(true, false)) {
-            throw RetryableItemError()
-        }
-        return items
-    }
+            return LoadResult.Error(RetryableItemError())
+        } else {
+            val bgColor = COLORS[generationId % COLORS.size]
+            val endExclusive = (position + loadSize).coerceAtMost(COUNT)
+            val data = (position until endExclusive).map {
+                Item(it, "item $it", bgColor)
+            }
 
-    override fun isRetryableError(error: Throwable): Boolean {
-        return error is RetryableItemError
+            return LoadResult.Page(
+                data = data,
+                prevKey = position,
+                nextKey = endExclusive,
+                itemsBefore = position,
+                itemsAfter = COUNT - endExclusive
+            )
+        }
     }
 
     companion object {
@@ -69,52 +86,5 @@ internal class ItemDataSource : PagedSource<Int, Item>() {
         @ColorInt
         private val COLORS = intArrayOf(Color.RED, Color.BLUE, Color.BLACK)
         private var sGenerationId: Int = 0
-    }
-
-    // TODO: Clean up logic only pertinent to tiling.
-    private fun computeStartPosition(params: LoadParams<Int>): Int {
-        val requestedStartPosition = params.key?.let { key ->
-            var initialPosition = key
-
-            if (params.placeholdersEnabled) {
-                // snap load size to page multiple (minimum two)
-                val initialLoadSize = maxOf(params.loadSize / params.pageSize, 2) * params.pageSize
-
-                // move start so the load is centered around the key, not starting at it
-                val idealStart = initialPosition - initialLoadSize / 2
-                initialPosition = maxOf(0, idealStart / params.pageSize * params.pageSize)
-            } else {
-                // not tiled, so don't try to snap or force multiple of a page size
-                initialPosition -= params.loadSize / 2
-            }
-
-            initialPosition
-        } ?: 0
-
-        var pageStart = requestedStartPosition / params.pageSize * params.pageSize
-
-        // maximum start pos is that which will encompass end of list
-        val maximumLoadPage =
-            (COUNT - params.loadSize + params.pageSize - 1) / params.pageSize * params.pageSize
-        pageStart = minOf(maximumLoadPage, pageStart)
-
-        // minimum start position is 0
-        return maxOf(0, pageStart)
-    }
-
-    private fun loadInitial(params: LoadParams<Int>): LoadResult<Int, Item> {
-        val position = computeStartPosition(params)
-        val loadSize = minOf(COUNT - position, params.loadSize)
-        val data = loadRangeInternal(position, loadSize)
-        return LoadResult(
-            data = data,
-            itemsBefore = position,
-            itemsAfter = COUNT - data.size - position
-        )
-    }
-
-    private fun loadRange(params: LoadParams<Int>): LoadResult<Int, Item> {
-        val data = loadRangeInternal(params.key ?: 0, params.loadSize)
-        return LoadResult(data)
     }
 }
