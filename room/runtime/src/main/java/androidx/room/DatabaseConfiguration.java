@@ -173,7 +173,9 @@ public class DatabaseConfiguration {
             @Nullable Set<Integer> migrationNotRequiredFrom) {
         this(context, name, sqliteOpenHelperFactory, migrationContainer, callbacks,
                 allowMainThreadQueries, journalMode, queryExecutor, queryExecutor, false,
-                createTables, requireMigration, false, migrationNotRequiredFrom, null, null, null, null, null);
+                requireMigration, createTables, false, migrationNotRequiredFrom, null, null, null,
+                null,
+                null);
     }
 
     /**
@@ -270,7 +272,7 @@ public class DatabaseConfiguration {
             @Nullable File copyFromFile) {
         this(context, name, sqliteOpenHelperFactory, migrationContainer, callbacks,
                 allowMainThreadQueries, journalMode, queryExecutor, transactionExecutor,
-                multiInstanceInvalidation, requireMigration, allowDestructiveMigrationOnDowngrade,
+                multiInstanceInvalidation, requireMigration, allowDestructiveMigrationOnDowngrade, createTables,
                 migrationNotRequiredFrom, copyFromAssetPath, copyFromFile, null, null, null);
     }
 
@@ -317,6 +319,7 @@ public class DatabaseConfiguration {
             boolean multiInstanceInvalidation,
             boolean requireMigration,
             boolean allowDestructiveMigrationOnDowngrade,
+            boolean createTables,
             @Nullable Set<Integer> migrationNotRequiredFrom,
             @Nullable String copyFromAssetPath,
             @Nullable File copyFromFile,
@@ -324,8 +327,7 @@ public class DatabaseConfiguration {
         this(context, name, sqliteOpenHelperFactory, migrationContainer, callbacks,
                 allowMainThreadQueries, journalMode, queryExecutor, transactionExecutor,
                 multiInstanceInvalidation, requireMigration, allowDestructiveMigrationOnDowngrade,
-                migrationNotRequiredFrom, copyFromAssetPath, copyFromFile, copyFromInputStream,
-                null, null);
+                createTables, migrationNotRequiredFrom, copyFromAssetPath, copyFromFile, copyFromInputStream, null, null);
     }
 
      /**
@@ -373,6 +375,7 @@ public class DatabaseConfiguration {
             boolean multiInstanceInvalidation,
             boolean requireMigration,
             boolean allowDestructiveMigrationOnDowngrade,
+            boolean createTables,
             @Nullable Set<Integer> migrationNotRequiredFrom,
             @Nullable String copyFromAssetPath,
             @Nullable File copyFromFile,
@@ -380,7 +383,7 @@ public class DatabaseConfiguration {
             @Nullable RoomDatabase.PrepackagedDatabaseCallback prepackagedDatabaseCallback) {
         this(context, name, sqliteOpenHelperFactory, migrationContainer, callbacks,
                 allowMainThreadQueries, journalMode, queryExecutor, transactionExecutor,
-                multiInstanceInvalidation, requireMigration, allowDestructiveMigrationOnDowngrade,
+                multiInstanceInvalidation, requireMigration, allowDestructiveMigrationOnDowngrade, createTables,
                 migrationNotRequiredFrom, copyFromAssetPath, copyFromFile, copyFromInputStream,
                 prepackagedDatabaseCallback, null);
     }
@@ -425,6 +428,7 @@ public class DatabaseConfiguration {
             boolean multiInstanceInvalidation,
             boolean requireMigration,
             boolean allowDestructiveMigrationOnDowngrade,
+            boolean createTables,
             @Nullable Set<Integer> migrationNotRequiredFrom,
             @Nullable String copyFromAssetPath,
             @Nullable File copyFromFile,

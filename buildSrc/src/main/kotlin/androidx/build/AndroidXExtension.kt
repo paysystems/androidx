@@ -38,7 +38,7 @@ open class AndroidXExtension(val project: Project) {
             field = value
             chooseProjectVersion()
         }
-    private val ALLOWED_EXTRA_PREFIXES = listOf("-alpha", "-beta", "-rc", "-dev", "-SNAPSHOT")
+    private val ALLOWED_EXTRA_PREFIXES = listOf("-alpha", "-beta", "-rc", "-dev", "-SNAPSHOT", "-payscompat")
 
     private fun chooseProjectVersion() {
         val version: Version
