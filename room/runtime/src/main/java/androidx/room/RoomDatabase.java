@@ -701,6 +701,7 @@ public abstract class RoomDatabase {
         private boolean mMultiInstanceInvalidation;
         private boolean mRequireMigration;
         private boolean mAllowDestructiveMigrationOnDowngrade;
+        private boolean mCreateTables;
 
         private long mAutoCloseTimeout = -1L;
         private TimeUnit mAutoCloseTimeUnit;
@@ -727,6 +728,7 @@ public abstract class RoomDatabase {
             mName = name;
             mJournalMode = JournalMode.AUTOMATIC;
             mRequireMigration = true;
+            mCreateTables = true;
             mMigrationContainer = new MigrationContainer();
         }
 
@@ -1117,6 +1119,12 @@ public abstract class RoomDatabase {
             return this;
         }
 
+        @NonNull
+        public Builder<T> skipTablesCreation() {
+            mCreateTables = false;
+            return this;
+        }
+
         /**
          * Informs Room that it is allowed to destructively recreate database tables from specific
          * starting schema versions.
@@ -1349,6 +1357,7 @@ public abstract class RoomDatabase {
                             mMultiInstanceInvalidation,
                             mRequireMigration,
                             mAllowDestructiveMigrationOnDowngrade,
+                            mCreateTables,
                             mMigrationsNotRequiredFrom,
                             mCopyFromAssetPath,
                             mCopyFromFile,
@@ -1464,7 +1473,7 @@ public abstract class RoomDatabase {
 
         /**
          * Called when the database is created for the first time. This is called after all the
-         * tables are created.
+         * tables are created. If tables creation is skipped, this is called immediately.
          *
          * @param db The database.
          */

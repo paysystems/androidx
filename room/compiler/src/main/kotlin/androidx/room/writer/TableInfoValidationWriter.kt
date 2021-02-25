@@ -60,8 +60,8 @@ class TableInfoValidationWriter(val entity: Entity) : ValidationWriter() {
                     "$L.put($S, new $T($S, $S, $L, $L, $S, $T.$L))",
                     columnListVar, field.columnName, RoomTypeNames.TABLE_INFO_COLUMN,
                     /*name*/ field.columnName,
-                    /*type*/ field.affinity?.name ?: SQLTypeAffinity.TEXT.name,
-                    /*nonNull*/ field.nonNull,
+                    /*type*/ field.compatColumn?.type ?: field.affinity?.name ?: SQLTypeAffinity.TEXT.name,
+                    /*nonNull*/ field.compatColumn?.nonNull ?: field.nonNull,
                     /*pkeyPos*/ entity.primaryKey.fields.indexOf(field) + 1,
                     /*defaultValue*/ field.defaultValue,
                     /*createdFrom*/ RoomTypeNames.TABLE_INFO, CREATED_FROM_ENTITY

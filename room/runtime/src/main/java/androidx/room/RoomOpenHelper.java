@@ -71,7 +71,13 @@ public class RoomOpenHelper extends SupportSQLiteOpenHelper.Callback {
     @Override
     public void onCreate(SupportSQLiteDatabase db) {
         boolean isEmptyDatabase = hasEmptySchema(db);
-        mDelegate.createAllTables(db);
+        boolean shouldCreateTables = mConfiguration == null || mConfiguration.createTables;
+        if (shouldCreateTables) {
+            mDelegate.createAllTables(db);
+        } else {
+            // Tables creation is skipped. So let the client to create them.
+            mDelegate.onCreate(db);
+        }
         if (!isEmptyDatabase) {
             // A 0 version pre-populated database goes through the create path because the
             // framework's SQLiteOpenHelper thinks the database was just created from scratch. If we
@@ -84,7 +90,10 @@ public class RoomOpenHelper extends SupportSQLiteOpenHelper.Callback {
             }
         }
         updateIdentity(db);
-        mDelegate.onCreate(db);
+        if (shouldCreateTables) {
+            // Tables created by Room.
+            mDelegate.onCreate(db);
+        }
     }
 
     @Override
@@ -109,8 +118,7 @@ public class RoomOpenHelper extends SupportSQLiteOpenHelper.Callback {
             }
         }
         if (!migrated) {
-            if (mConfiguration != null
-                    && !mConfiguration.isMigrationRequired(oldVersion, newVersion)) {
+            if (mConfiguration != null && !mConfiguration.isMigrationRequired(oldVersion, newVersion)) {
                 mDelegate.dropAllTables(db);
                 mDelegate.createAllTables(db);
             } else {

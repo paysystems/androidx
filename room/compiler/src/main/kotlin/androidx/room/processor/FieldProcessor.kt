@@ -16,11 +16,13 @@
 
 package androidx.room.processor
 
+import androidx.room.ColumnCompat
 import androidx.room.ColumnInfo
 import androidx.room.compiler.processing.XFieldElement
 import androidx.room.compiler.processing.XType
 import androidx.room.parser.Collate
 import androidx.room.parser.SQLTypeAffinity
+import androidx.room.vo.CompatColumn
 import androidx.room.vo.EmbeddedField
 import androidx.room.vo.Field
 import java.util.Locale
@@ -38,6 +40,7 @@ class FieldProcessor(
         val member = element.asMemberOf(containing)
         val type = member.typeName
         val columnInfo = element.toAnnotationBox(ColumnInfo::class)?.value
+        val columnCompat = element.toAnnotationBox(ColumnCompat::class)?.value
         val name = element.name
         val rawCName = if (columnInfo != null && columnInfo.name != ColumnInfo.INHERIT_FIELD_NAME) {
             columnInfo.name
@@ -80,7 +83,8 @@ class FieldProcessor(
             ),
             parent = fieldParent,
             indexed = columnInfo?.index ?: false,
-            nonNull = nonNull
+            nonNull = nonNull,
+            compatColumn = columnCompat?.let { CompatColumn(it.type, it.nonNull) }
         )
 
         when (bindingScope) {

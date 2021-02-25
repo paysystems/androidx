@@ -109,6 +109,8 @@ public class DatabaseConfiguration {
      */
     public final boolean allowDestructiveMigrationOnDowngrade;
 
+    public final boolean createTables;
+
     /**
      * The collection of schema versions from which migrations aren't required.
      */
@@ -167,10 +169,11 @@ public class DatabaseConfiguration {
             RoomDatabase.JournalMode journalMode,
             @NonNull Executor queryExecutor,
             boolean requireMigration,
+            boolean createTables,
             @Nullable Set<Integer> migrationNotRequiredFrom) {
         this(context, name, sqliteOpenHelperFactory, migrationContainer, callbacks,
                 allowMainThreadQueries, journalMode, queryExecutor, queryExecutor, false,
-                requireMigration, false, migrationNotRequiredFrom, null, null, null, null, null);
+                createTables, requireMigration, false, migrationNotRequiredFrom, null, null, null, null, null);
     }
 
     /**
@@ -212,11 +215,12 @@ public class DatabaseConfiguration {
             boolean multiInstanceInvalidation,
             boolean requireMigration,
             boolean allowDestructiveMigrationOnDowngrade,
+            boolean createTables,
             @Nullable Set<Integer> migrationNotRequiredFrom) {
         this(context, name, sqliteOpenHelperFactory, migrationContainer, callbacks,
                 allowMainThreadQueries, journalMode, queryExecutor, transactionExecutor,
                 multiInstanceInvalidation, requireMigration, allowDestructiveMigrationOnDowngrade,
-                migrationNotRequiredFrom, null, null, null, null, null);
+                createTables, migrationNotRequiredFrom, null, null, null, null, null);
     }
 
     /**
@@ -260,6 +264,7 @@ public class DatabaseConfiguration {
             boolean multiInstanceInvalidation,
             boolean requireMigration,
             boolean allowDestructiveMigrationOnDowngrade,
+            boolean createTables,
             @Nullable Set<Integer> migrationNotRequiredFrom,
             @Nullable String copyFromAssetPath,
             @Nullable File copyFromFile) {
@@ -438,6 +443,7 @@ public class DatabaseConfiguration {
         this.multiInstanceInvalidation = multiInstanceInvalidation;
         this.requireMigration = requireMigration;
         this.allowDestructiveMigrationOnDowngrade = allowDestructiveMigrationOnDowngrade;
+        this.createTables = createTables;
         this.mMigrationNotRequiredFrom = migrationNotRequiredFrom;
         this.copyFromAssetPath = copyFromAssetPath;
         this.copyFromFile = copyFromFile;
