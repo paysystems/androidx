@@ -36,7 +36,6 @@ import java.util.UUID;
  */
 @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
 public class TestProgressUpdater implements ProgressUpdater {
-
     private static final String TAG = Logger.tagWithPrefix("TestProgressUpdater");
 
     @NonNull
@@ -45,7 +44,6 @@ public class TestProgressUpdater implements ProgressUpdater {
             @NonNull Context context,
             @NonNull UUID id,
             @NonNull Data data) {
-
         Logger.get().info(TAG, String.format("Updating progress for %s (%s)", id, data));
         SettableFuture<Void> future = SettableFuture.create();
         future.set(null);

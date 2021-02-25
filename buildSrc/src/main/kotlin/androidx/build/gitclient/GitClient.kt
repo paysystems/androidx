@@ -16,8 +16,8 @@
 
 package androidx.build.gitclient
 
-import androidx.build.releasenotes.getAOSPLink
 import androidx.build.releasenotes.getBuganizerLink
+import androidx.build.releasenotes.getChangeIdAOSPLink
 import org.gradle.api.logging.Logger
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -59,10 +59,10 @@ class GitClientImpl(
      * The root location for git
      */
     private val workingDir: File,
-    private val logger: Logger? = null,
+    private val logger: Logger?,
     private val commandRunner: GitClient.CommandRunner = RealCommandRunner(
-            workingDir = workingDir,
-            logger = logger
+        workingDir = workingDir,
+        logger = logger
     )
 ) : GitClient {
 
@@ -77,11 +77,13 @@ class GitClientImpl(
         includeUncommitted: Boolean
     ): List<String> {
         // use this if we don't want local changes
-        return commandRunner.executeAndParse(if (includeUncommitted) {
-            "$CHANGED_FILES_CMD_PREFIX $sha"
-        } else {
-            "$CHANGED_FILES_CMD_PREFIX $top $sha"
-        })
+        return commandRunner.executeAndParse(
+            if (includeUncommitted) {
+                "$CHANGED_FILES_CMD_PREFIX HEAD..$sha"
+            } else {
+                "$CHANGED_FILES_CMD_PREFIX $top $sha"
+            }
+        )
     }
 
     /**
@@ -89,9 +91,9 @@ class GitClientImpl(
      */
     override fun findPreviousMergeCL(): String? {
         return commandRunner.executeAndParse(PREV_MERGE_CMD)
-                .firstOrNull()
-                ?.split(" ")
-                ?.firstOrNull()
+            .firstOrNull()
+            ?.split(" ")
+            ?.firstOrNull()
     }
 
     private fun findGitDirInParentFilepath(filepath: File): File? {
@@ -126,7 +128,8 @@ class GitClientImpl(
                     commitSHADelimiter = commitSHADelimiter,
                     subjectDelimiter = subjectDelimiter,
                     authorEmailDelimiter = authorEmailDelimiter
-                ))
+                )
+            )
         }
         return commitLog.toList()
     }
@@ -149,33 +152,32 @@ class GitClientImpl(
         val authorEmailDelimiter: String = "_Author:"
         val dateDelimiter: String = "_Date:"
         val bodyDelimiter: String = "_Body:"
-        val localProjectDir: String = fullProjectDir.toString()
-            .removePrefix(gitRoot.toString())
+        val localProjectDir: String = fullProjectDir.relativeTo(gitRoot).toString()
         val relativeProjectDir: String = fullProjectDir.relativeTo(workingDir).toString()
 
         var gitLogOptions: String =
             "--pretty=format:$commitStartDelimiter%n" +
-                    "$commitSHADelimiter%H%n" +
-                    "$authorEmailDelimiter%ae%n" +
-                    "$dateDelimiter%ad%n" +
-                    "$subjectDelimiter%s%n" +
-                    "$bodyDelimiter%b" +
-                    if (!keepMerges) {
-                        " --no-merges"
-                    } else {
-                        ""
-                    }
+                "$commitSHADelimiter%H%n" +
+                "$authorEmailDelimiter%ae%n" +
+                "$dateDelimiter%ad%n" +
+                "$subjectDelimiter%s%n" +
+                "$bodyDelimiter%b" +
+                if (!keepMerges) {
+                    " --no-merges"
+                } else {
+                    ""
+                }
         var gitLogCmd: String
         if (gitCommitRange.fromExclusive != "") {
             gitLogCmd = "$GIT_LOG_CMD_PREFIX $gitLogOptions " +
-                    "${gitCommitRange.fromExclusive}..${gitCommitRange.untilInclusive}" +
-                    " -- ./$relativeProjectDir"
+                "${gitCommitRange.fromExclusive}..${gitCommitRange.untilInclusive}" +
+                " -- ./$relativeProjectDir"
         } else {
             gitLogCmd = "$GIT_LOG_CMD_PREFIX $gitLogOptions ${gitCommitRange.untilInclusive} -n " +
-                    "${gitCommitRange.n} -- ./$relativeProjectDir"
+                "${gitCommitRange.n} -- ./$relativeProjectDir"
         }
         val gitLogString: String = commandRunner.execute(gitLogCmd)
-        return parseCommitLogString(
+        val commits = parseCommitLogString(
             gitLogString,
             commitStartDelimiter,
             commitSHADelimiter,
@@ -183,6 +185,14 @@ class GitClientImpl(
             authorEmailDelimiter,
             localProjectDir
         )
+        if (commits.isEmpty()) {
+            // Probably an error; log this
+            logger?.warn(
+                "No git commits found! Ran this command: '" +
+                    gitLogCmd + "' and received this output: '" + gitLogString + "'"
+            )
+        }
+        return commits
     }
 
     private class RealCommandRunner(
@@ -191,14 +201,14 @@ class GitClientImpl(
     ) : GitClient.CommandRunner {
         override fun execute(command: String): String {
             val parts = command.split("\\s".toRegex())
-            logger?.info("running command $command")
+            logger?.info("running command $command in $workingDir")
             val proc = ProcessBuilder(*parts.toTypedArray())
                 .directory(workingDir)
                 .redirectOutput(ProcessBuilder.Redirect.PIPE)
                 .redirectError(ProcessBuilder.Redirect.PIPE)
                 .start()
 
-            proc.waitFor(1, TimeUnit.MINUTES)
+            // Read output, waiting for process to finish, as needed
             val stdout = proc
                 .inputStream
                 .bufferedReader()
@@ -208,11 +218,15 @@ class GitClientImpl(
                 .bufferedReader()
                 .readText()
             val message = stdout + stderr
+            // wait potentially a little bit longer in case Git was waiting for us to
+            // read its response before it exited
+            proc.waitFor(10, TimeUnit.SECONDS)
             if (stderr != "") {
                 logger?.error("Response: $message")
             } else {
                 logger?.info("Response: $message")
             }
+            check(proc.exitValue() == 0) { "Nonzero exit value running git command." }
             return stdout
         }
         override fun executeAndParse(command: String): List<String> {
@@ -287,33 +301,53 @@ data class Commit(
     var changeId: String = ""
     var summary: String = ""
     var type: CommitType = CommitType.BUG_FIX
+    var releaseNote: String = ""
+    private val releaseNoteDelimiters: List<String> = listOf(
+        "Relnote:"
+    )
 
     init {
         val listedCommit: List<String> = gitCommit.split('\n')
         listedCommit.filter { line -> line.trim() != "" }.forEach { line ->
-            if (commitSHADelimiter in line) {
-                getSHAFromGitLine(line)
+            processCommitLine(line)
+        }
+    }
+
+    private fun processCommitLine(line: String) {
+        if (commitSHADelimiter in line) {
+            getSHAFromGitLine(line)
+            return
+        }
+        if (subjectDelimiter in line) {
+            getSummary(line)
+            return
+        }
+        if (changeIdDelimiter in line) {
+            getChangeIdFromGitLine(line)
+            return
+        }
+        if (authorEmailDelimiter in line) {
+            getAuthorEmailFromGitLine(line)
+            return
+        }
+        if ("Bug:" in line ||
+            "b/" in line ||
+            "bug:" in line ||
+            "Fixes:" in line ||
+            "fixes b/" in line
+        ) {
+            getBugsFromGitLine(line)
+            return
+        }
+        releaseNoteDelimiters.forEach { delimiter ->
+            if (delimiter in line) {
+                getReleaseNotesFromGitLine(line, gitCommit)
+                return
             }
-            if (subjectDelimiter in line) {
-                getSummary(line)
-            }
-            if (changeIdDelimiter in line) {
-                getChangeIdFromGitLine(line)
-            }
-            if (authorEmailDelimiter in line) {
-                getAuthorEmailFromGitLine(line)
-            }
-            if ("Bug:" in line ||
-                "b/" in line ||
-                "bug:" in line ||
-                "Fixes:" in line ||
-                "fixes b/" in line
-            ) {
-                getBugsFromGitLine(line)
-            }
-            if (projectDir.trim('/') in line) {
-                getFileFromGitLine(line)
-            }
+        }
+        if (projectDir.trim('/') in line) {
+            getFileFromGitLine(line)
+            return
         }
     }
 
@@ -383,9 +417,75 @@ data class Commit(
         }
     }
 
+    /**
+     * Reads in the release notes field from the git commit message line
+     *
+     * They can have a couple valid formats:
+     *
+     * `Release notes: This is a one-line release note`
+     * `Release Notes: "This is a multi-line release note.  This accounts for the use case where
+     *                  the commit cannot be explained in one line"
+     * `release notes: "This is a one-line release note.  The quotes can be used this way too"`
+     */
+    private fun getReleaseNotesFromGitLine(line: String, gitCommit: String) {
+        /* Account for the use of quotes in a release note line
+         * No quotes in the Release Note line means it's a one-line release note
+         * If there are quotes, assume it's a multi-line release note
+         */
+        var quoteCountInRelNoteLine: Int = 0
+        line.forEach { character ->
+            if (character == '"') { quoteCountInRelNoteLine++ }
+        }
+        if (quoteCountInRelNoteLine == 0) {
+            getOneLineReleaseNotesFromGitLine(line)
+        } else {
+            releaseNoteDelimiters.forEach { delimiter ->
+                if (delimiter in line) {
+                    // Find the starting quote of the release notes quote block
+                    var releaseNoteStartIndex = gitCommit.lastIndexOf(delimiter) + delimiter.length
+                    releaseNoteStartIndex = gitCommit.indexOf('"', releaseNoteStartIndex)
+                    // Move to the character after the first quote
+                    if (gitCommit[releaseNoteStartIndex] == '"') {
+                        releaseNoteStartIndex++
+                    }
+                    // Find the ending quote of the release notes quote block
+                    var releaseNoteEndIndex = releaseNoteStartIndex + 1
+                    releaseNoteEndIndex = gitCommit.indexOf('"', releaseNoteEndIndex)
+                    // If there is no closing quote, just use the first line
+                    if (releaseNoteEndIndex < 0) {
+                        getOneLineReleaseNotesFromGitLine(line)
+                        return
+                    }
+                    releaseNote = gitCommit.substring(
+                        startIndex = releaseNoteStartIndex,
+                        endIndex = releaseNoteEndIndex
+                    ).trim()
+                }
+            }
+        }
+    }
+
+    private fun getOneLineReleaseNotesFromGitLine(line: String) {
+        releaseNoteDelimiters.forEach { delimiter ->
+            if (delimiter in line) {
+                releaseNote = line.substringAfter(delimiter).trim(' ', '"')
+                return
+            }
+        }
+    }
+
+    fun getReleaseNoteString(): String {
+        var releaseNoteString: String = releaseNote
+        releaseNoteString += " ${getChangeIdAOSPLink(changeId)}"
+        bugs.forEach { bug ->
+            releaseNoteString += " ${getBuganizerLink(bug)}"
+        }
+        return releaseNoteString
+    }
+
     override fun toString(): String {
         var commitString: String = summary
-        commitString += " ${getAOSPLink(changeId)}"
+        commitString += " ${getChangeIdAOSPLink(changeId)}"
         bugs.forEach { bug ->
             commitString += " ${getBuganizerLink(bug)}"
         }

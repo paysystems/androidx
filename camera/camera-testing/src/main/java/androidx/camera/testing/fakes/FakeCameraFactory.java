@@ -20,16 +20,22 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RestrictTo;
 import androidx.annotation.RestrictTo.Scope;
-import androidx.camera.core.BaseCamera;
-import androidx.camera.core.CameraFactory;
-import androidx.camera.core.CameraX.LensFacing;
-import androidx.camera.core.LensFacingCameraIdFilter;
+import androidx.camera.core.CameraSelector;
+import androidx.camera.core.Logger;
+import androidx.camera.core.impl.CameraFactory;
+import androidx.camera.core.impl.CameraInternal;
+import androidx.core.util.Pair;
+import androidx.core.util.Preconditions;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
 
 /**
  * A {@link CameraFactory} implementation that contains and produces fake cameras.
@@ -39,96 +45,133 @@ import java.util.Set;
 @RestrictTo(Scope.LIBRARY_GROUP)
 public final class FakeCameraFactory implements CameraFactory {
 
-    private static final String BACK_ID = "0";
-    private static final String FRONT_ID = "1";
+    private static final String TAG = "FakeCameraFactory";
 
-    private Set<String> mCameraIds;
+    @Nullable
+    private Set<String> mCachedCameraIds;
+
+    @Nullable
+    private final CameraSelector mAvailableCamerasSelector;
 
     @SuppressWarnings("WeakerAccess") /* synthetic accessor */
-    final Map<String, BaseCamera> mCameraMap = new HashMap<>();
+    final Map<String, Pair<Integer, Callable<CameraInternal>>> mCameraMap = new HashMap<>();
 
     public FakeCameraFactory() {
-        HashSet<String> camIds = new HashSet<>();
-        camIds.add(BACK_ID);
-        camIds.add(FRONT_ID);
+        mAvailableCamerasSelector = null;
+    }
 
-        mCameraIds = Collections.unmodifiableSet(camIds);
-
-        insertCamera(BACK_ID, new FakeCamera(new FakeCameraInfo(0, LensFacing.BACK), null));
-        insertCamera(FRONT_ID, new FakeCamera(new FakeCameraInfo(0, LensFacing.FRONT), null));
+    public FakeCameraFactory(@Nullable CameraSelector availableCamerasSelector) {
+        mAvailableCamerasSelector = availableCamerasSelector;
     }
 
     @Override
     @NonNull
-    public BaseCamera getCamera(@NonNull String cameraId) {
-        if (mCameraIds.contains(cameraId)) {
-            BaseCamera camera = mCameraMap.get(cameraId);
-            if (camera == null) {
-                camera = new FakeCamera();
-                mCameraMap.put(cameraId, camera);
+    public CameraInternal getCamera(@NonNull String cameraId) {
+        Pair<Integer, Callable<CameraInternal>> cameraPair = mCameraMap.get(cameraId);
+        if (cameraPair != null) {
+            try {
+                Callable<CameraInternal> cameraCallable = Preconditions.checkNotNull(
+                        cameraPair.second);
+                return cameraCallable.call();
+            } catch (Exception e) {
+                throw new RuntimeException("Unable to create camera.", e);
             }
-            return camera;
         }
         throw new IllegalArgumentException("Unknown camera: " + cameraId);
     }
 
     /**
-     * Inserts a camera with the given camera ID.
+     * Inserts a {@link Callable} for creating cameras with the given camera ID.
      *
-     * @param cameraId Identifier to use for the camera.
-     * @param camera   Camera implementation.
+     * @param cameraId       Identifier to use for the camera.
+     * @param cameraInternal Callable used to provide the Camera implementation.
      */
-    public void insertCamera(@NonNull String cameraId, @NonNull BaseCamera camera) {
-        if (!mCameraIds.contains(cameraId)) {
-            HashSet<String> newCameraIds = new HashSet<>(mCameraIds);
-            newCameraIds.add(cameraId);
-            mCameraIds = Collections.unmodifiableSet(newCameraIds);
-        }
+    public void insertCamera(@CameraSelector.LensFacing int lensFacing, @NonNull String cameraId,
+            @NonNull Callable<CameraInternal> cameraInternal) {
+        // Invalidate caches
+        mCachedCameraIds = null;
 
-        mCameraMap.put(cameraId, camera);
+        mCameraMap.put(cameraId, Pair.create(lensFacing, cameraInternal));
     }
 
     /**
-     * Inserts a camera with front camera id.
+     * Inserts a camera and sets it as the default front camera.
      *
-     * @param camera Camera implementation.
+     * <p>This is a convenience method for calling
+     * {@link #insertCamera(int, String, Callable)} with
+     * {@link CameraSelector#LENS_FACING_FRONT} for all lens facing arguments.
+     *
+     * @param cameraId       Identifier to use for the front camera.
+     * @param cameraInternal Camera implementation.
      */
-    public void insertFrontCamera(@NonNull BaseCamera camera) {
-        insertCamera(FRONT_ID, camera);
+    public void insertDefaultFrontCamera(@NonNull String cameraId,
+            @NonNull Callable<CameraInternal> cameraInternal) {
+        insertCamera(CameraSelector.LENS_FACING_FRONT, cameraId, cameraInternal);
     }
 
     /**
-     * Inserts a camera with back camera id.
+     * Inserts a camera and sets it as the default back camera.
      *
-     * @param camera Camera implementation.
+     * <p>This is a convenience method for calling
+     * {@link #insertCamera(int, String, Callable)} with
+     * {@link CameraSelector#LENS_FACING_BACK} for all lens facing arguments.
+     *
+     * @param cameraId       Identifier to use for the back camera.
+     * @param cameraInternal Camera implementation.
      */
-    public void insertBackCamera(@NonNull BaseCamera camera) {
-        insertCamera(BACK_ID, camera);
+    public void insertDefaultBackCamera(@NonNull String cameraId,
+            @NonNull Callable<CameraInternal> cameraInternal) {
+        insertCamera(CameraSelector.LENS_FACING_BACK, cameraId, cameraInternal);
     }
 
     @Override
     @NonNull
     public Set<String> getAvailableCameraIds() {
-        return mCameraIds;
-    }
-
-    @Override
-    @Nullable
-    public String cameraIdForLensFacing(@NonNull LensFacing lensFacing) {
-        switch (lensFacing) {
-            case FRONT:
-                return FRONT_ID;
-            case BACK:
-                return BACK_ID;
-            default:
-                return null;
+        // Lazily cache the set of all camera ids. This cache will be invalidated anytime a new
+        // camera is added.
+        if (mCachedCameraIds == null) {
+            if (mAvailableCamerasSelector == null) {
+                mCachedCameraIds = Collections.unmodifiableSet(new HashSet<>(mCameraMap.keySet()));
+            } else {
+                mCachedCameraIds = Collections.unmodifiableSet(new HashSet<>(filteredCameraIds()));
+            }
         }
+        return mCachedCameraIds;
     }
 
-    @Override
+    /** Returns a list of camera ids filtered with {@link #mAvailableCamerasSelector}. */
     @NonNull
-    public LensFacingCameraIdFilter getLensFacingCameraIdFilter(@NonNull LensFacing lensFacing) {
-        return LensFacingCameraIdFilter.createLensFacingCameraIdFilterWithCameraMap(lensFacing,
-                mCameraMap);
+    private List<String> filteredCameraIds() {
+        Preconditions.checkNotNull(mAvailableCamerasSelector);
+        final List<String> filteredCameraIds = new ArrayList<>();
+        for (Map.Entry<String, Pair<Integer, Callable<CameraInternal>>> entry :
+                mCameraMap.entrySet()) {
+            final Callable<CameraInternal> callable = entry.getValue().second;
+            if (callable == null) {
+                continue;
+            }
+            try {
+                final CameraInternal camera = callable.call();
+                try {
+                    // CameraSelector.filter() throws an exception if all the cameras it takes
+                    // are filtered out. In the scenario below, only one camera is processed, so
+                    // if an exception isn't thrown, it's safe to add the camera id.
+                    mAvailableCamerasSelector.filter(
+                            new LinkedHashSet<>(Collections.singleton(camera)));
+                    filteredCameraIds.add(entry.getKey());
+                } catch (IllegalArgumentException exception) {
+                    // No op. The camera was not selected by the selector
+                }
+            } catch (Exception exception) {
+                Logger.e(TAG, "Failed to get access to the camera instance.", exception);
+            }
+        }
+        return filteredCameraIds;
+    }
+
+    @Nullable
+    @Override
+    public Object getCameraManager() {
+        return null;
     }
 }

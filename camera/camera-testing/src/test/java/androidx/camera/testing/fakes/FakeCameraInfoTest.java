@@ -21,8 +21,7 @@ import static com.google.common.truth.Truth.assertThat;
 
 import android.os.Build;
 
-import androidx.camera.core.CameraX;
-import androidx.test.filters.SmallTest;
+import androidx.camera.core.CameraSelector;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -31,20 +30,20 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
 import org.robolectric.annotation.internal.DoNotInstrument;
 
-@SmallTest
 @RunWith(RobolectricTestRunner.class)
 @DoNotInstrument
 @Config(minSdk = Build.VERSION_CODES.LOLLIPOP)
 public final class FakeCameraInfoTest {
 
     private static final int SENSOR_ROTATION_DEGREES = 90;
-    private static final CameraX.LensFacing LENS_FACING = CameraX.LensFacing.FRONT;
+    @CameraSelector.LensFacing
+    private static final int LENS_FACING = CameraSelector.LENS_FACING_FRONT;
 
-    private FakeCameraInfo mFakeCameraInfo;
+    private FakeCameraInfoInternal mFakeCameraInfo;
 
     @Before
     public void setUp() {
-        mFakeCameraInfo = new FakeCameraInfo(SENSOR_ROTATION_DEGREES, LENS_FACING);
+        mFakeCameraInfo = new FakeCameraInfoInternal(SENSOR_ROTATION_DEGREES, LENS_FACING);
     }
 
     @Test

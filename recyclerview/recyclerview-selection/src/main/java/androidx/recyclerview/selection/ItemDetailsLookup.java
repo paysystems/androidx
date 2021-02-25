@@ -44,7 +44,7 @@ import androidx.recyclerview.widget.RecyclerView;
  *       mRecyclerView = recyclerView;
  *   }
  *
- *   public ItemDetails<Uri> getItemDetails(MotionEvent e) {
+ *   public @Nullable ItemDetails<Uri> getItemDetails(@NonNull MotionEvent e) {
  *       View view = mRecyclerView.findChildViewUnder(e.getX(), e.getY());
  *       if (view != null) {
  *           ViewHolder holder = mRecyclerView.getChildViewHolder(view);
@@ -110,10 +110,6 @@ public abstract class ItemDetailsLookup<K> {
         return item != null && item.getSelectionKey() != null;
     }
 
-    private static boolean hasPosition(@Nullable ItemDetails<?> item) {
-        return item != null && item.getPosition() != RecyclerView.NO_POSITION;
-    }
-
     /**
      * @return the ItemDetails for the item under the event, or null.
      */
@@ -176,7 +172,8 @@ public abstract class ItemDetailsLookup<K> {
 
         /**
          * Returns the adapter position of the item. See
-         * {@link RecyclerView.ViewHolder#getAdapterPosition() ViewHolder.getAdapterPosition}
+         * {@link RecyclerView.ViewHolder#getAbsoluteAdapterPosition() ViewHolder
+         * .getAbsoluteAdapterPosition}
          *
          * @return the position of an item.
          */
@@ -241,10 +238,10 @@ public abstract class ItemDetailsLookup<K> {
         @Override
         public boolean equals(@Nullable Object obj) {
             return (obj instanceof ItemDetails)
-                    && isEqualTo((ItemDetails) obj);
+                    && isEqualTo((ItemDetails<?>) obj);
         }
 
-        private boolean isEqualTo(@NonNull ItemDetails other) {
+        private boolean isEqualTo(@NonNull ItemDetails<?> other) {
             K key = getSelectionKey();
             boolean sameKeys = false;
             if (key == null) {

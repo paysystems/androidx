@@ -67,6 +67,7 @@ public abstract class ListenableWorker {
     private volatile boolean mStopped;
 
     private boolean mUsed;
+    private boolean mRunInForeground;
 
     /**
      * @param appContext The application {@link Context}
@@ -204,6 +205,29 @@ public abstract class ListenableWorker {
     }
 
     /**
+     * This specifies that the {@link WorkRequest} is long-running or otherwise important.  In
+     * this case, WorkManager provides a signal to the OS that the process should be kept alive
+     * if possible while this work is executing.
+     * <p>
+     * Calls to {@code setForegroundAsync} *must* complete before a {@link ListenableWorker}
+     * signals completion by returning a {@link Result}.
+     * <p>
+     * Under the hood, WorkManager manages and runs a foreground service on your behalf to
+     * execute this WorkRequest, showing the notification provided in
+     * {@link ForegroundInfo}.
+     *
+     * @param foregroundInfo The {@link ForegroundInfo}
+     * @return A {@link ListenableFuture} which resolves after the {@link ListenableWorker}
+     * transitions to running in the context of a foreground {@link android.app.Service}.
+     */
+    @NonNull
+    public final ListenableFuture<Void> setForegroundAsync(@NonNull ForegroundInfo foregroundInfo) {
+        mRunInForeground = true;
+        return mWorkerParams.getForegroundUpdater()
+                .setForegroundAsync(getApplicationContext(), getId(), foregroundInfo);
+    }
+
+    /**
      * Returns {@code true} if this Worker has been told to stop.  This could be because of an
      * explicit cancellation signal by the user, or because the system has decided to preempt the
      * task. In these cases, the results of the work will be ignored by WorkManager and it is safe
@@ -256,6 +280,16 @@ public abstract class ListenableWorker {
     @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
     public final void setUsed() {
         mUsed = true;
+    }
+
+    /**
+     * @return {@code true} if the {@link ListenableWorker} is running in the context of a
+     * foreground {@link android.app.Service}.
+     * @hide
+     */
+    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+    public boolean isRunInForeground() {
+        return mRunInForeground;
     }
 
     /**
@@ -357,6 +391,13 @@ public abstract class ListenableWorker {
         }
 
         /**
+         * @return The output {@link Data} which will be merged into the input {@link Data} of
+         * any {@link OneTimeWorkRequest} that is dependent on this work request.
+         */
+        @NonNull
+        public abstract Data getOutputData();
+
+        /**
          * @hide
          */
         @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
@@ -388,11 +429,8 @@ public abstract class ListenableWorker {
                 mOutputData = outputData;
             }
 
-            /**
-             * @hide
-             */
-            @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
-            public Data getOutputData() {
+            @Override
+            public @NonNull Data getOutputData() {
                 return mOutputData;
             }
 
@@ -443,11 +481,8 @@ public abstract class ListenableWorker {
                 mOutputData = outputData;
             }
 
-            /**
-             * @hide
-             */
-            @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
-            public Data getOutputData() {
+            @Override
+            public @NonNull Data getOutputData() {
                 return mOutputData;
             }
 
@@ -497,6 +532,12 @@ public abstract class ListenableWorker {
             public int hashCode() {
                 String name = Retry.class.getName();
                 return name.hashCode();
+            }
+
+            @NonNull
+            @Override
+            public Data getOutputData() {
+                return Data.EMPTY;
             }
 
             @Override

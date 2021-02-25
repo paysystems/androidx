@@ -20,17 +20,22 @@ import android.content.Context;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.TotalCaptureResult;
 import android.media.Image;
+import android.util.Pair;
 import android.util.Size;
 import android.view.Surface;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.util.List;
+
 /**
  * Implementation for HDR preview use case.
  *
  * <p>This class should be implemented by OEM and deployed to the target devices. 3P developers
  * don't need to implement this, unless this is used for related testing usage.
+ *
+ * @since 1.0
  */
 public final class HdrPreviewExtenderImpl implements PreviewExtenderImpl {
     private static final int DEFAULT_STAGE_ID = 0;
@@ -67,6 +72,11 @@ public final class HdrPreviewExtenderImpl implements PreviewExtenderImpl {
     @Override
     public ProcessorImpl getProcessor() {
         return mProcessor;
+    }
+
+    @Override
+    public List<Pair<Integer, Size[]>> getSupportedResolutions() {
+        return null;
     }
 
     private PreviewImageProcessorImpl mProcessor = new PreviewImageProcessorImpl() {

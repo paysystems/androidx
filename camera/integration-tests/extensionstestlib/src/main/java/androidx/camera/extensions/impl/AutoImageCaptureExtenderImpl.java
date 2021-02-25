@@ -40,11 +40,14 @@ import java.util.Map;
  *
  * <p>This class should be implemented by OEM and deployed to the target devices. 3P developers
  * don't need to implement this, unless this is used for related testing usage.
+ *
+ * @since 1.0
  */
 public final class AutoImageCaptureExtenderImpl implements ImageCaptureExtenderImpl {
     private static final String TAG = "AutoICExtender";
     private static final int DEFAULT_STAGE_ID = 0;
     private static final int SESSION_STAGE_ID = 101;
+    private static final int EFFECT = CaptureRequest.CONTROL_EFFECT_MODE_SOLARIZE;
 
     public AutoImageCaptureExtenderImpl() {
     }
@@ -57,15 +60,22 @@ public final class AutoImageCaptureExtenderImpl implements ImageCaptureExtenderI
     public boolean isExtensionAvailable(@NonNull String cameraId,
             @Nullable CameraCharacteristics cameraCharacteristics) {
         // Requires API 23 for ImageWriter
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M;
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            return false;
+        }
+
+        if (cameraCharacteristics == null) {
+            return false;
+        }
+
+        return CameraCharacteristicAvailability.isEffectAvailable(cameraCharacteristics, EFFECT);
     }
 
     @Override
     public List<CaptureStageImpl> getCaptureStages() {
         // Placeholder set of CaptureRequest.Key values
         SettableCaptureStage captureStage = new SettableCaptureStage(DEFAULT_STAGE_ID);
-        captureStage.addCaptureRequestParameters(CaptureRequest.CONTROL_EFFECT_MODE,
-                CaptureRequest.CONTROL_EFFECT_MODE_SOLARIZE);
+        captureStage.addCaptureRequestParameters(CaptureRequest.CONTROL_EFFECT_MODE, EFFECT);
         List<CaptureStageImpl> captureStages = new ArrayList<>();
         captureStages.add(captureStage);
         return captureStages;
@@ -144,8 +154,7 @@ public final class AutoImageCaptureExtenderImpl implements ImageCaptureExtenderI
         // Set the necessary CaptureRequest parameters via CaptureStage, here we use some
         // placeholder set of CaptureRequest.Key values
         SettableCaptureStage captureStage = new SettableCaptureStage(SESSION_STAGE_ID);
-        captureStage.addCaptureRequestParameters(CaptureRequest.CONTROL_EFFECT_MODE,
-                CaptureRequest.CONTROL_EFFECT_MODE_SOLARIZE);
+        captureStage.addCaptureRequestParameters(CaptureRequest.CONTROL_EFFECT_MODE, EFFECT);
 
         return captureStage;
     }
@@ -155,8 +164,7 @@ public final class AutoImageCaptureExtenderImpl implements ImageCaptureExtenderI
         // Set the necessary CaptureRequest parameters via CaptureStage, here we use some
         // placeholder set of CaptureRequest.Key values
         SettableCaptureStage captureStage = new SettableCaptureStage(SESSION_STAGE_ID);
-        captureStage.addCaptureRequestParameters(CaptureRequest.CONTROL_EFFECT_MODE,
-                CaptureRequest.CONTROL_EFFECT_MODE_SOLARIZE);
+        captureStage.addCaptureRequestParameters(CaptureRequest.CONTROL_EFFECT_MODE, EFFECT);
 
         return captureStage;
     }
@@ -166,8 +174,7 @@ public final class AutoImageCaptureExtenderImpl implements ImageCaptureExtenderI
         // Set the necessary CaptureRequest parameters via CaptureStage, here we use some
         // placeholder set of CaptureRequest.Key values
         SettableCaptureStage captureStage = new SettableCaptureStage(SESSION_STAGE_ID);
-        captureStage.addCaptureRequestParameters(CaptureRequest.CONTROL_EFFECT_MODE,
-                CaptureRequest.CONTROL_EFFECT_MODE_SOLARIZE);
+        captureStage.addCaptureRequestParameters(CaptureRequest.CONTROL_EFFECT_MODE, EFFECT);
 
         return captureStage;
     }
@@ -175,5 +182,10 @@ public final class AutoImageCaptureExtenderImpl implements ImageCaptureExtenderI
     @Override
     public int getMaxCaptureStage() {
         return 3;
+    }
+
+    @Override
+    public List<Pair<Integer, Size[]>> getSupportedResolutions() {
+        return null;
     }
 }

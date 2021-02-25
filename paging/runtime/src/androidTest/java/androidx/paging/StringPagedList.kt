@@ -16,63 +16,56 @@
 
 package androidx.paging
 
-import androidx.testutils.TestDispatcher
+import androidx.paging.PagingSource.LoadResult.Error
+import androidx.paging.PagingSource.LoadResult.Page
+import androidx.testutils.DirectDispatcher
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.runBlocking
 
-class StringPagedList constructor(
-    leadingNulls: Int,
-    trailingNulls: Int,
-    vararg items: String,
-    list: List<String> = items.toList()
-) : PagedList<String>(
-    GlobalScope,
-    PagedSourceWrapper(ListDataSource(list)),
-    PagedStorage(),
-    TestDispatcher(),
-    TestDispatcher(),
-    null,
-    Config.Builder().setPageSize(1).build()
-), PagedStorage.Callback {
-    var detached = false
-
-    init {
-        val keyedStorage = getStorage()
-        keyedStorage.init(
-            leadingNulls,
-            list,
-            trailingNulls,
-            0,
-            this
+private class FakeSource<Value : Any>(
+    private val leadingNulls: Int,
+    private val trailingNulls: Int,
+    private val data: List<Value>
+) : PagingSource<Any, Value>() {
+    override suspend fun load(params: LoadParams<Any>): LoadResult<Any, Value> {
+        if (params is LoadParams.Refresh) {
+            return Page(
+                data = data,
+                prevKey = null,
+                nextKey = null,
+                itemsBefore = leadingNulls,
+                itemsAfter = trailingNulls
+            )
+        }
+        // TODO: prevent null-key load start/end
+        return Error(
+            IllegalArgumentException("This test source only supports initial load")
         )
     }
 
-    override val lastKey: Any? = null
+    override fun getRefreshKey(state: PagingState<Any, Value>): Any? = null
+}
 
-    override val isDetached
-        get() = detached
-
-    override fun detach() {
-        detached = true
-    }
-
-    override fun dispatchUpdatesSinceSnapshot(snapshot: PagedList<String>, callback: Callback) {}
-
-    override fun dispatchCurrentLoadState(callback: LoadStateListener) {}
-
-    override fun loadAroundInternal(index: Int) {}
-
-    override fun onInitialized(count: Int) {}
-
-    override fun onPagePrepended(leadingNulls: Int, changed: Int, added: Int) {}
-
-    override fun onPageAppended(endPosition: Int, changed: Int, added: Int) {}
-
-    override fun onPagePlaceholderInserted(pageIndex: Int) {}
-
-    override fun onPageInserted(start: Int, count: Int) {}
-
-    override fun onPagesRemoved(startOfDrops: Int, count: Int) = notifyRemoved(startOfDrops, count)
-
-    override fun onPagesSwappedToPlaceholder(startOfDrops: Int, count: Int) =
-        notifyChanged(startOfDrops, count)
+@Suppress("TestFunctionName", "DEPRECATION")
+fun StringPagedList(
+    leadingNulls: Int,
+    trailingNulls: Int,
+    vararg items: String
+): PagedList<String> = runBlocking {
+    PagedList.create(
+        initialPage = Page<Any, String>(
+            data = items.toList(),
+            prevKey = null,
+            nextKey = null,
+            itemsBefore = leadingNulls,
+            itemsAfter = trailingNulls
+        ),
+        pagingSource = FakeSource(leadingNulls, trailingNulls, items.toList()),
+        coroutineScope = GlobalScope,
+        notifyDispatcher = DirectDispatcher,
+        fetchDispatcher = DirectDispatcher,
+        boundaryCallback = null,
+        config = Config(1, prefetchDistance = 0),
+        key = null
+    )
 }

@@ -16,9 +16,11 @@
 
 package androidx.room.verifier
 
+import androidx.room.compiler.processing.XElement
 import androidx.room.processor.Context
 import androidx.room.vo.DatabaseView
 import androidx.room.vo.Entity
+import androidx.room.vo.EntityOrView
 import androidx.room.vo.FtsEntity
 import androidx.room.vo.FtsOptions
 import androidx.room.vo.Warning
@@ -29,7 +31,6 @@ import java.io.File
 import java.sql.Connection
 import java.sql.SQLException
 import java.util.regex.Pattern
-import javax.lang.model.element.Element
 
 /**
  * Builds an in-memory version of the database and verifies the queries against it.
@@ -38,9 +39,11 @@ import javax.lang.model.element.Element
 class DatabaseVerifier private constructor(
     val connection: Connection,
     val context: Context,
-    val entities: List<Entity>,
+    entities: List<Entity>,
     views: List<DatabaseView>
 ) {
+    val entitiesAndViews: List<EntityOrView> = entities + views
+
     companion object {
         private const val CONNECTION_URL = "jdbc:sqlite::memory:"
 
@@ -66,7 +69,7 @@ class DatabaseVerifier private constructor(
             // UUID named library files.
             synchronized(System::class.java) {
                 SQLiteJDBCLoader.initialize() // extract and loads native library
-                JDBC.isValidURL(CONNECTION_URL) // dummy call to register driver
+                JDBC.isValidURL(CONNECTION_URL) // call to register driver
             }
         }
 
@@ -75,18 +78,18 @@ class DatabaseVerifier private constructor(
             val tempDir = System.getProperty("org.sqlite.tmpdir", defaultTempDir)
             checkNotNull(tempDir) {
                 "Room needs the java.io.tmpdir or org.sqlite.tmpdir system property to be set to " +
-                        "setup SQLite."
+                    "setup SQLite."
             }
             File(tempDir).also {
                 check(
                     it.isDirectory &&
-                            (it.exists() || it.mkdirs()) &&
-                            it.canRead() &&
-                            it.canWrite()
+                        (it.exists() || it.mkdirs()) &&
+                        it.canRead() &&
+                        it.canWrite()
                 ) {
                     "The temp dir [$tempDir] needs to be a directory, must be readable, writable " +
-                            "and allow executables. Please, provide a temporary directory that " +
-                            "fits the requirements via the 'org.sqlite.tmpdir' property."
+                        "and allow executables. Please, provide a temporary directory that " +
+                        "fits the requirements via the 'org.sqlite.tmpdir' property."
                 }
             }
         }
@@ -96,7 +99,7 @@ class DatabaseVerifier private constructor(
          */
         fun create(
             context: Context,
-            element: Element,
+            element: XElement,
             entities: List<Entity>,
             views: List<DatabaseView>
         ): DatabaseVerifier? {
@@ -117,7 +120,8 @@ class DatabaseVerifier private constructor(
         entities.forEach { entity ->
             val stmt = connection.createStatement()
             val createTableQuery = if (entity is FtsEntity &&
-                !FtsOptions.defaultTokenizers.contains(entity.ftsOptions.tokenizer)) {
+                !FtsOptions.defaultTokenizers.contains(entity.ftsOptions.tokenizer)
+            ) {
                 // Custom FTS tokenizer used, use create statement without custom tokenizer
                 // since the DB used for verification probably doesn't have the tokenizer.
                 entity.getCreateTableQueryWithoutTokenizer()
@@ -153,7 +157,7 @@ class DatabaseVerifier private constructor(
     }
 
     private fun stripLocalizeCollations(sql: String) =
-            COLLATE_LOCALIZED_UNICODE_PATTERN.matcher(sql).replaceAll(" COLLATE NOCASE")
+        COLLATE_LOCALIZED_UNICODE_PATTERN.matcher(sql).replaceAll(" COLLATE NOCASE")
 
     fun closeConnection(context: Context) {
         if (!connection.isClosed) {

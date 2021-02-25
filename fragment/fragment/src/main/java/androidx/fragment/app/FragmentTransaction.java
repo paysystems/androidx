@@ -20,6 +20,7 @@ import static androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX;
 
 import android.os.Bundle;
 import android.view.View;
+import android.view.ViewGroup;
 
 import androidx.annotation.AnimRes;
 import androidx.annotation.AnimatorRes;
@@ -62,6 +63,7 @@ public abstract class FragmentTransaction {
     static final class Op {
         int mCmd;
         Fragment mFragment;
+        boolean mTopmostFragment;
         int mEnterAnim;
         int mExitAnim;
         int mPopEnterAnim;
@@ -75,6 +77,15 @@ public abstract class FragmentTransaction {
         Op(int cmd, Fragment fragment) {
             this.mCmd = cmd;
             this.mFragment = fragment;
+            this.mTopmostFragment = false;
+            this.mOldMaxState = Lifecycle.State.RESUMED;
+            this.mCurrentMaxState = Lifecycle.State.RESUMED;
+        }
+
+        Op(int cmd, Fragment fragment, boolean topmostFragment) {
+            this.mCmd = cmd;
+            this.mFragment = fragment;
+            this.mTopmostFragment = topmostFragment;
             this.mOldMaxState = Lifecycle.State.RESUMED;
             this.mCurrentMaxState = Lifecycle.State.RESUMED;
         }
@@ -82,6 +93,7 @@ public abstract class FragmentTransaction {
         Op(int cmd, @NonNull Fragment fragment, Lifecycle.State state) {
             this.mCmd = cmd;
             this.mFragment = fragment;
+            this.mTopmostFragment = false;
             this.mOldMaxState = fragment.mMaxState;
             this.mCurrentMaxState = state;
         }
@@ -232,6 +244,12 @@ public abstract class FragmentTransaction {
             @Nullable String tag) {
         doAddOp(containerViewId, fragment, tag, OP_ADD);
         return this;
+    }
+
+    FragmentTransaction add(@NonNull ViewGroup container, @NonNull Fragment fragment,
+            @Nullable String tag) {
+        fragment.mContainer = container;
+        return add(container.getId(), fragment, tag);
     }
 
     void doAddOp(int containerViewId, Fragment fragment, @Nullable String tag, int opcmd) {
@@ -447,9 +465,13 @@ public abstract class FragmentTransaction {
      * already above the received state, it will be forced down to the correct state.
      *
      * <p>The fragment provided must currently be added to the FragmentManager to have it's
-     * Lifecycle state capped, or previously added as part of this transaction. The
-     * {@link Lifecycle.State} passed in must at least be {@link Lifecycle.State#CREATED}, otherwise
-     * an {@link IllegalArgumentException} will be thrown.</p>
+     * Lifecycle state capped, or previously added as part of this transaction. If the
+     * {@link Lifecycle.State#INITIALIZED} is passed in as the {@link Lifecycle.State} and the
+     * provided fragment has already moved beyond {@link Lifecycle.State#INITIALIZED}, an
+     * {@link IllegalArgumentException} will be thrown.</p>
+     *
+     * <p>If the {@link Lifecycle.State#DESTROYED} is passed in as the {@link Lifecycle.State} an
+     * {@link IllegalArgumentException} will be thrown.</p>
      *
      * @param fragment the fragment to have it's state capped.
      * @param state the ceiling state for the fragment.
@@ -503,6 +525,19 @@ public abstract class FragmentTransaction {
      * entering and exiting in this transaction. These animations will not be
      * played when popping the back stack.
      *
+     * <p>This method applies the custom animations to all future fragment operations; previous
+     * operations are unaffected. Fragment operations in the same {@link FragmentTransaction} can
+     * set different animations by calling this method prior to each operation, e.g:
+     *
+     * <pre class="prettyprint">
+     *  fragmentManager.beingTransaction()
+     *      .setCustomAnimations(enter1, exit1)
+     *      .add(MyFragmentClass, args, tag1) // this fragment gets the first animations
+     *      .setCustomAnimations(enter2, exit2)
+     *      .add(MyFragmentClass, args, tag2) // this fragment gets the second animations
+     *      .commit()
+     * </pre>
+     *
      * @param enter An animation or animator resource ID used for the enter animation on the
      *              view of the fragment being added or attached.
      * @param exit An animation or animator resource ID used for the exit animation on the
@@ -519,6 +554,19 @@ public abstract class FragmentTransaction {
      * entering and exiting in this transaction. The <code>popEnter</code>
      * and <code>popExit</code> animations will be played for enter/exit
      * operations specifically when popping the back stack.
+     *
+     * <p>This method applies the custom animations to all future fragment operations; previous
+     * operations are unaffected. Fragment operations in the same {@link FragmentTransaction} can
+     * set different animations by calling this method prior to each operation, e.g:
+     *
+     * <pre class="prettyprint">
+     *  fragmentManager.beingTransaction()
+     *      .setCustomAnimations(enter1, exit1, popEnter1, popExit1)
+     *      .add(MyFragmentClass, args, tag1) // this fragment gets the first animations
+     *      .setCustomAnimations(enter2, exit2, popEnter2, popExit2)
+     *      .add(MyFragmentClass, args, tag2) // this fragment gets the second animations
+     *      .commit()
+     * </pre>
      *
      * @param enter An animation or animator resource ID used for the enter animation on the
      *              view of the fragment being added or attached.

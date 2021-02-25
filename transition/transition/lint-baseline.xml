@@ -1,301 +1,400 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<issues format="5" by="lint 3.5.0-beta04" client="gradle" variant="debug" version="3.5.0-beta04">
+<issues format="5" by="lint 4.2.0-beta02" client="gradle" variant="debug" version="4.2.0-beta02">
 
     <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public ArcMotion(Context context, AttributeSet attrs) {"
-        errorLine2="                     ~~~~~~~">
+        id="BanUncheckedReflection"
+        message="Calling Method.invoke without an SDK check"
+        errorLine1="                        (View) sAddGhostMethod.invoke(null, view, viewGroup, matrix));"
+        errorLine2="                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/androidx/transition/ArcMotion.java"
-            line="70"
+            file="src/main/java/androidx/transition/GhostViewPlatform.java"
+            line="47"
+            column="32"/>
+    </issue>
+
+    <issue
+        id="BanUncheckedReflection"
+        message="Calling Method.invoke without an SDK check"
+        errorLine1="                sRemoveGhostMethod.invoke(null, view);"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/transition/GhostViewPlatform.java"
+            line="61"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="BanUncheckedReflection"
+        message="Calling Method.invoke without an SDK check"
+        errorLine1="                sCancelMethod.invoke(t);"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/transition/ViewGroupUtilsApi14.java"
+            line="125"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="BanUncheckedReflection"
+        message="Calling Method.invoke without an SDK check"
+        errorLine1="                    sInvalidateChildInParentFastMethod.invoke(mHostView, left, top, dirty);"
+        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/transition/ViewOverlayApi14.java"
+            line="289"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="BanUncheckedReflection"
+        message="Calling Method.invoke without an SDK check"
+        errorLine1="                sSetFrameMethod.invoke(v, left, top, right, bottom);"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/transition/ViewUtilsBase.java"
+            line="145"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="PrivateConstructorForUtilityClass"
+        message="Utility class with non private constructor"
+        errorLine1="    private static class ArrayListManager {"
+        errorLine2="                         ~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/transition/Transition.java"
+            line="2379"
+            column="26"/>
+    </issue>
+
+    <issue
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 19, the call containing class androidx.transition.AnimatorUtils is not annotated with @RequiresApi(x) where x is at least 19. Either annotate the containing class with at least @RequiresApi(19) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(19)."
+        errorLine1="            animator.addPauseListener(listener);"
+        errorLine2="                     ~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/transition/AnimatorUtils.java"
+            line="32"
             column="22"/>
     </issue>
 
     <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public ArcMotion(Context context, AttributeSet attrs) {"
-        errorLine2="                                      ~~~~~~~~~~~~">
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 19, the call containing class androidx.transition.AnimatorUtils is not annotated with @RequiresApi(x) where x is at least 19. Either annotate the containing class with at least @RequiresApi(19) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(19)."
+        errorLine1="            animator.pause();"
+        errorLine2="                     ~~~~~">
         <location
-            file="src/main/java/androidx/transition/ArcMotion.java"
-            line="70"
-            column="39"/>
+            file="src/main/java/androidx/transition/AnimatorUtils.java"
+            line="38"
+            column="22"/>
     </issue>
 
     <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Path getPath(float startX, float startY, float endX, float endY) {"
-        errorLine2="           ~~~~">
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 19, the call containing class androidx.transition.AnimatorUtils is not annotated with @RequiresApi(x) where x is at least 19. Either annotate the containing class with at least @RequiresApi(19) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(19)."
+        errorLine1="            animator.resume();"
+        errorLine2="                     ~~~~~~">
         <location
-            file="src/main/java/androidx/transition/ArcMotion.java"
-            line="184"
-            column="12"/>
+            file="src/main/java/androidx/transition/AnimatorUtils.java"
+            line="54"
+            column="22"/>
     </issue>
 
     <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public AutoTransition(Context context, AttributeSet attrs) {"
-        errorLine2="                          ~~~~~~~">
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 29, the call containing class androidx.transition.CanvasUtils is not annotated with @RequiresApi(x) where x is at least 29. Either annotate the containing class with at least @RequiresApi(29) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(29)."
+        errorLine1="                canvas.enableZ();"
+        errorLine2="                       ~~~~~~~">
         <location
-            file="src/main/java/androidx/transition/AutoTransition.java"
-            line="41"
-            column="27"/>
+            file="src/main/java/androidx/transition/CanvasUtils.java"
+            line="45"
+            column="24"/>
     </issue>
 
     <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public AutoTransition(Context context, AttributeSet attrs) {"
-        errorLine2="                                           ~~~~~~~~~~~~">
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 29, the call containing class androidx.transition.CanvasUtils is not annotated with @RequiresApi(x) where x is at least 29. Either annotate the containing class with at least @RequiresApi(29) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(29)."
+        errorLine1="                canvas.disableZ();"
+        errorLine2="                       ~~~~~~~~">
         <location
-            file="src/main/java/androidx/transition/AutoTransition.java"
-            line="41"
-            column="44"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public ChangeBounds(Context context, AttributeSet attrs) {"
-        errorLine2="                        ~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/ChangeBounds.java"
-            line="175"
-            column="25"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public ChangeBounds(Context context, AttributeSet attrs) {"
-        errorLine2="                                         ~~~~~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/ChangeBounds.java"
-            line="175"
-            column="42"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public String[] getTransitionProperties() {"
-        errorLine2="           ~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/ChangeClipBounds.java"
+            file="src/main/java/androidx/transition/CanvasUtils.java"
             line="47"
-            column="12"/>
+            column="24"/>
     </issue>
 
     <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public ChangeClipBounds(Context context, AttributeSet attrs) {"
-        errorLine2="                            ~~~~~~~">
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 21, the call containing class androidx.transition.GhostViewHolder is not annotated with @RequiresApi(x) where x is at least 21. Either annotate the containing class with at least @RequiresApi(21) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(21)."
+        errorLine1="            if (view.getZ() != comparedWith.getZ()) {"
+        errorLine2="                     ~~~~">
         <location
-            file="src/main/java/androidx/transition/ChangeClipBounds.java"
-            line="54"
-            column="29"/>
+            file="src/main/java/androidx/transition/GhostViewHolder.java"
+            line="176"
+            column="22"/>
     </issue>
 
     <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public ChangeClipBounds(Context context, AttributeSet attrs) {"
-        errorLine2="                                             ~~~~~~~~~~~~">
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 21, the call containing class androidx.transition.GhostViewHolder is not annotated with @RequiresApi(x) where x is at least 21. Either annotate the containing class with at least @RequiresApi(21) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(21)."
+        errorLine1="            if (view.getZ() != comparedWith.getZ()) {"
+        errorLine2="                                            ~~~~">
         <location
-            file="src/main/java/androidx/transition/ChangeClipBounds.java"
-            line="54"
-            column="46"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Animator createAnimator(@NonNull final ViewGroup sceneRoot, TransitionValues startValues,"
-        errorLine2="           ~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/ChangeClipBounds.java"
-            line="83"
-            column="12"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Animator createAnimator(@NonNull final ViewGroup sceneRoot, TransitionValues startValues,"
-        errorLine2="                                                                       ~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/ChangeClipBounds.java"
-            line="83"
-            column="72"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="            TransitionValues endValues) {"
-        errorLine2="            ~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/ChangeClipBounds.java"
-            line="84"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public ChangeImageTransform(Context context, AttributeSet attrs) {"
-        errorLine2="                                ~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/ChangeImageTransform.java"
-            line="77"
-            column="33"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public ChangeImageTransform(Context context, AttributeSet attrs) {"
-        errorLine2="                                                 ~~~~~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/ChangeImageTransform.java"
-            line="77"
-            column="50"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public String[] getTransitionProperties() {"
-        errorLine2="           ~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/ChangeImageTransform.java"
-            line="114"
-            column="12"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Animator createAnimator(@NonNull ViewGroup sceneRoot, TransitionValues startValues,"
-        errorLine2="           ~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/ChangeImageTransform.java"
-            line="129"
-            column="12"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Animator createAnimator(@NonNull ViewGroup sceneRoot, TransitionValues startValues,"
-        errorLine2="                                                                 ~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/ChangeImageTransform.java"
-            line="129"
-            column="66"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="            final TransitionValues endValues) {"
-        errorLine2="                  ~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/ChangeImageTransform.java"
-            line="130"
-            column="19"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public ChangeScroll(Context context, AttributeSet attrs) {"
-        errorLine2="                        ~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/ChangeScroll.java"
-            line="46"
-            column="25"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public ChangeScroll(Context context, AttributeSet attrs) {"
-        errorLine2="                                         ~~~~~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/ChangeScroll.java"
-            line="46"
-            column="42"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public ChangeTransform(Context context, AttributeSet attrs) {"
-        errorLine2="                           ~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/ChangeTransform.java"
-            line="113"
-            column="28"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public ChangeTransform(Context context, AttributeSet attrs) {"
-        errorLine2="                                            ~~~~~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/ChangeTransform.java"
-            line="113"
+            file="src/main/java/androidx/transition/GhostViewHolder.java"
+            line="176"
             column="45"/>
     </issue>
 
     <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public String[] getTransitionProperties() {"
-        errorLine2="           ~~~~~~~~">
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 21, the call containing class androidx.transition.GhostViewHolder is not annotated with @RequiresApi(x) where x is at least 21. Either annotate the containing class with at least @RequiresApi(21) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(21)."
+        errorLine1="                return view.getZ() > comparedWith.getZ();"
+        errorLine2="                            ~~~~">
         <location
-            file="src/main/java/androidx/transition/ChangeTransform.java"
-            line="192"
-            column="12"/>
+            file="src/main/java/androidx/transition/GhostViewHolder.java"
+            line="177"
+            column="29"/>
     </issue>
 
     <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Animator createAnimator(@NonNull ViewGroup sceneRoot, TransitionValues startValues,"
-        errorLine2="           ~~~~~~~~">
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 21, the call containing class androidx.transition.GhostViewHolder is not annotated with @RequiresApi(x) where x is at least 21. Either annotate the containing class with at least @RequiresApi(21) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(21)."
+        errorLine1="                return view.getZ() > comparedWith.getZ();"
+        errorLine2="                                                  ~~~~">
         <location
-            file="src/main/java/androidx/transition/ChangeTransform.java"
-            line="242"
-            column="12"/>
+            file="src/main/java/androidx/transition/GhostViewHolder.java"
+            line="177"
+            column="51"/>
     </issue>
 
     <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Animator createAnimator(@NonNull ViewGroup sceneRoot, TransitionValues startValues,"
-        errorLine2="                                                                 ~~~~~~~~~~~~~~~~">
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 29, the call containing class androidx.transition.ImageViewUtils is not annotated with @RequiresApi(x) where x is at least 29. Either annotate the containing class with at least @RequiresApi(29) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(29)."
+        errorLine1="            view.animateTransform(matrix);"
+        errorLine2="                 ~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/androidx/transition/ChangeTransform.java"
-            line="242"
-            column="66"/>
+            file="src/main/java/androidx/transition/ImageViewUtils.java"
+            line="46"
+            column="18"/>
     </issue>
 
     <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="            TransitionValues endValues) {"
-        errorLine2="            ~~~~~~~~~~~~~~~~">
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 29, the call containing class androidx.transition.ImageViewUtils is not annotated with @RequiresApi(x) where x is at least 29. Either annotate the containing class with at least @RequiresApi(29) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(29)."
+        errorLine1="                view.animateTransform(matrix);"
+        errorLine2="                     ~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/androidx/transition/ChangeTransform.java"
-            line="243"
-            column="13"/>
+            file="src/main/java/androidx/transition/ImageViewUtils.java"
+            line="92"
+            column="22"/>
+    </issue>
+
+    <issue
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 21, the call containing class androidx.transition.ObjectAnimatorUtils is not annotated with @RequiresApi(x) where x is at least 21. Either annotate the containing class with at least @RequiresApi(21) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(21)."
+        errorLine1="            return ObjectAnimator.ofObject(target, property, null, path);"
+        errorLine2="                                  ~~~~~~~~">
+        <location
+            file="src/main/java/androidx/transition/ObjectAnimatorUtils.java"
+            line="29"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 21, the call containing class androidx.transition.PropertyValuesHolderUtils is not annotated with @RequiresApi(x) where x is at least 21. Either annotate the containing class with at least @RequiresApi(21) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(21)."
+        errorLine1="            return PropertyValuesHolder.ofObject(property, null, path);"
+        errorLine2="                                        ~~~~~~~~">
+        <location
+            file="src/main/java/androidx/transition/PropertyValuesHolderUtils.java"
+            line="39"
+            column="41"/>
+    </issue>
+
+    <issue
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 19, the call containing class androidx.transition.TransitionUtils is not annotated with @RequiresApi(x) where x is at least 19. Either annotate the containing class with at least @RequiresApi(19) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(19)."
+        errorLine1="            addToOverlay = !view.isAttachedToWindow();"
+        errorLine2="                                 ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/transition/TransitionUtils.java"
+            line="94"
+            column="34"/>
+    </issue>
+
+    <issue
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 19, the call containing class androidx.transition.TransitionUtils is not annotated with @RequiresApi(x) where x is at least 19. Either annotate the containing class with at least @RequiresApi(19) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(19)."
+        errorLine1="            sceneRootIsAttached = sceneRoot == null ? false : sceneRoot.isAttachedToWindow();"
+        errorLine2="                                                                        ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/transition/TransitionUtils.java"
+            line="95"
+            column="73"/>
+    </issue>
+
+    <issue
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 18, the call containing class androidx.transition.TransitionUtils is not annotated with @RequiresApi(x) where x is at least 18. Either annotate the containing class with at least @RequiresApi(18) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(18)."
+        errorLine1="            sceneRoot.getOverlay().add(view);"
+        errorLine2="                      ~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/transition/TransitionUtils.java"
+            line="108"
+            column="23"/>
+    </issue>
+
+    <issue
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 18, the call containing class androidx.transition.TransitionUtils is not annotated with @RequiresApi(x) where x is at least 18. Either annotate the containing class with at least @RequiresApi(18) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(18)."
+        errorLine1="            sceneRoot.getOverlay().add(view);"
+        errorLine2="                                   ~~~">
+        <location
+            file="src/main/java/androidx/transition/TransitionUtils.java"
+            line="108"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 28, the call containing class androidx.transition.TransitionUtils is not annotated with @RequiresApi(x) where x is at least 28. Either annotate the containing class with at least @RequiresApi(28) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(28)."
+        errorLine1="                bitmap = Bitmap.createBitmap(picture);"
+        errorLine2="                                ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/transition/TransitionUtils.java"
+            line="127"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 18, the call containing class androidx.transition.TransitionUtils is not annotated with @RequiresApi(x) where x is at least 18. Either annotate the containing class with at least @RequiresApi(18) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(18)."
+        errorLine1="            sceneRoot.getOverlay().remove(view);"
+        errorLine2="                      ~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/transition/TransitionUtils.java"
+            line="137"
+            column="23"/>
+    </issue>
+
+    <issue
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 18, the call containing class androidx.transition.TransitionUtils is not annotated with @RequiresApi(x) where x is at least 18. Either annotate the containing class with at least @RequiresApi(18) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(18)."
+        errorLine1="            sceneRoot.getOverlay().remove(view);"
+        errorLine2="                                   ~~~~~~">
+        <location
+            file="src/main/java/androidx/transition/TransitionUtils.java"
+            line="137"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 29, the call containing class androidx.transition.ViewGroupUtils is not annotated with @RequiresApi(x) where x is at least 29. Either annotate the containing class with at least @RequiresApi(29) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(29)."
+        errorLine1="            group.suppressLayout(suppress);"
+        errorLine2="                  ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/transition/ViewGroupUtils.java"
+            line="57"
+            column="19"/>
+    </issue>
+
+    <issue
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 29, the call containing class androidx.transition.ViewGroupUtils is not annotated with @RequiresApi(x) where x is at least 29. Either annotate the containing class with at least @RequiresApi(29) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(29)."
+        errorLine1="                group.suppressLayout(suppress);"
+        errorLine2="                      ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/transition/ViewGroupUtils.java"
+            line="72"
+            column="23"/>
+    </issue>
+
+    <issue
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 29, the call containing class androidx.transition.ViewGroupUtils is not annotated with @RequiresApi(x) where x is at least 29. Either annotate the containing class with at least @RequiresApi(29) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(29)."
+        errorLine1="            return viewGroup.getChildDrawingOrder(i);"
+        errorLine2="                             ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/transition/ViewGroupUtils.java"
+            line="84"
+            column="30"/>
+    </issue>
+
+    <issue
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 29, the call containing class androidx.transition.ViewUtilsApi19 is not annotated with @RequiresApi(x) where x is at least 29. Either annotate the containing class with at least @RequiresApi(29) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(29)."
+        errorLine1="                view.setTransitionAlpha(alpha);"
+        errorLine2="                     ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/transition/ViewUtilsApi19.java"
+            line="40"
+            column="22"/>
+    </issue>
+
+    <issue
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 29, the call containing class androidx.transition.ViewUtilsApi19 is not annotated with @RequiresApi(x) where x is at least 29. Either annotate the containing class with at least @RequiresApi(29) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(29)."
+        errorLine1="                return view.getTransitionAlpha();"
+        errorLine2="                            ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/transition/ViewUtilsApi19.java"
+            line="56"
+            column="29"/>
+    </issue>
+
+    <issue
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 29, the call containing class androidx.transition.ViewUtilsApi21 is not annotated with @RequiresApi(x) where x is at least 29. Either annotate the containing class with at least @RequiresApi(29) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(29)."
+        errorLine1="                view.transformMatrixToGlobal(matrix);"
+        errorLine2="                     ~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/transition/ViewUtilsApi21.java"
+            line="50"
+            column="22"/>
+    </issue>
+
+    <issue
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 29, the call containing class androidx.transition.ViewUtilsApi21 is not annotated with @RequiresApi(x) where x is at least 29. Either annotate the containing class with at least @RequiresApi(29) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(29)."
+        errorLine1="                view.transformMatrixToLocal(matrix);"
+        errorLine2="                     ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/transition/ViewUtilsApi21.java"
+            line="64"
+            column="22"/>
+    </issue>
+
+    <issue
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 29, the call containing class androidx.transition.ViewUtilsApi21 is not annotated with @RequiresApi(x) where x is at least 29. Either annotate the containing class with at least @RequiresApi(29) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(29)."
+        errorLine1="                view.setAnimationMatrix(matrix);"
+        errorLine2="                     ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/transition/ViewUtilsApi21.java"
+            line="78"
+            column="22"/>
+    </issue>
+
+    <issue
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 29, the call containing class androidx.transition.ViewUtilsApi22 is not annotated with @RequiresApi(x) where x is at least 29. Either annotate the containing class with at least @RequiresApi(29) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(29)."
+        errorLine1="                v.setLeftTopRightBottom(left, top, right, bottom);"
+        errorLine2="                  ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/transition/ViewUtilsApi22.java"
+            line="40"
+            column="19"/>
+    </issue>
+
+    <issue
+        id="UnsafeNewApiCall"
+        message="This call is to a method from API 29, the call containing class androidx.transition.ViewUtilsApi23 is not annotated with @RequiresApi(x) where x is at least 29. Either annotate the containing class with at least @RequiresApi(29) or move the call to a static method in a wrapper class annotated with at least @RequiresApi(29)."
+        errorLine1="                    view.setTransitionVisibility(visibility);"
+        errorLine2="                         ~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/androidx/transition/ViewUtilsApi23.java"
+            line="45"
+            column="26"/>
     </issue>
 
     <issue
@@ -345,44 +444,11 @@
     <issue
         id="UnknownNullness"
         message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Explode(Context context, AttributeSet attrs) {"
-        errorLine2="                   ~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/Explode.java"
-            line="54"
-            column="20"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Explode(Context context, AttributeSet attrs) {"
-        errorLine2="                                    ~~~~~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/Explode.java"
-            line="54"
-            column="37"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Animator onAppear(ViewGroup sceneRoot, View view,"
-        errorLine2="           ~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/Explode.java"
-            line="82"
-            column="12"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
         errorLine1="    public Animator onAppear(ViewGroup sceneRoot, View view,"
         errorLine2="                             ~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Explode.java"
-            line="82"
+            line="84"
             column="30"/>
     </issue>
 
@@ -393,7 +459,7 @@
         errorLine2="                                                  ~~~~">
         <location
             file="src/main/java/androidx/transition/Explode.java"
-            line="82"
+            line="84"
             column="51"/>
     </issue>
 
@@ -404,7 +470,7 @@
         errorLine2="            ~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Explode.java"
-            line="83"
+            line="85"
             column="13"/>
     </issue>
 
@@ -415,19 +481,8 @@
         errorLine2="                                          ~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Explode.java"
-            line="83"
+            line="85"
             column="43"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Animator onDisappear(ViewGroup sceneRoot, View view,"
-        errorLine2="           ~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/Explode.java"
-            line="99"
-            column="12"/>
     </issue>
 
     <issue
@@ -437,7 +492,7 @@
         errorLine2="                                ~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Explode.java"
-            line="99"
+            line="102"
             column="33"/>
     </issue>
 
@@ -448,7 +503,7 @@
         errorLine2="                                                     ~~~~">
         <location
             file="src/main/java/androidx/transition/Explode.java"
-            line="99"
+            line="102"
             column="54"/>
     </issue>
 
@@ -459,7 +514,7 @@
         errorLine2="            ~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Explode.java"
-            line="100"
+            line="103"
             column="13"/>
     </issue>
 
@@ -470,41 +525,8 @@
         errorLine2="                                          ~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Explode.java"
-            line="100"
+            line="103"
             column="43"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Fade(Context context, AttributeSet attrs) {"
-        errorLine2="                ~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/Fade.java"
-            line="103"
-            column="17"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Fade(Context context, AttributeSet attrs) {"
-        errorLine2="                                 ~~~~~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/Fade.java"
-            line="103"
-            column="34"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Animator onAppear(ViewGroup sceneRoot, View view,"
-        errorLine2="           ~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/Fade.java"
-            line="147"
-            column="12"/>
     </issue>
 
     <issue
@@ -514,7 +536,7 @@
         errorLine2="                             ~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Fade.java"
-            line="147"
+            line="149"
             column="30"/>
     </issue>
 
@@ -525,7 +547,7 @@
         errorLine2="                                                  ~~~~">
         <location
             file="src/main/java/androidx/transition/Fade.java"
-            line="147"
+            line="149"
             column="51"/>
     </issue>
 
@@ -536,7 +558,7 @@
         errorLine2="            ~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Fade.java"
-            line="148"
+            line="150"
             column="13"/>
     </issue>
 
@@ -547,19 +569,8 @@
         errorLine2="            ~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Fade.java"
-            line="149"
+            line="151"
             column="13"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Animator onDisappear(ViewGroup sceneRoot, final View view, TransitionValues startValues,"
-        errorLine2="           ~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/Fade.java"
-            line="163"
-            column="12"/>
     </issue>
 
     <issue
@@ -569,7 +580,7 @@
         errorLine2="                                ~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Fade.java"
-            line="163"
+            line="166"
             column="33"/>
     </issue>
 
@@ -580,7 +591,7 @@
         errorLine2="                                                           ~~~~">
         <location
             file="src/main/java/androidx/transition/Fade.java"
-            line="163"
+            line="166"
             column="60"/>
     </issue>
 
@@ -591,7 +602,7 @@
         errorLine2="                                                                      ~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Fade.java"
-            line="163"
+            line="166"
             column="71"/>
     </issue>
 
@@ -602,7 +613,7 @@
         errorLine2="            ~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Fade.java"
-            line="164"
+            line="167"
             column="13"/>
     </issue>
 
@@ -613,7 +624,7 @@
         errorLine2="                             ~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="45"
+            line="47"
             column="30"/>
     </issue>
 
@@ -624,7 +635,7 @@
         errorLine2="           ~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="50"
+            line="52"
             column="12"/>
     </issue>
 
@@ -635,7 +646,7 @@
         errorLine2="                                  ~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="50"
+            line="52"
             column="35"/>
     </issue>
 
@@ -646,7 +657,7 @@
         errorLine2="           ~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="59"
+            line="61"
             column="12"/>
     </issue>
 
@@ -657,7 +668,7 @@
         errorLine2="                                      ~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="59"
+            line="61"
             column="39"/>
     </issue>
 
@@ -668,7 +679,7 @@
         errorLine2="                                        ~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="69"
+            line="71"
             column="41"/>
     </issue>
 
@@ -679,7 +690,7 @@
         errorLine2="            ~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="70"
+            line="72"
             column="13"/>
     </issue>
 
@@ -690,7 +701,7 @@
         errorLine2="                                  ~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="70"
+            line="72"
             column="35"/>
     </issue>
 
@@ -701,7 +712,7 @@
         errorLine2="                             ~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="85"
+            line="87"
             column="30"/>
     </issue>
 
@@ -712,7 +723,7 @@
         errorLine2="                                                   ~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="85"
+            line="87"
             column="52"/>
     </issue>
 
@@ -723,7 +734,7 @@
         errorLine2="                           ~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="101"
+            line="103"
             column="28"/>
     </issue>
 
@@ -734,7 +745,7 @@
         errorLine2="                                                 ~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="101"
+            line="103"
             column="50"/>
     </issue>
 
@@ -745,7 +756,7 @@
         errorLine2="           ~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="132"
+            line="134"
             column="12"/>
     </issue>
 
@@ -756,7 +767,7 @@
         errorLine2="                                           ~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="132"
+            line="134"
             column="44"/>
     </issue>
 
@@ -767,7 +778,7 @@
         errorLine2="                                                               ~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="132"
+            line="134"
             column="64"/>
     </issue>
 
@@ -778,7 +789,7 @@
         errorLine2="            ~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="133"
+            line="135"
             column="13"/>
     </issue>
 
@@ -789,7 +800,7 @@
         errorLine2="                                         ~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="148"
+            line="150"
             column="42"/>
     </issue>
 
@@ -800,7 +811,7 @@
         errorLine2="                                                                         ~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="148"
+            line="150"
             column="74"/>
     </issue>
 
@@ -811,7 +822,7 @@
         errorLine2="                  ~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="149"
+            line="151"
             column="19"/>
     </issue>
 
@@ -822,7 +833,7 @@
         errorLine2="           ~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="181"
+            line="191"
             column="12"/>
     </issue>
 
@@ -833,7 +844,7 @@
         errorLine2="                                             ~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="181"
+            line="191"
             column="46"/>
     </issue>
 
@@ -844,7 +855,7 @@
         errorLine2="            ~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="182"
+            line="192"
             column="13"/>
     </issue>
 
@@ -855,7 +866,7 @@
         errorLine2="                                       ~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="182"
+            line="192"
             column="40"/>
     </issue>
 
@@ -866,7 +877,7 @@
         errorLine2="                                       ~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="212"
+            line="222"
             column="40"/>
     </issue>
 
@@ -877,7 +888,7 @@
         errorLine2="                                                            ~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="212"
+            line="222"
             column="61"/>
     </issue>
 
@@ -888,7 +899,7 @@
         errorLine2="                                            ~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="217"
+            line="227"
             column="45"/>
     </issue>
 
@@ -899,7 +910,7 @@
         errorLine2="                  ~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="218"
+            line="228"
             column="19"/>
     </issue>
 
@@ -910,7 +921,7 @@
         errorLine2="                                                ~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="218"
+            line="228"
             column="49"/>
     </issue>
 
@@ -921,7 +932,7 @@
         errorLine2="                  ~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="219"
+            line="229"
             column="19"/>
     </issue>
 
@@ -932,7 +943,7 @@
         errorLine2="                                               ~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="219"
+            line="229"
             column="48"/>
     </issue>
 
@@ -943,7 +954,7 @@
         errorLine2="                  ~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="220"
+            line="230"
             column="19"/>
     </issue>
 
@@ -954,7 +965,7 @@
         errorLine2="                                                        ~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="220"
+            line="230"
             column="57"/>
     </issue>
 
@@ -965,7 +976,7 @@
         errorLine2="                                         ~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="244"
+            line="295"
             column="42"/>
     </issue>
 
@@ -976,7 +987,7 @@
         errorLine2="            ~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="245"
+            line="296"
             column="13"/>
     </issue>
 
@@ -987,7 +998,7 @@
         errorLine2="                                               ~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="245"
+            line="296"
             column="48"/>
     </issue>
 
@@ -998,7 +1009,7 @@
         errorLine2="                               ~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="255"
+            line="306"
             column="32"/>
     </issue>
 
@@ -1009,7 +1020,7 @@
         errorLine2="                                                     ~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="255"
+            line="306"
             column="54"/>
     </issue>
 
@@ -1020,7 +1031,7 @@
         errorLine2="            ~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="256"
+            line="307"
             column="13"/>
     </issue>
 
@@ -1031,7 +1042,7 @@
         errorLine2="                          ~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="282"
+            line="333"
             column="27"/>
     </issue>
 
@@ -1042,7 +1053,7 @@
         errorLine2="                                                ~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="282"
+            line="333"
             column="49"/>
     </issue>
 
@@ -1053,7 +1064,7 @@
         errorLine2="                             ~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="290"
+            line="341"
             column="30"/>
     </issue>
 
@@ -1064,7 +1075,7 @@
         errorLine2="                                                   ~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="290"
+            line="341"
             column="52"/>
     </issue>
 
@@ -1075,7 +1086,7 @@
         errorLine2="                             ~~~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="298"
+            line="349"
             column="30"/>
     </issue>
 
@@ -1086,63 +1097,8 @@
         errorLine2="                                                         ~~~~">
         <location
             file="src/main/java/androidx/transition/FragmentTransitionSupport.java"
-            line="298"
+            line="349"
             column="58"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public PathMotion(Context context, AttributeSet attrs) {"
-        errorLine2="                      ~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/PathMotion.java"
-            line="46"
-            column="23"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public PathMotion(Context context, AttributeSet attrs) {"
-        errorLine2="                                       ~~~~~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/PathMotion.java"
-            line="46"
-            column="40"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public abstract Path getPath(float startX, float startY, float endX, float endY);"
-        errorLine2="                    ~~~~">
-        <location
-            file="src/main/java/androidx/transition/PathMotion.java"
-            line="61"
-            column="21"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public PatternPathMotion(Context context, AttributeSet attrs) {"
-        errorLine2="                             ~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/PatternPathMotion.java"
-            line="61"
-            column="30"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public PatternPathMotion(Context context, AttributeSet attrs) {"
-        errorLine2="                                              ~~~~~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/PatternPathMotion.java"
-            line="61"
-            column="47"/>
     </issue>
 
     <issue
@@ -1152,7 +1108,7 @@
         errorLine2="                             ~~~~">
         <location
             file="src/main/java/androidx/transition/PatternPathMotion.java"
-            line="84"
+            line="85"
             column="30"/>
     </issue>
 
@@ -1163,7 +1119,7 @@
         errorLine2="           ~~~~">
         <location
             file="src/main/java/androidx/transition/PatternPathMotion.java"
-            line="95"
+            line="96"
             column="12"/>
     </issue>
 
@@ -1174,19 +1130,8 @@
         errorLine2="                               ~~~~">
         <location
             file="src/main/java/androidx/transition/PatternPathMotion.java"
-            line="106"
+            line="107"
             column="32"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Path getPath(float startX, float startY, float endX, float endY) {"
-        errorLine2="           ~~~~">
-        <location
-            file="src/main/java/androidx/transition/PatternPathMotion.java"
-            line="134"
-            column="12"/>
     </issue>
 
     <issue
@@ -1236,44 +1181,11 @@
     <issue
         id="UnknownNullness"
         message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Slide(Context context, AttributeSet attrs) {"
-        errorLine2="                 ~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/Slide.java"
-            line="168"
-            column="18"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Slide(Context context, AttributeSet attrs) {"
-        errorLine2="                                  ~~~~~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/Slide.java"
-            line="168"
-            column="35"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Animator onAppear(ViewGroup sceneRoot, View view,"
-        errorLine2="           ~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/Slide.java"
-            line="248"
-            column="12"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
         errorLine1="    public Animator onAppear(ViewGroup sceneRoot, View view,"
         errorLine2="                             ~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Slide.java"
-            line="248"
+            line="250"
             column="30"/>
     </issue>
 
@@ -1284,7 +1196,7 @@
         errorLine2="                                                  ~~~~">
         <location
             file="src/main/java/androidx/transition/Slide.java"
-            line="248"
+            line="250"
             column="51"/>
     </issue>
 
@@ -1295,7 +1207,7 @@
         errorLine2="            ~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Slide.java"
-            line="249"
+            line="251"
             column="13"/>
     </issue>
 
@@ -1306,19 +1218,8 @@
         errorLine2="                                          ~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Slide.java"
-            line="249"
+            line="251"
             column="43"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Animator onDisappear(ViewGroup sceneRoot, View view,"
-        errorLine2="           ~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/Slide.java"
-            line="264"
-            column="12"/>
     </issue>
 
     <issue
@@ -1328,7 +1229,7 @@
         errorLine2="                                ~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Slide.java"
-            line="264"
+            line="267"
             column="33"/>
     </issue>
 
@@ -1339,7 +1240,7 @@
         errorLine2="                                                     ~~~~">
         <location
             file="src/main/java/androidx/transition/Slide.java"
-            line="264"
+            line="267"
             column="54"/>
     </issue>
 
@@ -1350,7 +1251,7 @@
         errorLine2="            ~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Slide.java"
-            line="265"
+            line="268"
             column="13"/>
     </issue>
 
@@ -1361,30 +1262,8 @@
         errorLine2="                                          ~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Slide.java"
-            line="265"
+            line="268"
             column="43"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Transition(Context context, AttributeSet attrs) {"
-        errorLine2="                      ~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/Transition.java"
-            line="277"
-            column="23"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Transition(Context context, AttributeSet attrs) {"
-        errorLine2="                                       ~~~~~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/Transition.java"
-            line="277"
-            column="40"/>
     </issue>
 
     <issue
@@ -1394,7 +1273,7 @@
         errorLine2="                                          ~~~~~~">
         <location
             file="src/main/java/androidx/transition/Transition.java"
-            line="509"
+            line="506"
             column="43"/>
     </issue>
 
@@ -1405,7 +1284,7 @@
         errorLine2="                                   ~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Transition.java"
-            line="704"
+            line="701"
             column="36"/>
     </issue>
 
@@ -1416,7 +1295,7 @@
         errorLine2="                                                        ~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Transition.java"
-            line="704"
+            line="701"
             column="57"/>
     </issue>
 
@@ -1427,7 +1306,7 @@
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Transition.java"
-            line="705"
+            line="702"
             column="13"/>
     </issue>
 
@@ -1438,7 +1317,7 @@
         errorLine2="                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Transition.java"
-            line="705"
+            line="702"
             column="45"/>
     </issue>
 
@@ -1449,7 +1328,7 @@
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Transition.java"
-            line="706"
+            line="703"
             column="13"/>
     </issue>
 
@@ -1460,7 +1339,7 @@
         errorLine2="                      ~~~~">
         <location
             file="src/main/java/androidx/transition/Transition.java"
-            line="1717"
+            line="1715"
             column="23"/>
     </issue>
 
@@ -1471,7 +1350,7 @@
         errorLine2="                       ~~~~">
         <location
             file="src/main/java/androidx/transition/Transition.java"
-            line="1749"
+            line="1747"
             column="24"/>
     </issue>
 
@@ -1482,7 +1361,7 @@
         errorLine2="                           ~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Transition.java"
-            line="1896"
+            line="1894"
             column="28"/>
     </issue>
 
@@ -1493,7 +1372,7 @@
         errorLine2="           ~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Transition.java"
-            line="2221"
+            line="2214"
             column="12"/>
     </issue>
 
@@ -1504,30 +1383,8 @@
         errorLine2="                        ~~~~">
         <location
             file="src/main/java/androidx/transition/Transition.java"
-            line="2444"
+            line="2437"
             column="25"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public static TransitionInflater from(Context context) {"
-        errorLine2="                  ~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/TransitionInflater.java"
-            line="57"
-            column="19"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public static TransitionInflater from(Context context) {"
-        errorLine2="                                          ~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/TransitionInflater.java"
-            line="57"
-            column="43"/>
     </issue>
 
     <issue
@@ -1537,7 +1394,7 @@
         errorLine2="           ~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/TransitionInflater.java"
-            line="69"
+            line="70"
             column="12"/>
     </issue>
 
@@ -1548,7 +1405,7 @@
         errorLine2="           ~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/TransitionInflater.java"
-            line="91"
+            line="92"
             column="12"/>
     </issue>
 
@@ -1559,7 +1416,7 @@
         errorLine2="                                                                    ~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/TransitionInflater.java"
-            line="91"
+            line="92"
             column="69"/>
     </issue>
 
@@ -1570,7 +1427,7 @@
         errorLine2="                                            ~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/TransitionManager.java"
-            line="429"
+            line="428"
             column="45"/>
     </issue>
 
@@ -1638,28 +1495,6 @@
             file="src/main/java/androidx/transition/TransitionPropagation.java"
             line="89"
             column="21"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public TransitionSet(Context context, AttributeSet attrs) {"
-        errorLine2="                         ~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/TransitionSet.java"
-            line="115"
-            column="26"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public TransitionSet(Context context, AttributeSet attrs) {"
-        errorLine2="                                          ~~~~~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/TransitionSet.java"
-            line="115"
-            column="43"/>
     </issue>
 
     <issue
@@ -1757,7 +1592,7 @@
         errorLine2="                               ~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/TransitionSet.java"
-            line="619"
+            line="609"
             column="32"/>
     </issue>
 
@@ -1768,7 +1603,7 @@
         errorLine2="                                     ~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/TransitionSet.java"
-            line="629"
+            line="619"
             column="38"/>
     </issue>
 
@@ -1779,7 +1614,7 @@
         errorLine2="           ~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/TransitionSet.java"
-            line="648"
+            line="638"
             column="12"/>
     </issue>
 
@@ -1797,28 +1632,6 @@
     <issue
         id="UnknownNullness"
         message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Visibility(Context context, AttributeSet attrs) {"
-        errorLine2="                      ~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/Visibility.java"
-            line="105"
-            column="23"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Visibility(Context context, AttributeSet attrs) {"
-        errorLine2="                                       ~~~~~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/Visibility.java"
-            line="105"
-            column="40"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
         errorLine1="    public boolean isVisible(TransitionValues values) {"
         errorLine2="                             ~~~~~~~~~~~~~~~~">
         <location
@@ -1831,21 +1644,10 @@
         id="UnknownNullness"
         message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
         errorLine1="    public Animator onAppear(ViewGroup sceneRoot, TransitionValues startValues, int startVisibility,"
-        errorLine2="           ~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/Visibility.java"
-            line="281"
-            column="12"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Animator onAppear(ViewGroup sceneRoot, TransitionValues startValues, int startVisibility,"
         errorLine2="                             ~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Visibility.java"
-            line="281"
+            line="282"
             column="30"/>
     </issue>
 
@@ -1856,7 +1658,7 @@
         errorLine2="                                                  ~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Visibility.java"
-            line="281"
+            line="282"
             column="51"/>
     </issue>
 
@@ -1867,19 +1669,8 @@
         errorLine2="            ~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Visibility.java"
-            line="282"
+            line="283"
             column="13"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Animator onAppear(ViewGroup sceneRoot, View view, TransitionValues startValues,"
-        errorLine2="           ~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/Visibility.java"
-            line="317"
-            column="12"/>
     </issue>
 
     <issue
@@ -1889,7 +1680,7 @@
         errorLine2="                             ~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Visibility.java"
-            line="317"
+            line="319"
             column="30"/>
     </issue>
 
@@ -1900,7 +1691,7 @@
         errorLine2="                                                  ~~~~">
         <location
             file="src/main/java/androidx/transition/Visibility.java"
-            line="317"
+            line="319"
             column="51"/>
     </issue>
 
@@ -1911,7 +1702,7 @@
         errorLine2="                                                             ~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Visibility.java"
-            line="317"
+            line="319"
             column="62"/>
     </issue>
 
@@ -1922,19 +1713,8 @@
         errorLine2="            ~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Visibility.java"
-            line="318"
+            line="320"
             column="13"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Animator onDisappear(ViewGroup sceneRoot, TransitionValues startValues,"
-        errorLine2="           ~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/Visibility.java"
-            line="338"
-            column="12"/>
     </issue>
 
     <issue
@@ -1944,7 +1724,7 @@
         errorLine2="                                ~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Visibility.java"
-            line="338"
+            line="341"
             column="33"/>
     </issue>
 
@@ -1955,7 +1735,7 @@
         errorLine2="                                                     ~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Visibility.java"
-            line="338"
+            line="341"
             column="54"/>
     </issue>
 
@@ -1966,19 +1746,8 @@
         errorLine2="                                 ~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Visibility.java"
-            line="339"
+            line="342"
             column="34"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public Animator onDisappear(ViewGroup sceneRoot, View view, TransitionValues startValues,"
-        errorLine2="           ~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/Visibility.java"
-            line="500"
-            column="12"/>
     </issue>
 
     <issue
@@ -1988,7 +1757,7 @@
         errorLine2="                                ~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Visibility.java"
-            line="500"
+            line="504"
             column="33"/>
     </issue>
 
@@ -1999,7 +1768,7 @@
         errorLine2="                                                     ~~~~">
         <location
             file="src/main/java/androidx/transition/Visibility.java"
-            line="500"
+            line="504"
             column="54"/>
     </issue>
 
@@ -2010,7 +1779,7 @@
         errorLine2="                                                                ~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Visibility.java"
-            line="500"
+            line="504"
             column="65"/>
     </issue>
 
@@ -2021,30 +1790,8 @@
         errorLine2="            ~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/androidx/transition/Visibility.java"
-            line="501"
+            line="505"
             column="13"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public boolean isTransitionRequired(TransitionValues startValues, TransitionValues newValues) {"
-        errorLine2="                                        ~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/Visibility.java"
-            line="506"
-            column="41"/>
-    </issue>
-
-    <issue
-        id="UnknownNullness"
-        message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://android.github.io/kotlin-guides/interop.html#nullability-annotations"
-        errorLine1="    public boolean isTransitionRequired(TransitionValues startValues, TransitionValues newValues) {"
-        errorLine2="                                                                      ~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/androidx/transition/Visibility.java"
-            line="506"
-            column="71"/>
     </issue>
 
     <issue

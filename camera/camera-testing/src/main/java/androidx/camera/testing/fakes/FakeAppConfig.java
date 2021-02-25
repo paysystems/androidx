@@ -16,38 +16,78 @@
 
 package androidx.camera.testing.fakes;
 
-import android.content.Context;
-
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.annotation.RestrictTo;
-import androidx.annotation.RestrictTo.Scope;
-import androidx.camera.core.AppConfig;
-import androidx.camera.core.CameraDeviceSurfaceManager;
-import androidx.camera.core.CameraFactory;
-import androidx.camera.core.CameraX;
-import androidx.camera.core.ExtendableUseCaseConfigFactory;
-import androidx.camera.core.UseCaseConfigFactory;
+import androidx.annotation.experimental.UseExperimental;
+import androidx.camera.core.CameraSelector;
+import androidx.camera.core.CameraXConfig;
+import androidx.camera.core.ExperimentalAvailableCamerasLimiter;
+import androidx.camera.core.impl.CameraDeviceSurfaceManager;
+import androidx.camera.core.impl.CameraFactory;
 
 /**
- * Convenience class for generating a fake {@link AppConfig}.
+ * Convenience class for generating a fake {@link CameraXConfig}.
  *
- * <p>This {@link AppConfig} contains all fake CameraX implementation components.
- * @hide Hidden until {@link CameraX#init(Context, AppConfig)} is public.
+ * <p>This {@link CameraXConfig} contains all fake CameraX implementation components.
  */
-@RestrictTo(Scope.LIBRARY_GROUP)
 public final class FakeAppConfig {
+    private FakeAppConfig() {
+    }
 
-    /** Generates a fake {@link AppConfig}. */
-    public static AppConfig create() {
-        CameraFactory cameraFactory = new FakeCameraFactory();
-        CameraDeviceSurfaceManager surfaceManager = new FakeCameraDeviceSurfaceManager();
-        UseCaseConfigFactory defaultConfigFactory = new ExtendableUseCaseConfigFactory();
+    private static final String CAMERA_ID_0 = "0";
+    private static final String CAMERA_ID_1 = "1";
 
-        AppConfig.Builder appConfigBuilder =
-                new AppConfig.Builder()
-                        .setCameraFactory(cameraFactory)
-                        .setDeviceSurfaceManager(surfaceManager)
-                        .setUseCaseConfigFactory(defaultConfigFactory);
+    /** Generates a fake {@link CameraXConfig}. */
+    @UseExperimental(markerClass = ExperimentalAvailableCamerasLimiter.class)
+    @NonNull
+    public static CameraXConfig create() {
+        return create(null);
+    }
+
+    /**
+     * Generates a fake {@link CameraXConfig} with the provided {@linkplain CameraSelector
+     * available cameras limiter}.
+     */
+    @ExperimentalAvailableCamerasLimiter
+    @NonNull
+    public static CameraXConfig create(@Nullable CameraSelector availableCamerasSelector) {
+        final CameraFactory.Provider cameraFactoryProvider = (ignored1, ignored2, ignored3) -> {
+            final FakeCameraFactory cameraFactory = new FakeCameraFactory(availableCamerasSelector);
+            cameraFactory.insertCamera(CameraSelector.LENS_FACING_BACK, CAMERA_ID_0,
+                    () -> new FakeCamera(CAMERA_ID_0, null,
+                            new FakeCameraInfoInternal(CAMERA_ID_0, 0,
+                                    CameraSelector.LENS_FACING_BACK)));
+            cameraFactory.insertCamera(CameraSelector.LENS_FACING_FRONT, CAMERA_ID_1,
+                    () -> new FakeCamera(CAMERA_ID_1, null,
+                            new FakeCameraInfoInternal(CAMERA_ID_1, 0,
+                                    CameraSelector.LENS_FACING_FRONT)));
+            return cameraFactory;
+        };
+
+        final CameraDeviceSurfaceManager.Provider surfaceManagerProvider =
+                (ignored1, ignored2, ignored3) -> new FakeCameraDeviceSurfaceManager();
+
+        final CameraXConfig.Builder appConfigBuilder = new CameraXConfig.Builder()
+                .setCameraFactoryProvider(cameraFactoryProvider)
+                .setDeviceSurfaceManagerProvider(surfaceManagerProvider)
+                .setUseCaseConfigFactoryProvider(ignored -> new FakeUseCaseConfigFactory());
+
+        if (availableCamerasSelector != null) {
+            appConfigBuilder.setAvailableCamerasLimiter(availableCamerasSelector);
+        }
 
         return appConfigBuilder.build();
+    }
+
+    /** @hide */
+    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+    public static final class DefaultProvider implements CameraXConfig.Provider {
+
+        @NonNull
+        @Override
+        public CameraXConfig getCameraXConfig() {
+            return create();
+        }
     }
 }
