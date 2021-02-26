@@ -36,3 +36,10 @@ jacoco.exec
 # Layout Inspector creates it.
 captures/
 __pycache__
+
+# fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+fastlane/readme.md
