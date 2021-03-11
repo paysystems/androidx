@@ -64,19 +64,19 @@ class AndroidXUiPlugin : Plugin<Project> {
                                 ArtifactTypeDefinition.JAR_TYPE
                             )
                         }
-                    }.files
+                    }
 
                     project.tasks.withType(KotlinCompile::class.java).configureEach { compile ->
                         compile.kotlinOptions.useIR = true
                         // TODO(b/157230235): remove when this is enabled by default
                         compile.kotlinOptions.freeCompilerArgs += "-Xopt-in=kotlin.RequiresOptIn"
-                        compile.inputs.files(kotlinPlugin)
+                        compile.inputs.files({ kotlinPlugin.files })
                             .withPropertyName("composeCompilerExtension")
                             .withNormalizer(ClasspathNormalizer::class.java)
                         compile.doFirst {
                             if (!conf.isEmpty) {
                                 compile.kotlinOptions.freeCompilerArgs +=
-                                    "-Xplugin=${kotlinPlugin.first()}"
+                                    "-Xplugin=${kotlinPlugin.files.first()}"
                             }
                         }
                     }
@@ -85,11 +85,15 @@ class AndroidXUiPlugin : Plugin<Project> {
                         val androidXExtension =
                             project.extensions.findByType(AndroidXExtension::class.java)
                         if (androidXExtension != null) {
-                            if (!conf.isEmpty && androidXExtension.publish.shouldPublish()) {
+                            if (androidXExtension.publish.shouldPublish()) {
                                 project.tasks.withType(KotlinCompile::class.java)
                                     .configureEach { compile ->
-                                        compile.kotlinOptions.freeCompilerArgs +=
-                                            listOf("-P", composeSourceOption)
+                                        compile.doFirst {
+                                            if (!conf.isEmpty) {
+                                                compile.kotlinOptions.freeCompilerArgs +=
+                                                    listOf("-P", composeSourceOption)
+                                            }
+                                        }
                                     }
                             }
                         }
@@ -136,17 +140,20 @@ class AndroidXUiPlugin : Plugin<Project> {
                 // Too many Kotlin features require synthetic accessors - we want to rely on R8 to
                 // remove these accessors
                 disable("SyntheticAccessor")
-                // Composable naming is normally a warning, but we ignore (in AndroidX)
+                // These lint checks are normally a warning (or lower), but we ignore (in AndroidX)
                 // warnings in Lint, so we make it an error here so it will fail the build.
                 // Note that this causes 'UnknownIssueId' lint warnings in the build log when
-                // Lint tries to apply this rule to modules that do not have this lint check.
-                // Unfortunately suppressing this doesn't seem to work, and disabling it causes
-                // it just to log `Lint: Unknown issue id "ComposableNaming"`, which will still
-                // cause the build log simplifier to fail.
+                // Lint tries to apply this rule to modules that do not have this lint check, so
+                // we disable that check too
+                disable("UnknownIssueId")
                 error("ComposableNaming")
                 error("ComposableLambdaParameterNaming")
                 error("ComposableLambdaParameterPosition")
                 error("CompositionLocalNaming")
+                error("ComposableModifierFactory")
+                error("ModifierFactoryReturnType")
+                error("ModifierFactoryExtensionFunction")
+                error("ModifierParameter")
             }
 
             // TODO(148540713): remove this exclusion when Lint can support using multiple lint jars
