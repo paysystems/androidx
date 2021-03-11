@@ -28,7 +28,7 @@ package androidx.car.app {
     method @CallSuper public final void dump(java.io.FileDescriptor, java.io.PrintWriter, String![]?);
     method public final androidx.car.app.Session? getCurrentSession();
     method public final androidx.car.app.HostInfo? getHostInfo();
-    method @CallSuper public final android.os.IBinder? onBind(android.content.Intent);
+    method @CallSuper public final android.os.IBinder onBind(android.content.Intent);
     method public abstract androidx.car.app.Session onCreateSession();
     method public final boolean onUnbind(android.content.Intent);
     field public static final String CATEGORY_CHARGING_APP = "androidx.car.app.category.CHARGING";
@@ -157,6 +157,9 @@ package androidx.car.app {
 
 package androidx.car.app.annotations {
 
+  @RequiresOptIn @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.CLASS) @java.lang.annotation.Target({java.lang.annotation.ElementType.TYPE, java.lang.annotation.ElementType.CONSTRUCTOR, java.lang.annotation.ElementType.FIELD, java.lang.annotation.ElementType.METHOD}) public @interface ExperimentalCarApi {
+  }
+
   @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME) @java.lang.annotation.Target({java.lang.annotation.ElementType.TYPE, java.lang.annotation.ElementType.CONSTRUCTOR, java.lang.annotation.ElementType.FIELD, java.lang.annotation.ElementType.METHOD}) public @interface RequiresCarApi {
     method public abstract int value();
   }
@@ -271,6 +274,11 @@ package androidx.car.app.model {
     method public boolean isEmpty();
     method public static boolean isNullOrEmpty(androidx.car.app.model.CarText?);
     method public CharSequence toCharSequence();
+  }
+
+  @androidx.car.app.annotations.ExperimentalCarApi @androidx.car.app.annotations.RequiresCarApi(2) public final class ClickableSpan extends androidx.car.app.model.CarSpan {
+    method public static androidx.car.app.model.ClickableSpan create(androidx.car.app.model.OnClickListener);
+    method public androidx.car.app.model.OnClickDelegate getOnClickDelegate();
   }
 
   public final class DateTimeWithZone {

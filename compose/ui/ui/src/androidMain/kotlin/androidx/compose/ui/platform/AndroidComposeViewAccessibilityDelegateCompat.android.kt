@@ -33,6 +33,7 @@ import android.view.accessibility.AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTE
 import android.view.accessibility.AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_START_INDEX
 import android.view.accessibility.AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY
 import android.view.accessibility.AccessibilityNodeProvider
+import androidx.annotation.DoNotInline
 import androidx.annotation.IntRange
 import androidx.annotation.RequiresApi
 import androidx.annotation.VisibleForTesting
@@ -268,12 +269,15 @@ internal class AndroidComposeViewAccessibilityDelegateCompat(val view: AndroidCo
         }
         info.packageName = view.context.packageName
         try {
+            val boundsInRoot = semanticsNode.boundsInRoot
+            val topLeftInScreen = view.localToScreen(boundsInRoot.topLeft)
+            val bottomRightInScreen = view.localToScreen(boundsInRoot.bottomRight)
             info.setBoundsInScreen(
                 android.graphics.Rect(
-                    semanticsNode.boundsInWindow.left.toInt(),
-                    semanticsNode.boundsInWindow.top.toInt(),
-                    semanticsNode.boundsInWindow.right.toInt(),
-                    semanticsNode.boundsInWindow.bottom.toInt()
+                    topLeftInScreen.x.toInt(),
+                    topLeftInScreen.y.toInt(),
+                    bottomRightInScreen.x.toInt(),
+                    bottomRightInScreen.y.toInt()
                 )
             )
         } catch (e: IllegalStateException) {
@@ -306,8 +310,11 @@ internal class AndroidComposeViewAccessibilityDelegateCompat(val view: AndroidCo
         setText(semanticsNode, info)
         info.stateDescription =
             semanticsNode.config.getOrNull(SemanticsProperties.StateDescription)
-        info.contentDescription =
-            semanticsNode.config.getOrNull(SemanticsProperties.ContentDescription)
+
+        // If the node has a content description (in unmerged config), it will be used. Otherwise
+        // for merging node we concatenate content descriptions and texts from its children.
+        info.contentDescription = calculateContentDescription(semanticsNode)
+
         semanticsNode.config.getOrNull(SemanticsProperties.Heading)?.let {
             info.isHeading = true
         }
@@ -416,7 +423,10 @@ internal class AndroidComposeViewAccessibilityDelegateCompat(val view: AndroidCo
                 AccessibilityNodeInfoCompat.MOVEMENT_GRANULARITY_WORD or
                 AccessibilityNodeInfoCompat.MOVEMENT_GRANULARITY_PARAGRAPH
             // We only traverse the text when contentDescription is not set.
-            if (info.contentDescription.isNullOrEmpty() &&
+            val contentDescription = semanticsNode.unmergedConfig.getOrNull(
+                SemanticsProperties.ContentDescription
+            )
+            if (contentDescription.isNullOrEmpty() &&
                 semanticsNode.config.contains(SemanticsActions.GetTextLayoutResult)
             ) {
                 info.movementGranularities = info.movementGranularities or
@@ -427,7 +437,10 @@ internal class AndroidComposeViewAccessibilityDelegateCompat(val view: AndroidCo
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !info.text.isNullOrEmpty() &&
             semanticsNode.config.contains(SemanticsActions.GetTextLayoutResult)
         ) {
-            info.unwrap().availableExtraData = listOf(EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY)
+            AccessibilityNodeInfoVerificationHelperMethods.setAvailableExtraData(
+                info.unwrap(),
+                listOf(EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY)
+            )
         }
 
         val rangeInfo =
@@ -1086,7 +1099,7 @@ internal class AndroidComposeViewAccessibilityDelegateCompat(val view: AndroidCo
                 return
             }
             val textLayoutResults = mutableListOf<TextLayoutResult>()
-            // Note now it only works for single Text/TextField until we fix the merging issue.
+            // Note now it only works for single Text/TextField until we fix b/157474582.
             val getLayoutResult = node.config[SemanticsActions.GetTextLayoutResult]
                 .action?.invoke(textLayoutResults)
             val textLayoutResult: TextLayoutResult
@@ -1098,6 +1111,11 @@ internal class AndroidComposeViewAccessibilityDelegateCompat(val view: AndroidCo
             val boundingRects = mutableListOf<RectF?>()
             val textNode: SemanticsNode? = node.findNonEmptyTextChild()
             for (i in 0 until positionInfoLength) {
+                // This is a workaround until we fix the merging issue in b/157474582.
+                if (positionInfoStartIndex + i >= textLayoutResult.layoutInput.text.length) {
+                    boundingRects.add(null)
+                    continue
+                }
                 val bounds = textLayoutResult.getBoundingBox(positionInfoStartIndex + i)
                 val screenBounds: Rect?
                 // Only the visible/partial visible locations are used.
@@ -1674,6 +1692,7 @@ internal class AndroidComposeViewAccessibilityDelegateCompat(val view: AndroidCo
         extendSelection: Boolean
     ): Boolean {
         val text = getIterableTextForAccessibility(node)
+            ?: calculateContentDescriptionFromChildren(node)
         if (text.isNullOrEmpty()) {
             return false
         }
@@ -1722,7 +1741,9 @@ internal class AndroidComposeViewAccessibilityDelegateCompat(val view: AndroidCo
         event.toIndex = toIndex
         event.action = action
         event.movementGranularity = granularity
-        event.text.add(getIterableTextForAccessibility(node))
+        event.text.add(
+            getIterableTextForAccessibility(node) ?: calculateContentDescriptionFromChildren(node)
+        )
         sendEvent(event)
     }
 
@@ -1764,7 +1785,7 @@ internal class AndroidComposeViewAccessibilityDelegateCompat(val view: AndroidCo
 
     private fun getAccessibilitySelectionStart(node: SemanticsNode): Int {
         // If there is ContentDescription, it will be used instead of text during traversal.
-        if (!node.config.contains(SemanticsProperties.ContentDescription) &&
+        if (!node.unmergedConfig.contains(SemanticsProperties.ContentDescription) &&
             node.config.contains(SemanticsProperties.TextSelectionRange)
         ) {
             return node.config[SemanticsProperties.TextSelectionRange].start
@@ -1774,7 +1795,7 @@ internal class AndroidComposeViewAccessibilityDelegateCompat(val view: AndroidCo
 
     private fun getAccessibilitySelectionEnd(node: SemanticsNode): Int {
         // If there is ContentDescription, it will be used instead of text during traversal.
-        if (!node.config.contains(SemanticsProperties.ContentDescription) &&
+        if (!node.unmergedConfig.contains(SemanticsProperties.ContentDescription) &&
             node.config.contains(SemanticsProperties.TextSelectionRange)
         ) {
             return node.config[SemanticsProperties.TextSelectionRange].end
@@ -1792,7 +1813,10 @@ internal class AndroidComposeViewAccessibilityDelegateCompat(val view: AndroidCo
         node: SemanticsNode?,
         granularity: Int
     ): AccessibilityIterators.TextSegmentIterator? {
+        if (node == null) return null
+
         val text = getIterableTextForAccessibility(node)
+            ?: calculateContentDescriptionFromChildren(node)
         if (text.isNullOrEmpty()) {
             return null
         }
@@ -1819,7 +1843,7 @@ internal class AndroidComposeViewAccessibilityDelegateCompat(val view: AndroidCo
             AccessibilityNodeInfoCompat.MOVEMENT_GRANULARITY_LINE,
             AccessibilityNodeInfoCompat.MOVEMENT_GRANULARITY_PAGE -> {
                 // Line and page granularity are only for static text or text field.
-                if (node == null || !node.config.contains(SemanticsActions.GetTextLayoutResult)) {
+                if (!node.config.contains(SemanticsActions.GetTextLayoutResult)) {
                     return null
                 }
                 // TODO(b/157474582): Note now it only works for single Text/TextField until we
@@ -1848,9 +1872,11 @@ internal class AndroidComposeViewAccessibilityDelegateCompat(val view: AndroidCo
     }
 
     /**
-     * Gets the text reported for accessibility purposes.
+     * Gets the text reported for accessibility purposes. If a text node has a content description
+     * in the unmerged config, it will be used instead of the text.
      *
-     * @return The accessibility text.
+     * This function is basically prioritising the content description over the text or editable
+     * text of the text and text field nodes.
      */
     private fun getIterableTextForAccessibility(node: SemanticsNode?): String? {
         if (node == null) {
@@ -1858,8 +1884,8 @@ internal class AndroidComposeViewAccessibilityDelegateCompat(val view: AndroidCo
         }
         // Note in android framework, TextView set this to its text. This is changed to
         // prioritize content description, even for Text.
-        if (node.config.contains(SemanticsProperties.ContentDescription)) {
-            return node.config[SemanticsProperties.ContentDescription]
+        if (node.unmergedConfig.contains(SemanticsProperties.ContentDescription)) {
+            return node.unmergedConfig[SemanticsProperties.ContentDescription]
         }
 
         if (node.isTextField) {
@@ -1882,6 +1908,85 @@ internal class AndroidComposeViewAccessibilityDelegateCompat(val view: AndroidCo
         } else {
             editableText.text
         }
+    }
+
+    /**
+     * Content description of the node that itself has a content description will be reported as
+     * is. Text node and text field node without a content description ignore it and report null.
+     * In other situations we concatenate non-merging children's content description or texts
+     * using [calculateContentDescriptionFromChildren]. Note that we ignore merging children as
+     * they should be focused separately.
+     *
+     * This method is used to set the content description of the node.
+     */
+    private fun calculateContentDescription(node: SemanticsNode): String? {
+        val contentDescription =
+            node.unmergedConfig.getOrNull(SemanticsProperties.ContentDescription)
+        if (!contentDescription.isNullOrEmpty()) {
+            return contentDescription
+        }
+
+        if (node.unmergedConfig.contains(SemanticsProperties.Text) ||
+            node.unmergedConfig.contains(SemanticsActions.SetText)
+        ) {
+            return null
+        }
+
+        // if node merges its children, concatenate their content descriptions and texts
+        return calculateContentDescriptionFromChildren(node)
+    }
+
+    /**
+     * Concatenate content descriptions and texts of non-merging children of the [node] that
+     * merges its children.
+     */
+    fun calculateContentDescriptionFromChildren(node: SemanticsNode): String? {
+        fun concatenateChildrenContentDescriptionAndText(node: SemanticsNode): List<String> {
+            val childDescriptions = mutableListOf<String>()
+
+            node.unmergedChildren().fastForEach { childNode ->
+                // Don't merge child that merges its children because that child node will be focused
+                // separately
+                if (childNode.unmergedConfig.isMergingSemanticsOfDescendants) {
+                    return@fastForEach
+                }
+
+                val contentDescription =
+                    childNode.unmergedConfig.getOrNull(SemanticsProperties.ContentDescription)
+                if (!contentDescription.isNullOrEmpty()) {
+                    childDescriptions.add(contentDescription)
+                    return@fastForEach
+                }
+
+                // check if it's a text field node
+                if (childNode.config.contains(SemanticsActions.SetText)) {
+                    val text = getTextForTextField(childNode)
+                    if (!text.isNullOrEmpty()) {
+                        childDescriptions.add(text)
+                    }
+                    return@fastForEach
+                }
+
+                // check if it's a text node
+                val text = childNode.unmergedConfig.getOrNull(SemanticsProperties.Text)
+                if (!text.isNullOrEmpty()) {
+                    childDescriptions.add(text.text)
+                    return@fastForEach
+                }
+
+                concatenateChildrenContentDescriptionAndText(childNode).fastForEach {
+                    childDescriptions.add(it)
+                }
+            }
+
+            return childDescriptions
+        }
+
+        // if node merges its children, concatenate their content descriptions and texts
+        if (node.unmergedConfig.isMergingSemanticsOfDescendants) {
+            return concatenateChildrenContentDescriptionAndText(node).joinToString()
+        }
+        return null
     }
 
     private fun setCollectionInfo(node: SemanticsNode, info: AccessibilityNodeInfoCompat) {
@@ -2090,4 +2195,18 @@ internal fun SemanticsOwner.getAllUncoveredSemanticsNodesToMap(
 
     findAllSemanticNodesRecursive(root)
     return nodes
+}
+
+/**
+ * This class is here to ensure that the classes that use this API will get verified and can be
+ * AOT compiled. It is expected that this class will soft-fail verification, but the classes
+ * which use this method will pass.
+ */
+@RequiresApi(Build.VERSION_CODES.O)
+internal object AccessibilityNodeInfoVerificationHelperMethods {
+    @RequiresApi(Build.VERSION_CODES.O)
+    @DoNotInline
+    fun setAvailableExtraData(node: AccessibilityNodeInfo, data: List<String>) {
+        node.availableExtraData = data
+    }
 }
