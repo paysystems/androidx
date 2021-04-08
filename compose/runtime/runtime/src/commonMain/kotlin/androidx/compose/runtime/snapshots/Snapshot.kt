@@ -20,7 +20,7 @@ package androidx.compose.runtime.snapshots
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.InternalComposeApi
-import androidx.compose.runtime.ThreadLocal
+import androidx.compose.runtime.SnapshotThreadLocal
 import androidx.compose.runtime.synchronized
 
 /**
@@ -1076,7 +1076,7 @@ internal class NestedReadonlySnapshot(
     override val readOnly get() = true
     override val root: Snapshot get() = parent.root
     override fun takeNestedSnapshot(readObserver: ((Any) -> Unit)?) =
-        parent.takeNestedSnapshot(readObserver)
+        NestedReadonlySnapshot(id, invalid, readObserver, parent)
     override fun notifyObjectsInitialized() {
         // Nothing to do for read-only snapshots
     }
@@ -1355,7 +1355,10 @@ private fun mergedWriteObserver(
  */
 private const val INVALID_SNAPSHOT = 0
 
-private val threadSnapshot = ThreadLocal<Snapshot>()
+/**
+ * Current thread snapshot
+ */
+private val threadSnapshot = SnapshotThreadLocal<Snapshot>()
 
 // A global synchronization object. This synchronization object should be taken before modifying any
 // of the fields below.
@@ -1427,7 +1430,7 @@ private fun <T> advanceGlobalSnapshot(block: (invalid: SnapshotIdSet) -> T): T {
     val modified = previousGlobalSnapshot.modified
     if (modified != null) {
         val observers = sync { applyObservers.toList() }
-        for (observer in observers) {
+        observers.fastForEach { observer ->
             observer(modified, previousGlobalSnapshot)
         }
     }
