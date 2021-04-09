@@ -7,13 +7,12 @@ trigger:
 - androidx-room-pays-release
 
 pool:
-  vmImage: ubuntu-latest
+  vmImage: macos-latest
 
 steps:
-- script: echo Hello, world!
-  displayName: 'Run a one-line script'
-
+- script: | 
+    chmod +x gradlew
+  
 - script: |
-    echo Add other tasks to build, test, and deploy your project.
-    echo See https://aka.ms/yaml
-  displayName: 'Run a multi-line script'
+    fastlane deploy_room
+  displayName: 'Uploading Room to Artifactory'
