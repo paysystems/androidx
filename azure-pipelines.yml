@@ -10,9 +10,17 @@ pool:
   vmImage: macos-latest
 
 steps:
+- task: JavaToolInstaller@0
+  inputs:
+    versionSpec: '11'
+    jdkArchitectureOption: 'x64'
+    jdkSourceOption: 'PreInstalled'
+
 - script: | 
     chmod +x gradlew
   
 - script: |
     fastlane deploy_room
   displayName: 'Uploading Room to Artifactory'
+  env:
+    ARTIFACTORY_PASSWORD: $(artifactory_password)
