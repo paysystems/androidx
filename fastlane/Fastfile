@@ -25,8 +25,9 @@ platform :android do
       sh "./room/gradlew -p ./room createArchive"
       artifacts = Dir["#{artifactsRootPath}/androidx/room/*/*/*.{jar,aar,pom}"]
       artifacts.each do |artifact|
+        dirname = File.basename(Dir.getwd)
         repoPath = artifact.partition(artifactsRootPath).last
-        filePath = "androidx/#{artifact}"
+        filePath = "#{dirname}/#{artifact}"
         artifactory(
           username: ENV["ARTIFACTORY_USER"],
           password: ENV["ARTIFACTORY_PASSWORD"],
