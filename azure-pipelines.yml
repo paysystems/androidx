@@ -33,7 +33,7 @@ steps:
       sha1Value="${sha1Value##*)= }"
       sha256Value="$(openssl dgst -sha256 "$file")"
       sha256Value="${sha256Value##*)= }"
-      repoPath=$(artifactory_url)/gradle-release-local/androidx/room/$filename"
+      repoPath=$(artifactory_url)/gradle-release-local/androidx/room/"$filename"
       echo "Current time : $now"
       echo "Uploading: $file"
       echo "URI: $repoPath"
