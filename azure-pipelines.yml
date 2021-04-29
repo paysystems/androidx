@@ -33,17 +33,17 @@ steps:
       sha1Value="${sha1Value##*)= }"
       sha256Value="$(openssl dgst -sha256 "$file")"
       sha256Value="${sha256Value##*)= }"
-      repoPath=$(artifactory_url)/gradle-release-local/androidx/room/"$filename"
+      repoPath=$(artifactory_url)gradle-release-local/androidx/room/"$filename"
       echo "Current time : $now"
       echo "Uploading: $file"
       echo "URI: $repoPath"
       echo "MD5: $md5Value"
       echo "SHA1: $sha1Value"
       echo "SHA256 Hash: $sha256Value"
-      #retry curl -X PUT -u $(artifactory_user):$(artifactory_password) -o /dev/null \
-      #-H "X-Checksum-Md5: $md5Value" \
-      #-H "X-Checksum-Sha1: $sha1Value" \
-      #-H "X-Checksum-Sha256: $sha256Value" \
-      #-T "$file" "$repoPath"
+      retry curl -X PUT -u $(artifactory_user):$(artifactory_password) -o /dev/null \
+      -H "X-Checksum-Md5: $md5Value" \
+      -H "X-Checksum-Sha1: $sha1Value" \
+      -H "X-Checksum-Sha256: $sha256Value" \
+      -T "$file" "$repoPath"
     done
   displayName: Upload to Artifactory
