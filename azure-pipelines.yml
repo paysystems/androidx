@@ -6,6 +6,7 @@ pool:
 
 steps:
 - task: JavaToolInstaller@0
+  displayName: Acquire Java 11
   inputs:
     versionSpec: '11'
     jdkArchitectureOption: 'x64'
@@ -19,8 +20,8 @@ steps:
 - script: |
     set -e
     . azure-pipelines-utils.sh    
-    shopt -s globstar
-    for file in out/room-playground/room-playground/build/support_repo/androidx/room/*/*/*.{jar,aar,pom}; do
+    root=out/room-playground/room-playground/build/support_repo/androidx/room
+    for file in $(find "$root" -name '*.jar' -or -name '*.aar' -or -name '*.pom'); do
       echo "--------------------------"
       echo "--- Artifactory upload ---"
       echo "--------------------------"
@@ -32,7 +33,7 @@ steps:
       sha1Value="${sha1Value##*)= }"
       sha256Value="$(openssl dgst -sha256 "$file")"
       sha256Value="${sha256Value##*)= }"
-      repoPath=$(artifactory_url)/gradle-release-local/"$filename"
+      repoPath=$(artifactory_url)/gradle-release-local/androidx/room/$filename"
       echo "Current time : $now"
       echo "Uploading: $file"
       echo "URI: $repoPath"
