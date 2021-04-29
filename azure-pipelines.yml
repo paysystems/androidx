@@ -26,7 +26,7 @@ steps:
       echo "--- Artifactory upload ---"
       echo "--------------------------"
       now=$(date +"%T")
-      filename=${file#*/}
+      filename=${file#$root/}
       md5Value="$(openssl dgst -md5 "$file")"
       md5Value="${md5Value##*)= }"
       sha1Value="$(openssl dgst -sha1 "$file")"
