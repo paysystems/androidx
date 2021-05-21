@@ -6,44 +6,16 @@ pool:
 
 steps:
 - task: JavaToolInstaller@0
-  displayName: Acquire Java 11
   inputs:
     versionSpec: '11'
     jdkArchitectureOption: 'x64'
     jdkSourceOption: 'PreInstalled'
 
-- script: |
+- script: | 
     chmod +x gradlew
-    ./room/gradlew -p ./room createArchive
-  displayName: Build Room
   
 - script: |
-    set -e
-    . azure-pipelines-utils.sh    
-    root=out/room-playground/room-playground/build/support_repo/androidx/room
-    for file in $(find "$root" -name '*.jar' -or -name '*.aar' -or -name '*.pom'); do
-      echo "--------------------------"
-      echo "--- Artifactory upload ---"
-      echo "--------------------------"
-      now=$(date +"%T")
-      filename=${file#$root/}
-      md5Value="$(openssl dgst -md5 "$file")"
-      md5Value="${md5Value##*)= }"
-      sha1Value="$(openssl dgst -sha1 "$file")"
-      sha1Value="${sha1Value##*)= }"
-      sha256Value="$(openssl dgst -sha256 "$file")"
-      sha256Value="${sha256Value##*)= }"
-      repoPath=$(artifactory_url)gradle-release-local/androidx/room/"$filename"
-      echo "Current time : $now"
-      echo "Uploading: $file"
-      echo "URI: $repoPath"
-      echo "MD5: $md5Value"
-      echo "SHA1: $sha1Value"
-      echo "SHA256 Hash: $sha256Value"
-      retry curl -X PUT -u $(artifactory_user):$(artifactory_password) -o /dev/null \
-      -H "X-Checksum-Md5: $md5Value" \
-      -H "X-Checksum-Sha1: $sha1Value" \
-      -H "X-Checksum-Sha256: $sha256Value" \
-      -T "$file" "$repoPath"
-    done
-  displayName: Upload to Artifactory
+    fastlane deploy_room
+  displayName: 'Uploading Room to Artifactory'
+  env:
+    ARTIFACTORY_PASSWORD: $(artifactory_password)

@@ -23,19 +23,30 @@ platform :android do
       artifactsRootPath = "out/room-playground/room-playground/build/support_repo"
       sh "rm -rfv #{artifactsRootPath}/androidx/room/*"
       sh "./room/gradlew -p ./room createArchive"
-      artifacts = Dir["#{artifactsRootPath}/androidx/room/*/*/*.{jar,aar,pom}"]
+      artifacts = Dir["#{artifactsRootPath}/androidx/room/room-{common,compiler,ktx,migration,runtime,testing}/*/*.{jar,aar,pom}"]
       artifacts.each do |artifact|
         dirname = File.basename(Dir.getwd)
         repoPath = artifact.partition(artifactsRootPath).last
         filePath = "#{dirname}/#{artifact}"
-        artifactory(
-          username: ENV["ARTIFACTORY_USER"],
-          password: ENV["ARTIFACTORY_PASSWORD"],
-          endpoint: ENV["ARTIFACTORY_URL"],
-          file: filePath,   # File to upload
-          repo: "gradle-release-local",   # Artifactory repo
-          repo_path: repoPath   # Path to place the artifact including its filename
-        )
+        begin
+          retries ||= 0
+          puts "try #{retries}"
+          artifactory(
+            username: ENV["ARTIFACTORY_USER"],
+            password: ENV["ARTIFACTORY_PASSWORD"],
+            endpoint: ENV["ARTIFACTORY_URL"],
+            file: filePath,   # File to upload
+            repo: "gradle-release-local",   # Artifactory repo
+            repo_path: repoPath   # Path to place the artifact including its filename
+          )
+        rescue
+          if (retries += 1) < 5
+            sleep(3) # sleep for 3 sec before retry
+            retry
+          else
+            raise
+          end
+        end
       end
     end
   end
