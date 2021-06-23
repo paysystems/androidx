@@ -173,7 +173,7 @@ public class DatabaseConfiguration {
             @Nullable Set<Integer> migrationNotRequiredFrom) {
         this(context, name, sqliteOpenHelperFactory, migrationContainer, callbacks,
                 allowMainThreadQueries, journalMode, queryExecutor, queryExecutor, false,
-                requireMigration, createTables, false, migrationNotRequiredFrom, null, null, null,
+                requireMigration, false, createTables, migrationNotRequiredFrom, null, null, null,
                 null,
                 null);
     }
