@@ -23,7 +23,7 @@ platform :android do
       artifactsRootPath = "out/room-playground/room-playground/build/support_repo"
       sh "rm -rfv #{artifactsRootPath}/androidx/room/*"
       sh "./room/gradlew -p ./room createArchive"
-      artifacts = Dir["#{artifactsRootPath}/androidx/room/room-{common,compiler,ktx,migration,runtime,testing}/*/*.{jar,aar,pom}"]
+      artifacts = Dir["#{artifactsRootPath}/androidx/room/room-{common,compiler,compiler-processing,ktx,migration,runtime,testing}/*/*.{jar,aar,pom}"]
       artifacts.each do |artifact|
         dirname = File.basename(Dir.getwd)
         repoPath = artifact.partition(artifactsRootPath).last
