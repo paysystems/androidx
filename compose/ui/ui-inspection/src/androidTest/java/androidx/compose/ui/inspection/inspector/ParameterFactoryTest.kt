@@ -22,6 +22,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -49,6 +50,8 @@ import androidx.compose.ui.graphics.colorspace.ColorModel
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.debugInspectorInfo
+import androidx.compose.ui.platform.inspectable
 import androidx.compose.ui.platform.isDebugInspectorInfoEnabled
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
@@ -69,6 +72,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.packFloats
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.MediumTest
 import com.google.common.truth.Truth.assertThat
@@ -76,13 +80,14 @@ import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 
 private const val ROOT_ID = 3L
 private const val NODE_ID = -7L
 private const val PARAM_INDEX = 4
+private const val MAX_RECURSIONS = 2
+private const val MAX_ITERABLE_SIZE = 5
 
 @Suppress("unused")
 private fun topLevelFunction() {
@@ -92,13 +97,6 @@ private fun topLevelFunction() {
 @RunWith(AndroidJUnit4::class)
 class ParameterFactoryTest {
     private val factory = ParameterFactory(InlineClassConverter())
-    private val originalMaxRecursions = factory.maxRecursions
-    private val originalMaxIterable = factory.maxIterable
-    private val node = MutableInspectorNode().apply {
-        width = 1000
-        height = 500
-        id = NODE_ID
-    }.build()
 
     @Before
     fun before() {
@@ -108,8 +106,6 @@ class ParameterFactoryTest {
 
     @After
     fun after() {
-        factory.maxRecursions = originalMaxRecursions
-        factory.maxIterable = originalMaxIterable
         isDebugInspectorInfoEnabled = false
     }
 
@@ -218,22 +214,29 @@ class ParameterFactoryTest {
             )
         ) {
             parameter("brush", ParameterType.String, "LinearGradient") {
-                parameter("colors", ParameterType.Iterable, "") {
+                parameter("colors", ParameterType.Iterable, "List[2]") {
                     parameter("[0]", ParameterType.Color, Color.Red.toArgb())
                     parameter("[1]", ParameterType.Color, Color.Blue.toArgb())
                 }
-                // Parameters are traversed in alphabetical order through reflection queries.
-                // Validate createdSize exists before validating end parameter
-                parameter("createdSize", ParameterType.String, "Unspecified", index = 5)
                 parameter("end", ParameterType.String, Offset::class.java.simpleName) {
                     parameter("x", ParameterType.DimensionDp, 2.5f)
                     parameter("y", ParameterType.DimensionDp, 5.0f)
+                }
+                parameter("intrinsicSize", ParameterType.String, Size::class.java.simpleName) {
+                    val width = 5.0f
+                    val height = 9.5f
+                    parameter("height", ParameterType.Float, height)
+                    parameter("maxDimension", ParameterType.Float, height)
+                    parameter("minDimension", ParameterType.Float, width)
+                    parameter("packedValue", ParameterType.Int64, packFloats(width, height))
+                    parameter("width", ParameterType.Float, width)
                 }
                 parameter("start", ParameterType.String, Offset::class.java.simpleName) {
                     parameter("x", ParameterType.DimensionDp, 0.0f)
                     parameter("y", ParameterType.DimensionDp, 0.25f)
                 }
-                parameter("tileMode", ParameterType.String, "Clamp", index = 4)
+                parameter("tileMode", ParameterType.String, "Clamp", index = 5)
+                parameter("createdSize", ParameterType.String, "Unspecified", index = 6)
             }
         }
         // TODO: add tests for RadialGradient & ShaderBrush
@@ -262,7 +265,6 @@ class ParameterFactoryTest {
         )
     }
 
-    @Ignore
     @Test
     fun testCornerBasedShape() {
         validate(create("corner", RoundedCornerShape(2.0.dp, 0.5.dp, 2.5.dp, 0.7.dp))) {
@@ -275,29 +277,28 @@ class ParameterFactoryTest {
         }
         validate(create("corner", CutCornerShape(2))) {
             parameter("corner", ParameterType.String, CutCornerShape::class.java.simpleName) {
-                parameter("bottomEnd", ParameterType.DimensionDp, 5.0f)
-                parameter("bottomStart", ParameterType.DimensionDp, 5.0f)
-                parameter("topEnd", ParameterType.DimensionDp, 5.0f)
-                parameter("topStart", ParameterType.DimensionDp, 5.0f)
+                parameter("bottomEnd", ParameterType.String, "2.0%")
+                parameter("bottomStart", ParameterType.String, "2.0%")
+                parameter("topEnd", ParameterType.String, "2.0%")
+                parameter("topStart", ParameterType.String, "2.0%")
             }
         }
         validate(create("corner", RoundedCornerShape(1.0f, 10.0f, 2.0f, 3.5f))) {
             parameter("corner", ParameterType.String, RoundedCornerShape::class.java.simpleName) {
-                parameter("bottomEnd", ParameterType.DimensionDp, 1.0f)
-                parameter("bottomStart", ParameterType.DimensionDp, 1.75f)
-                parameter("topEnd", ParameterType.DimensionDp, 5.0f)
-                parameter("topStart", ParameterType.DimensionDp, 0.5f)
+                parameter("bottomEnd", ParameterType.String, "2.0px")
+                parameter("bottomStart", ParameterType.String, "3.5px")
+                parameter("topEnd", ParameterType.String, "10.0px")
+                parameter("topStart", ParameterType.String, "1.0px")
             }
         }
     }
 
-    @Ignore
     @Test
     fun testCornerSize() {
         assertThat(lookup(ZeroCornerSize)).isEqualTo(ParameterType.String to "ZeroCornerSize")
         assertThat(lookup(CornerSize(2.4.dp))).isEqualTo(ParameterType.DimensionDp to 2.4f)
-        assertThat(lookup(CornerSize(2.4f))).isEqualTo(ParameterType.DimensionDp to 1.2f)
-        assertThat(lookup(CornerSize(3))).isEqualTo(ParameterType.DimensionDp to 7.5f)
+        assertThat(lookup(CornerSize(2.4f))).isEqualTo(ParameterType.String to "2.4px")
+        assertThat(lookup(CornerSize(3))).isEqualTo(ParameterType.String to "3.0%")
     }
 
     @Test
@@ -423,7 +424,7 @@ class ParameterFactoryTest {
     @Test
     fun testLocaleList() {
         validate(create("locales", LocaleList(Locale("fr-ca"), Locale("fr-be")))) {
-            parameter("locales", ParameterType.Iterable, "") {
+            parameter("locales", ParameterType.Iterable, "Collection[2]") {
                 parameter("[0]", ParameterType.String, "fr-CA")
                 parameter("[1]", ParameterType.String, "fr-BE")
             }
@@ -436,12 +437,71 @@ class ParameterFactoryTest {
     }
 
     @Test
+    fun testMap() {
+        val map = mapOf(1 to "one", 2 to "two")
+        validate(create("map", map)) {
+            parameter("map", ParameterType.Iterable, "Map[2]") {
+                parameter("[1]", ParameterType.String, "one") {
+                    parameter("key", ParameterType.Int32, 1)
+                    parameter("value", ParameterType.String, "one")
+                }
+                parameter("[2]", ParameterType.String, "two") {
+                    parameter("key", ParameterType.Int32, 2)
+                    parameter("value", ParameterType.String, "two")
+                }
+            }
+        }
+    }
+
+    @Test
+    fun testMapEntry() {
+        val entry = object : Map.Entry<String, String> {
+            override val key = "Hello"
+            override val value = "World"
+        }
+        validate(create("myEntry", entry)) {
+            parameter("myEntry", ParameterType.String, "World") {
+                parameter("key", ParameterType.String, "Hello")
+                parameter("value", ParameterType.String, "World")
+            }
+        }
+    }
+
+    @Test
+    fun testMapWithComplexTypes() {
+        val k1 = MyClass("k1")
+        val k2 = MyClass("k2")
+        val v1 = MyClass("v1")
+        val v2 = MyClass("v2")
+        val map = mapOf(k1 to v1, k2 to v2)
+        validate(create("map", map, maxRecursions = 3)) {
+            parameter("map", ParameterType.Iterable, "Map[2]") {
+                parameter("[MyClass]", ParameterType.String, "MyClass") {
+                    parameter("key", ParameterType.String, "MyClass") {
+                        parameter("name", ParameterType.String, "k1")
+                    }
+                    parameter("value", ParameterType.String, "MyClass") {
+                        parameter("name", ParameterType.String, "v1")
+                    }
+                }
+                parameter("[MyClass]", ParameterType.String, "MyClass") {
+                    parameter("key", ParameterType.String, "MyClass") {
+                        parameter("name", ParameterType.String, "k2")
+                    }
+                    parameter("value", ParameterType.String, "MyClass") {
+                        parameter("name", ParameterType.String, "v2")
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
     fun testShortIntArray() {
-        factory.maxIterable = 10
         val value = intArrayOf(10, 11, 12)
         val parameter = create("array", value)
         validate(parameter) {
-            parameter("array", ParameterType.Iterable, "") {
+            parameter("array", ParameterType.Iterable, "IntArray[3]") {
                 parameter("[0]", ParameterType.Int32, 10)
                 parameter("[1]", ParameterType.Int32, 11)
                 parameter("[2]", ParameterType.Int32, 12)
@@ -451,12 +511,12 @@ class ParameterFactoryTest {
 
     @Test
     fun testLongIntArray() {
-        factory.maxIterable = 5
         val value = intArrayOf(10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23)
         val refToSelf = ref()
+        val display = "IntArray[14]"
         val parameter = create("array", value)
         validate(parameter) {
-            parameter("array", ParameterType.Iterable, "", refToSelf) {
+            parameter("array", ParameterType.Iterable, display, refToSelf) {
                 parameter("[0]", ParameterType.Int32, 10)
                 parameter("[1]", ParameterType.Int32, 11)
                 parameter("[2]", ParameterType.Int32, 12)
@@ -465,9 +525,9 @@ class ParameterFactoryTest {
             }
         }
 
-        // If we need to retrieve more array elements we call "factory.expand" with the reference:
-        validate(factory.expand(ROOT_ID, node, "array", value, refToSelf, 5, 5)!!) {
-            parameter("array", ParameterType.Iterable, "", refToSelf) {
+        // If we need to retrieve more array elements we call "expand" with the reference:
+        validate(expand("array", value, refToSelf, 5, 5)!!) {
+            parameter("array", ParameterType.Iterable, display, refToSelf, childStartIndex = 5) {
                 parameter("[5]", ParameterType.Int32, 15)
                 parameter("[6]", ParameterType.Int32, 16)
                 parameter("[7]", ParameterType.Int32, 17)
@@ -476,10 +536,10 @@ class ParameterFactoryTest {
             }
         }
 
-        // Call "factory.expand" again to retrieve more:
-        validate(factory.expand(ROOT_ID, node, "array", value, refToSelf, 10, 5)!!) {
+        // Call "expand" again to retrieve more:
+        validate(expand("array", value, refToSelf, 10, 5)!!) {
             // This time we reached the end of the array, and we do not get a reference to get more
-            parameter("array", ParameterType.Iterable, "") {
+            parameter("array", ParameterType.Iterable, display, childStartIndex = 10) {
                 parameter("[10]", ParameterType.Int32, 20)
                 parameter("[11]", ParameterType.Int32, 21)
                 parameter("[12]", ParameterType.Int32, 22)
@@ -490,23 +550,56 @@ class ParameterFactoryTest {
 
     @Test
     fun testListWithNullElement() {
-        factory.maxIterable = 3
-        val value = listOf("Hello", null, "World")
+        val value = listOf(
+            "a",
+            null,
+            "b",
+            "c",
+            null,
+            null,
+            null,
+            null,
+            "d",
+            null,
+            "e",
+            null,
+            null,
+            null,
+            null,
+            null,
+            "f",
+            null,
+            "g",
+            null
+        )
         val parameter = create("array", value)
+        val refToSelf = ref()
+        val display = "List[20]"
         validate(parameter) {
             // Here we get all the available elements from the list.
             // There is no need to go back for more data, and the iterable does not have a
             // reference for doing so.
-            parameter("array", ParameterType.Iterable, "") {
-                parameter("[0]", ParameterType.String, "Hello")
-                parameter("[2]", ParameterType.String, "World", index = 2)
+            parameter("array", ParameterType.Iterable, display, refToSelf) {
+                parameter("[0]", ParameterType.String, "a")
+                parameter("[2]", ParameterType.String, "b", index = 2)
+                parameter("[3]", ParameterType.String, "c", index = 3)
+                parameter("[8]", ParameterType.String, "d", index = 8)
+                parameter("[10]", ParameterType.String, "e", index = 10)
+            }
+        }
+
+        // Call "expand" to retrieve more elements:
+        validate(expand("array", value, refToSelf, 11, 5)!!) {
+            // This time we reached the end of the array, and we do not get a reference to get more
+            parameter("array", ParameterType.Iterable, display) {
+                parameter("[16]", ParameterType.String, "f", index = 16)
+                parameter("[18]", ParameterType.String, "g", index = 18)
             }
         }
     }
 
     @Test
     fun testModifier() {
-        factory.maxRecursions = 4
         validate(
             create(
                 "modifier",
@@ -517,7 +610,8 @@ class ParameterFactoryTest {
                     .fillMaxWidth()
                     .wrapContentHeight(Alignment.Bottom)
                     .width(30.0.dp)
-                    .paint(TestPainter(10f, 20f))
+                    .paint(TestPainter(10f, 20f)),
+                maxRecursions = 4
             )
         ) {
             parameter("modifier", ParameterType.String, "") {
@@ -526,9 +620,9 @@ class ParameterFactoryTest {
                     parameter("shape", ParameterType.String, "RectangleShape")
                 }
                 parameter("border", ParameterType.Color, Color.Red.toArgb()) {
+                    parameter("width", ParameterType.DimensionDp, 5.0f)
                     parameter("color", ParameterType.Color, Color.Red.toArgb())
                     parameter("shape", ParameterType.String, "RectangleShape")
-                    parameter("width", ParameterType.DimensionDp, 5.0f)
                 }
                 parameter("padding", ParameterType.DimensionDp, 2.0f)
                 parameter("fillMaxWidth", ParameterType.String, "") {
@@ -540,13 +634,8 @@ class ParameterFactoryTest {
                 }
                 parameter("width", ParameterType.DimensionDp, 30.0f)
                 parameter("paint", ParameterType.String, "") {
-                    parameter("alignment", ParameterType.String, "Center")
-                    parameter("alpha", ParameterType.Float, 1.0f)
-                    parameter("contentScale", ParameterType.String, "Inside")
                     parameter("painter", ParameterType.String, "TestPainter") {
-                        parameter("alpha", ParameterType.Float, 1.0f)
                         parameter("color", ParameterType.Color, Color.Red.toArgb())
-                        parameter("drawLambda", ParameterType.Lambda, null, index = 6)
                         parameter("height", ParameterType.Float, 20.0f)
                         parameter("intrinsicSize", ParameterType.String, "Size") {
                             parameter("height", ParameterType.Float, 20.0f)
@@ -555,11 +644,16 @@ class ParameterFactoryTest {
                             parameter("packedValue", ParameterType.Int64, 4692750812821061632L)
                             parameter("width", ParameterType.Float, 10.0f)
                         }
+                        parameter("width", ParameterType.Float, 10.0f)
+                        parameter("alpha", ParameterType.Float, 1.0f)
+                        parameter("drawLambda", ParameterType.Lambda, null, index = 6)
                         parameter("layoutDirection", ParameterType.String, "Ltr", index = 8)
                         parameter("useLayer", ParameterType.Boolean, false, index = 9)
-                        parameter("width", ParameterType.Float, 10.0f)
                     }
                     parameter("sizeToIntrinsics", ParameterType.Boolean, true)
+                    parameter("alignment", ParameterType.String, "Center")
+                    parameter("contentScale", ParameterType.String, "Inside")
+                    parameter("alpha", ParameterType.Float, 1.0f)
                 }
             }
         }
@@ -575,14 +669,33 @@ class ParameterFactoryTest {
     }
 
     @Test
+    fun testWrappedModifier() {
+        fun Modifier.frame(color: Color) = inspectable(
+            debugInspectorInfo {
+                name = "frame"
+                value = color
+            }
+        ) {
+            background(color).border(width = 5.dp, color = color)
+        }
+        validate(create("modifier", Modifier.width(40.dp).frame(Color.Green).height(50.dp))) {
+            parameter("modifier", ParameterType.String, "") {
+                parameter("width", ParameterType.DimensionDp, 40.0f)
+                parameter("frame", ParameterType.Color, Color.Green.toArgb())
+                parameter("height", ParameterType.DimensionDp, 50.0f)
+            }
+        }
+    }
+
+    @Test
     fun testSingleModifierWithParameters() {
         validate(create("modifier", Modifier.padding(1.dp, 2.dp, 3.dp, 4.dp))) {
             parameter("modifier", ParameterType.String, "") {
                 parameter("padding", ParameterType.String, "") {
-                    parameter("bottom", ParameterType.DimensionDp, 4.0f)
-                    parameter("end", ParameterType.DimensionDp, 3.0f)
                     parameter("start", ParameterType.DimensionDp, 1.0f)
                     parameter("top", ParameterType.DimensionDp, 2.0f)
+                    parameter("end", ParameterType.DimensionDp, 3.0f)
+                    parameter("bottom", ParameterType.DimensionDp, 4.0f)
                 }
             }
         }
@@ -643,9 +756,7 @@ class ParameterFactoryTest {
         val name = MyClass::class.java.simpleName
 
         // Limit the recursions for this test to validate parameter nodes with missing children.
-        factory.maxRecursions = 2
-
-        val parameter = create("v1", v1)
+        val parameter = create("v1", v1, maxRecursions = 2)
         val v2ref = ref(3, 1)
         validate(parameter) {
             parameter("v1", ParameterType.String, name) {
@@ -663,9 +774,9 @@ class ParameterFactoryTest {
         }
 
         // If we need to retrieve the missing child nodes for v2 from above, we must
-        // call "factory.expand" with the reference:
+        // call "expand" with the reference:
         val v4ref = ref(3, 1, 1, 1)
-        validate(factory.expand(ROOT_ID, node, "v1", v1, v2ref)!!) {
+        validate(expand("v1", v1, v2ref)!!) {
             parameter("other", ParameterType.String, name) {
                 parameter("name", ParameterType.String, "v3")
                 parameter("other", ParameterType.String, name) {
@@ -679,8 +790,8 @@ class ParameterFactoryTest {
         }
 
         // If we need to retrieve the missing child nodes for v4 from above, we must
-        // call "factory.expand" with the reference:
-        validate(factory.expand(ROOT_ID, node, "v1", v1, v4ref)!!) {
+        // call "expand" with the reference:
+        validate(expand("v1", v1, v4ref)!!) {
             parameter("other", ParameterType.String, name) {
                 parameter("name", ParameterType.String, "v5")
             }
@@ -802,15 +913,57 @@ class ParameterFactoryTest {
         assertThat(lookup(Icons.Rounded.Add)).isEqualTo(ParameterType.String to "Rounded.Add")
     }
 
-    private fun create(name: String, value: Any): NodeParameter {
-        val parameter = factory.create(ROOT_ID, node, name, value, PARAM_INDEX)
+    private fun create(
+        name: String,
+        value: Any,
+        maxRecursions: Int = MAX_RECURSIONS,
+        maxInitialIterableSize: Int = MAX_ITERABLE_SIZE
+    ): NodeParameter {
+        val parameter = factory.create(
+            ROOT_ID,
+            NODE_ID,
+            name,
+            value,
+            ParameterKind.Normal,
+            PARAM_INDEX,
+            maxRecursions,
+            maxInitialIterableSize
+        )
 
         // Check that factory.expand will return the exact same information as factory.create
         // for each parameter and parameter child. Punt if there are references.
-        checkExpand(parameter, parameter.name, value, mutableListOf())
+        checkExpand(
+            parameter,
+            parameter.name,
+            value,
+            mutableListOf(),
+            maxRecursions,
+            maxInitialIterableSize
+        )
 
         return parameter
     }
+
+    private fun expand(
+        name: String,
+        value: Any?,
+        reference: NodeParameterReference,
+        startIndex: Int = 0,
+        maxElements: Int = MAX_ITERABLE_SIZE,
+        maxRecursions: Int = MAX_RECURSIONS,
+        maxInitialIterableSize: Int = MAX_ITERABLE_SIZE
+    ): NodeParameter? =
+        factory.expand(
+            ROOT_ID,
+            NODE_ID,
+            name,
+            value,
+            reference,
+            startIndex,
+            maxElements,
+            maxRecursions,
+            maxInitialIterableSize
+        )
 
     private fun lookup(value: Any): Pair<ParameterType, Any?> {
         val parameter = create("parameter", value)
@@ -819,7 +972,7 @@ class ParameterFactoryTest {
     }
 
     private fun ref(vararg reference: Int): NodeParameterReference =
-        NodeParameterReference(NODE_ID, PARAM_INDEX, reference)
+        NodeParameterReference(NODE_ID, ParameterKind.Normal, PARAM_INDEX, reference)
 
     private fun validate(
         parameter: NodeParameter,
@@ -834,11 +987,19 @@ class ParameterFactoryTest {
         parameter: NodeParameter,
         name: String,
         value: Any,
-        indices: MutableList<Int>
+        indices: MutableList<Int>,
+        maxRecursions: Int,
+        maxInitialIterableSize: Int
     ) {
-        factory.clearCacheFor(ROOT_ID)
-        val reference = NodeParameterReference(NODE_ID, PARAM_INDEX, indices)
-        val expanded = factory.expand(ROOT_ID, node, name, value, reference)
+        factory.clearReferenceCache()
+        val reference = NodeParameterReference(NODE_ID, ParameterKind.Normal, PARAM_INDEX, indices)
+        val expanded = expand(
+            name,
+            value,
+            reference,
+            maxRecursions = maxRecursions,
+            maxInitialIterableSize = maxInitialIterableSize
+        )
         if (parameter.value == null && indices.isNotEmpty()) {
             assertThat(expanded).isNull()
         } else {
@@ -847,7 +1008,14 @@ class ParameterFactoryTest {
                 parameter.elements.forEach { element ->
                     if (element.index >= 0) {
                         indices.add(element.index)
-                        checkExpand(element, name, value, indices)
+                        checkExpand(
+                            element,
+                            name,
+                            value,
+                            indices,
+                            maxRecursions,
+                            maxInitialIterableSize
+                        )
                         indices.removeLast()
                     }
                 }
@@ -877,8 +1045,9 @@ private class TestPainter(
 }
 
 class ParameterValidationReceiver(
-    private val parameterIterator: Iterator<NodeParameter>,
-    private val trace: String = ""
+    private val parameterIterator: ListIterator<NodeParameter>,
+    private val trace: String = "",
+    private val startIndex: Int = 0
 ) {
     fun parameter(
         name: String,
@@ -886,26 +1055,26 @@ class ParameterValidationReceiver(
         value: Any?,
         ref: NodeParameterReference? = null,
         index: Int = -1,
+        childStartIndex: Int = 0,
         block: ParameterValidationReceiver.() -> Unit = {}
     ) {
+        val listIndex = startIndex + parameterIterator.nextIndex()
+        val expectedIndex = if (index < 0) listIndex else index
         assertWithMessage("No such element found: $name").that(parameterIterator.hasNext()).isTrue()
         val parameter = parameterIterator.next()
         assertThat(parameter.name).isEqualTo(name)
         val msg = "$trace${parameter.name}"
         assertWithMessage(msg).that(parameter.type).isEqualTo(type)
-        assertWithMessage(msg).that(parameter.index).isEqualTo(index)
-        assertWithMessage(msg).that(checkEquals(parameter.reference, ref)).isTrue()
+        assertWithMessage(msg).that(parameter.index).isEqualTo(expectedIndex)
+        assertWithMessage(msg).that(parameter.reference.toString()).isEqualTo(ref.toString())
         if (type != ParameterType.Lambda || value != null) {
             assertWithMessage(msg).that(parameter.value).isEqualTo(value)
         }
-        var elements: List<NodeParameter> = parameter.elements
-        if (name != "modifier" && type != ParameterType.Iterable) {
-            // Do not sort modifiers or iterables: the order is important
-            elements = elements.sortedBy { it.name }
+        val iterator = parameter.elements.listIterator()
+        ParameterValidationReceiver(iterator, "$msg.", childStartIndex).apply {
+            block()
+            checkFinished(msg)
         }
-        val children = ParameterValidationReceiver(elements.listIterator(), "$msg.")
-        children.block()
-        children.checkFinished(msg)
     }
 
     fun checkFinished(trace: String = "") {
@@ -924,13 +1093,16 @@ class MyClass(private val name: String) {
     var other: MyClass? = null
     var self: MyClass? = null
     var third: MyClass? = null
+
+    override fun hashCode(): Int = name.hashCode()
+    override fun equals(other: Any?): Boolean = name == (other as? MyClass)?.name
 }
 
 private fun NodeParameter.checkEquals(other: NodeParameter): Boolean {
     assertThat(other.name).isEqualTo(name)
     assertThat(other.type).isEqualTo(type)
     assertThat(other.value).isEqualTo(value)
-    assertThat(checkEquals(reference, other.reference)).isTrue()
+    assertThat(other.reference.toString()).isEqualTo(reference.toString())
     assertThat(other.elements.size).isEqualTo(elements.size)
     var hasReferences = reference != null
     elements.forEachIndexed { i, element ->
@@ -938,9 +1110,3 @@ private fun NodeParameter.checkEquals(other: NodeParameter): Boolean {
     }
     return hasReferences
 }
-
-private fun checkEquals(ref1: NodeParameterReference?, ref2: NodeParameterReference?): Boolean =
-    ref1 === ref2 ||
-        ref1?.nodeId == ref2?.nodeId &&
-        ref1?.parameterIndex == ref2?.parameterIndex &&
-        ref1?.indices.contentEquals(ref2?.indices)
