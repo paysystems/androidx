@@ -15,9 +15,7 @@
  */
 package androidx.emoji2.widget;
 
-import android.annotation.SuppressLint;
 import android.content.Context;
-import android.os.Build;
 import android.text.InputFilter;
 import android.util.AttributeSet;
 import android.view.ActionMode;
@@ -25,9 +23,8 @@ import android.widget.Button;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.annotation.RequiresApi;
 import androidx.core.widget.TextViewCompat;
-import androidx.emoji2.helpers.EmojiTextViewHelper;
+import androidx.emoji2.viewsintegration.EmojiTextViewHelper;
 
 /**
  * Button widget enhanced with emoji capability by using {@link EmojiTextViewHelper}. When used
@@ -57,14 +54,6 @@ public class EmojiButton extends Button {
         init();
     }
 
-    @SuppressLint("UnsafeNewApiCall")
-    @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
-    public EmojiButton(@NonNull Context context, @Nullable AttributeSet attrs, int defStyleAttr,
-            int defStyleRes) {
-        super(context, attrs, defStyleAttr, defStyleRes);
-        init();
-    }
-
     private void init() {
         if (!mInitialized) {
             mInitialized = true;
@@ -73,7 +62,7 @@ public class EmojiButton extends Button {
     }
 
     @Override
-    public void setFilters(@NonNull InputFilter[] filters) {
+    public void setFilters(@SuppressWarnings("ArrayReturn") @NonNull InputFilter[] filters) {
         super.setFilters(getEmojiTextViewHelper().getFilters(filters));
     }
 
