@@ -19,11 +19,11 @@ package androidx.core.performance
 import android.os.Build.VERSION_CODES.R
 import android.os.Build.VERSION_CODES.S
 import com.google.common.truth.Truth.assertThat
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowBuild
 import org.robolectric.shadows.ShadowSystemProperties
 
 /** Unit tests for [PerformanceClass]. */
@@ -34,17 +34,24 @@ class PerformanceClassTest {
 
     @Test
     @Config(maxSdk = R)
-    fun getPerformanceClass_sdk30() {
-        assertThat(pc.getPerformanceClass()).isEqualTo(0)
+    fun getMediaPerformanceClass_sdk30() {
+        assertThat(pc.getMediaPerformanceClass()).isEqualTo(0)
     }
 
     @Test
-    // Note this test is not actually running because robolectric does not support sdk31 yet
-    @Ignore("b/206673076")
     @Config(minSdk = S)
-    fun getPerformanceClass_sdk31() {
+    fun getMediaPerformanceClass_sdk31_declared30() {
         // TODO(b/205732671): Use ShadowBuild.setMediaPerformanceClass when available
-        ShadowSystemProperties.override("ro.odm.build.media_performance_class", "31")
-        assertThat(pc.getPerformanceClass()).isEqualTo(31)
+        ShadowSystemProperties.override("ro.odm.build.media_performance_class", "30")
+        ShadowBuild.reset()
+        assertThat(pc.getMediaPerformanceClass()).isEqualTo(30)
+    }
+
+    @Test
+    @Config(minSdk = S)
+    fun getMediaPerformanceClass_sdk31_notDeclared() {
+        // TODO(b/205732671): Use ShadowBuild.setMediaPerformanceClass when available
+        ShadowBuild.reset()
+        assertThat(pc.getMediaPerformanceClass()).isEqualTo(0)
     }
 }
