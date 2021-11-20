@@ -34,6 +34,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
+import android.os.Looper
 import android.support.wearable.complications.IPreviewComplicationDataCallback
 import android.support.wearable.complications.IProviderInfoService
 import android.support.wearable.watchface.Constants
@@ -582,6 +583,12 @@ public class EditorSessionTest {
             override fun onDestroy() {
                 onDestroyLatch.countDown()
                 backgroundHandlerThread.quitSafely()
+            }
+
+            override fun setComplicationSlotConfigExtrasChangeCallback(
+                callback: WatchFace.ComplicationSlotConfigExtrasChangeCallback?
+            ) {
+                complicationSlotsManager.configExtrasChangeCallback = callback
             }
         }
         if (!shouldTimeout) {
@@ -1440,6 +1447,57 @@ public class EditorSessionTest {
     }
 
     @Test
+    public fun mutable_configExtras() {
+        // Invoke the test data source chooser to record the result.
+        ComplicationHelperActivity.useTestComplicationDataSourceChooserActivity = true
+        // Invoke the data source chooser without checking for permissions first.
+        ComplicationHelperActivity.skipPermissionCheck = true
+
+        val chosenComplicationDataSourceInfo = ComplicationDataSourceInfo(
+            "TestDataSource3App",
+            "TestDataSource3",
+            Icon.createWithBitmap(
+                Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+            ),
+            ComplicationType.LONG_TEXT,
+            dataSource3
+        )
+        TestComplicationDataSourceChooserActivity.lastIntent = null
+        TestComplicationDataSourceChooserActivity.resultIntent = Intent().apply {
+            putExtra(
+                ComplicationDataSourceChooserIntent.EXTRA_PROVIDER_INFO,
+                chosenComplicationDataSourceInfo.toWireComplicationProviderInfo()
+            )
+        }
+
+        val scenario = createOnWatchFaceEditingTestActivity(
+            emptyList(),
+            listOf(leftComplication, rightComplication)
+        )
+
+        lateinit var editorSession: EditorSession
+        scenario.onActivity { activity ->
+            editorSession = activity.editorSession
+        }
+
+        runBlocking {
+            rightComplication.configExtras = Bundle().apply {
+                putString(PROVIDER_CHOOSER_EXTRA_KEY, "Updated")
+            }
+
+            val chosenComplicationDataSource =
+                editorSession.openComplicationDataSourceChooser(RIGHT_COMPLICATION_ID)
+            assertThat(chosenComplicationDataSource).isNotNull()
+
+            assertThat(
+                TestComplicationDataSourceChooserActivity.lastIntent?.extras?.getString(
+                    PROVIDER_CHOOSER_EXTRA_KEY
+                )
+            ).isEqualTo("Updated")
+        }
+    }
+
+    @Test
     public fun getComplicationIdAt() {
         val scenario = createOnWatchFaceEditingTestActivity(
             emptyList(),
@@ -2118,8 +2176,8 @@ public class EditorSessionTest {
 
         scenario.onActivity { activity ->
             val mockWatchFaceHostApi = mock(WatchFaceHostApi::class.java)
-            val mockHandler = mock(Handler::class.java)
-            `when`(mockWatchFaceHostApi.getUiThreadHandler()).thenReturn(mockHandler)
+            val handler = Handler(Looper.myLooper()!!)
+            `when`(mockWatchFaceHostApi.getUiThreadHandler()).thenReturn(handler)
             `when`(mockWatchFaceHostApi.getContext()).thenReturn(
                 ApplicationProvider.getApplicationContext<Context>()
             )
@@ -2165,7 +2223,7 @@ public class EditorSessionTest {
                     watchState,
                     mockWatchFaceHostApi,
                     CompletableDeferred(),
-                    CoroutineScope(mockHandler.asCoroutineDispatcher())
+                    CoroutineScope(handler.asCoroutineDispatcher())
                 ),
                 null
             )
