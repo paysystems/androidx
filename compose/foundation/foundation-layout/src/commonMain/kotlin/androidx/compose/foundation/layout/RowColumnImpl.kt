@@ -125,7 +125,7 @@ internal fun rowColumnMeasurePolicy(
                     targetSpace - fixedSpace - arrangementSpacingPx * (weightChildrenCount - 1)
 
                 val weightUnitSpace = if (totalWeight > 0) remainingToTarget / totalWeight else 0f
-                var remainder = remainingToTarget - rowColumnParentData.sumBy {
+                var remainder = remainingToTarget - rowColumnParentData.sumOf {
                     (weightUnitSpace * it.weight).roundToInt()
                 }
 
@@ -162,6 +162,8 @@ internal fun rowColumnMeasurePolicy(
                         placeables[i] = placeable
                     }
                 }
+                weightedSpace = (weightedSpace + arrangementSpacingPx * (weightChildrenCount - 1))
+                    .coerceAtMost(constraints.mainAxisMax - fixedSpace)
             }
 
             var beforeCrossAxisAlignmentLine = 0
@@ -197,12 +199,7 @@ internal fun rowColumnMeasurePolicy(
             }
 
             // Compute the Row or Column size and position the children.
-            val mainAxisLayoutSize =
-                if (totalWeight > 0f && constraints.mainAxisMax != Constraints.Infinity) {
-                    constraints.mainAxisMax
-                } else {
-                    max(fixedSpace + weightedSpace, constraints.mainAxisMin)
-                }
+            val mainAxisLayoutSize = max(fixedSpace + weightedSpace, constraints.mainAxisMin)
             val crossAxisLayoutSize = if (constraints.crossAxisMax != Constraints.Infinity &&
                 crossAxisSize == SizeMode.Expand
             ) {
@@ -684,7 +681,13 @@ private fun intrinsicSize(
 ) = if (layoutOrientation == intrinsicOrientation) {
     intrinsicMainAxisSize(children, intrinsicMainSize, crossAxisAvailable, mainAxisSpacing)
 } else {
-    intrinsicCrossAxisSize(children, intrinsicCrossSize, intrinsicMainSize, crossAxisAvailable)
+    intrinsicCrossAxisSize(
+        children,
+        intrinsicCrossSize,
+        intrinsicMainSize,
+        crossAxisAvailable,
+        mainAxisSpacing
+    )
 }
 
 private fun intrinsicMainAxisSize(
@@ -714,9 +717,10 @@ private fun intrinsicCrossAxisSize(
     children: List<IntrinsicMeasurable>,
     mainAxisSize: IntrinsicMeasurable.(Int) -> Int,
     crossAxisSize: IntrinsicMeasurable.(Int) -> Int,
-    mainAxisAvailable: Int
+    mainAxisAvailable: Int,
+    mainAxisSpacing: Int
 ): Int {
-    var fixedSpace = 0
+    var fixedSpace = min((children.size - 1) * mainAxisSpacing, mainAxisAvailable)
     var crossAxisMax = 0
     var totalWeight = 0f
     children.fastForEach { child ->
@@ -751,7 +755,13 @@ private fun intrinsicCrossAxisSize(
         if (weight > 0f) {
             crossAxisMax = max(
                 crossAxisMax,
-                child.crossAxisSize((weightUnitSpace * weight).roundToInt())
+                child.crossAxisSize(
+                    if (weightUnitSpace != Constraints.Infinity) {
+                        (weightUnitSpace * weight).roundToInt()
+                    } else {
+                        Constraints.Infinity
+                    }
+                )
             )
         }
     }

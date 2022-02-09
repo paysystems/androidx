@@ -54,9 +54,15 @@ import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import kotlin.math.floor
+import kotlin.math.max
 
 /**
- * A component that represents two states (checked / unchecked).
+ * <a href="https://material.io/components/checkboxes" class="external" target="_blank">Material Design checkbox</a>.
+ *
+ * Checkboxes allow users to select one or more items from a set. Checkboxes can turn an option on
+ * or off.
+ *
+ * ![Checkboxes image](https://developer.android.com/images/reference/androidx/compose/material/checkboxes.png)
  *
  * @sample androidx.compose.material.samples.CheckboxSample
  *
@@ -96,11 +102,14 @@ fun Checkbox(
 }
 
 /**
- * A TriStateCheckbox is a toggleable component that provides
- * checked / unchecked / indeterminate options.
- * <p>
- * A TriStateCheckbox should be used when there are
- * dependent checkboxes associated to this component and those can have different values.
+ * <a href="https://material.io/components/checkboxes" class="external" target="_blank">Material Design checkbox</a> parent.
+ *
+ * Checkboxes can have a parent-child relationship with other checkboxes. When the parent checkbox
+ * is checked, all child checkboxes are checked. If a parent checkbox is unchecked, all child
+ * checkboxes are unchecked. If some, but not all, child checkboxes are checked, the parent checkbox
+ * becomes an indeterminate checkbox.
+ *
+ * ![Checkboxes image](https://developer.android.com/images/reference/androidx/compose/material/checkboxes.png)
  *
  * @sample androidx.compose.material.samples.TriStateCheckboxSample
  *
@@ -148,6 +157,7 @@ fun TriStateCheckbox(
         enabled = enabled,
         value = state,
         modifier = modifier
+            .then(if (onClick != null) { Modifier.minimumTouchTargetSize() } else { Modifier })
             .then(toggleableModifier)
             .padding(CheckboxDefaultPadding),
         colors = colors
@@ -313,7 +323,8 @@ private fun DrawScope.drawBox(
         boxColor,
         topLeft = Offset(strokeWidth, strokeWidth),
         size = Size(checkboxSize - strokeWidth * 2, checkboxSize - strokeWidth * 2),
-        cornerRadius = CornerRadius(radius / 2),
+        // Set the inner radius to be equal to the outer radius - border's stroke width.
+        cornerRadius = CornerRadius(max(0f, radius - strokeWidth)),
         style = Fill
     )
     drawRoundRect(

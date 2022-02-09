@@ -18,6 +18,8 @@
 
 package androidx.compose.runtime.lint
 
+import androidx.compose.lint.isComposable
+import androidx.compose.lint.returnsUnit
 import com.android.tools.lint.client.api.UElementHandler
 import com.android.tools.lint.detector.api.Category
 import com.android.tools.lint.detector.api.Detector
@@ -28,15 +30,12 @@ import com.android.tools.lint.detector.api.LintFix
 import com.android.tools.lint.detector.api.Scope
 import com.android.tools.lint.detector.api.Severity
 import com.android.tools.lint.detector.api.SourceCodeScanner
-import com.intellij.psi.PsiType
 import org.jetbrains.kotlin.psi.KtFunctionType
 import org.jetbrains.kotlin.psi.KtNullableType
 import org.jetbrains.kotlin.psi.KtParameter
-import org.jetbrains.uast.UAnnotation
 import org.jetbrains.uast.UElement
 import org.jetbrains.uast.UMethod
 import org.jetbrains.uast.UParameter
-import org.jetbrains.uast.toUElement
 import java.util.EnumSet
 
 /**
@@ -56,7 +55,7 @@ class ComposableLambdaParameterDetector : Detector(), SourceCodeScanner {
             if (!node.isComposable) return
 
             // Ignore non-unit composable functions
-            if (node.returnType != PsiType.VOID) return
+            if (!node.returnsUnit) return
 
             /**
              * Small class to hold information from lambda properties needed for lint checks.
@@ -72,22 +71,15 @@ class ComposableLambdaParameterDetector : Detector(), SourceCodeScanner {
                 // an extension function - just ignore it.
                 val ktParameter = parameter.sourcePsi as? KtParameter ?: return@mapNotNull null
 
-                val typeReference = ktParameter.typeReference!!
+                val isComposable = parameter.isComposable
 
-                // Currently type annotations don't appear on the psiType in the version of
-                // UAST / PSI we are using, so we have to look through the type reference.
-                // Should be fixed when Lint upgrades the version to 1.4.30+.
-                val hasComposableAnnotationOnType = typeReference.annotationEntries.any {
-                    (it.toUElement() as UAnnotation).qualifiedName == ComposableFqn
-                }
-
-                val functionType = when (val typeElement = typeReference.typeElement) {
-                    is KtFunctionType -> typeElement
-                    is KtNullableType -> typeElement.innerType as? KtFunctionType
+                val functionType = when (val type = ktParameter.typeReference!!.typeElement) {
+                    is KtFunctionType -> type
+                    is KtNullableType -> type.innerType as? KtFunctionType
                     else -> null
                 }
 
-                if (functionType != null && hasComposableAnnotationOnType) {
+                if (functionType != null && isComposable) {
                     ComposableLambdaParameterInfo(parameter, functionType)
                 } else {
                     null
@@ -143,25 +135,31 @@ class ComposableLambdaParameterDetector : Detector(), SourceCodeScanner {
 
     companion object {
         val ComposableLambdaParameterNaming = Issue.create(
-            "ComposableLambdaParameterNaming",
-            "Primary composable lambda parameter not named `content`",
-            "Composable functions with only one composable lambda parameter should use the name " +
-                "`content` for the parameter.",
-            Category.CORRECTNESS, 3, Severity.IGNORE,
-            Implementation(
+            id = "ComposableLambdaParameterNaming",
+            briefDescription = "Primary composable lambda parameter not named `content`",
+            explanation = "Composable functions with only one composable lambda parameter should " +
+                "use the name `content` for the parameter.",
+            category = Category.CORRECTNESS,
+            priority = 3,
+            severity = Severity.WARNING,
+            enabledByDefault = false,
+            implementation = Implementation(
                 ComposableLambdaParameterDetector::class.java,
                 EnumSet.of(Scope.JAVA_FILE, Scope.TEST_SOURCES)
             )
         )
 
         val ComposableLambdaParameterPosition = Issue.create(
-            "ComposableLambdaParameterPosition",
-            "Non-trailing primary composable lambda parameter",
-            "Composable functions with only one composable lambda parameter should place the " +
-                "parameter at the end of the parameter list, so it can be used as a trailing " +
-                "lambda.",
-            Category.CORRECTNESS, 3, Severity.IGNORE,
-            Implementation(
+            id = "ComposableLambdaParameterPosition",
+            briefDescription = "Non-trailing primary composable lambda parameter",
+            explanation = "Composable functions with only one composable lambda parameter should " +
+                "place the parameter at the end of the parameter list, so it can be used as a " +
+                "trailing lambda.",
+            category = Category.CORRECTNESS,
+            priority = 3,
+            severity = Severity.WARNING,
+            enabledByDefault = false,
+            implementation = Implementation(
                 ComposableLambdaParameterDetector::class.java,
                 EnumSet.of(Scope.JAVA_FILE, Scope.TEST_SOURCES)
             )

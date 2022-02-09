@@ -15,7 +15,9 @@
  */
 package androidx.emoji2.text;
 
-import static androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX;
+import static androidx.annotation.RestrictTo.Scope.LIBRARY;
+import static androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP;
+import static androidx.annotation.RestrictTo.Scope.TESTS;
 
 import android.annotation.SuppressLint;
 import android.graphics.Paint;
@@ -25,7 +27,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.annotation.RestrictTo;
-import androidx.annotation.VisibleForTesting;
 import androidx.core.util.Preconditions;
 
 /**
@@ -70,7 +71,7 @@ public abstract class EmojiSpan extends ReplacementSpan {
      *
      * @hide
      */
-    @RestrictTo(LIBRARY_GROUP_PREFIX)
+    @RestrictTo(LIBRARY)
     EmojiSpan(@NonNull final EmojiMetadata metadata) {
         Preconditions.checkNotNull(metadata, "metadata cannot be null");
         mMetadata = metadata;
@@ -78,7 +79,8 @@ public abstract class EmojiSpan extends ReplacementSpan {
 
     @Override
     public int getSize(@NonNull final Paint paint,
-            @SuppressLint("UnknownNullness") final CharSequence text,
+            @SuppressLint("UnknownNullness") @SuppressWarnings("MissingNullability")
+            final CharSequence text,
             final int start,
             final int end,
             @Nullable final Paint.FontMetricsInt fm) {
@@ -102,8 +104,9 @@ public abstract class EmojiSpan extends ReplacementSpan {
     /**
      * @hide
      */
-    @RestrictTo(LIBRARY_GROUP_PREFIX)
-    final EmojiMetadata getMetadata() {
+    @NonNull
+    @RestrictTo(LIBRARY_GROUP)
+    public final EmojiMetadata getMetadata() {
         return mMetadata;
     }
 
@@ -112,7 +115,7 @@ public abstract class EmojiSpan extends ReplacementSpan {
      *
      * @hide
      */
-    @RestrictTo(LIBRARY_GROUP_PREFIX)
+    @RestrictTo(LIBRARY)
     final int getWidth() {
         return mWidth;
     }
@@ -122,15 +125,15 @@ public abstract class EmojiSpan extends ReplacementSpan {
      *
      * @hide
      */
-    @RestrictTo(LIBRARY_GROUP_PREFIX)
-    final int getHeight() {
+    @RestrictTo(TESTS)
+    public final int getHeight() {
         return mHeight;
     }
 
     /**
      * @hide
      */
-    @RestrictTo(LIBRARY_GROUP_PREFIX)
+    @RestrictTo(LIBRARY)
     final float getRatio() {
         return mRatio;
     }
@@ -140,8 +143,7 @@ public abstract class EmojiSpan extends ReplacementSpan {
      *
      * @hide
      */
-    @RestrictTo(LIBRARY_GROUP_PREFIX)
-    @VisibleForTesting
+    @RestrictTo(TESTS)
     public final int getId() {
         return getMetadata().getId();
     }
