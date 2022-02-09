@@ -44,7 +44,8 @@ data class Field(
     // index might be removed when being merged into an Entity
     var indexed: Boolean = false,
     /** Whether the table column for this field should be NOT NULL */
-    val nonNull: Boolean = calcNonNull(type, parent)
+    val nonNull: Boolean = calcNonNull(type, parent),
+    val compatColumn: CompatColumn? = null
 ) : HasSchemaIdentity {
     lateinit var getter: FieldGetter
     lateinit var setter: FieldSetter
