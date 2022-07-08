@@ -87,8 +87,8 @@ dependencies {
     implementation(project(":room:room-common"))
     implementation(project(":room:room-runtime"))
     implementation(projectOrArtifact(":arch:core:core-runtime"))
-    implementation(projectOrArtifact(":lifecycle:lifecycle-livedata"))
-    implementation(projectOrArtifact(":lifecycle:lifecycle-runtime"))
+    implementation("androidx.lifecycle:lifecycle-livedata:2.4.0")
+    implementation("androidx.lifecycle:lifecycle-runtime:2.4.0")
     implementation(libs.multidex)
 
     // Workaround for b/191286558.
@@ -111,10 +111,10 @@ dependencies {
     androidTestImplementation(project(":room:room-guava"))
     androidTestImplementation(project(":room:room-paging"))
     androidTestImplementation("androidx.arch.core:core-testing:2.0.1")
-    androidTestImplementation(projectOrArtifact(":paging:paging-runtime"))
-    androidTestImplementation(projectOrArtifact(":lifecycle:lifecycle-runtime"))
-    androidTestImplementation(projectOrArtifact(":lifecycle:lifecycle-runtime-testing"))
-    androidTestImplementation(projectOrArtifact(":lifecycle:lifecycle-livedata"))
+    androidTestImplementation("androidx.paging:paging-runtime:3.1.0")
+    androidTestImplementation("androidx.lifecycle:lifecycle-runtime:2.4.0")
+    androidTestImplementation("androidx.lifecycle:lifecycle-runtime-testing:2.4.0")
+    androidTestImplementation("androidx.lifecycle:lifecycle-livedata:2.4.0")
 
     // libs.findbugs dependency resolves an app/testapp version conflict.
     androidTestImplementation(libs.findbugs)

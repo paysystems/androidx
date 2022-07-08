@@ -103,7 +103,7 @@ dependencies {
     testImplementation(libs.autoValue) // to access the processor in tests
     testImplementation(libs.autoServiceAnnotations)
     testImplementation(libs.autoService) // to access the processor in tests
-    testImplementation(projectOrArtifact(":paging:paging-common"))
+    testImplementation("androidx.paging:paging-common:3.1.0")
     testImplementation(project(":room:room-compiler-processing-testing"))
     testImplementation(libs.junit)
     testImplementation(libs.jsr250)
@@ -280,9 +280,9 @@ tasks.withType(KotlinCompile).configureEach {
     kotlinOptions {
         freeCompilerArgs += [
                 "-Xjvm-default=all",
-                "-Xopt-in=kotlin.RequiresOptIn",
-                "-Xopt-in=kotlin.contracts.ExperimentalContracts",
-                "-Xopt-in=androidx.room.compiler.processing.ExperimentalProcessingApi"
+                "-opt-in=kotlin.RequiresOptIn",
+                "-opt-in=kotlin.contracts.ExperimentalContracts",
+                "-opt-in=androidx.room.compiler.processing.ExperimentalProcessingApi"
         ]
     }
 }
