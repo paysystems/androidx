@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The Android Open Source Project
+ * Copyright 2022 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,10 +14,4 @@
  * limitations under the License.
  */
 
-package sample.experimental
-
-@Suppress("DEPRECATION")
-@RequiresOptIn
-@Retention(AnnotationRetention.BINARY)
-@Target(AnnotationTarget.CLASS, AnnotationTarget.FUNCTION)
-annotation class ExperimentalLocationKt
+// This file exists to trick AGP/lint to work around b/234865137

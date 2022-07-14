@@ -23,7 +23,7 @@ plugins {
 
 dependencies {
     api(libs.kotlinStdlib)
-    implementation(project(":paging:paging-common"))
+    implementation("androidx.paging:paging-common:3.1.0")
     implementation(project(":internal-testutils-ktx"))
     implementation(libs.kotlinTest)
 }
@@ -31,6 +31,6 @@ dependencies {
 // Allow usage of Kotlin's @OptIn.
 tasks.withType(KotlinCompile).configureEach {
     kotlinOptions {
-        freeCompilerArgs += ["-Xopt-in=kotlin.RequiresOptIn"]
+        freeCompilerArgs += ["-opt-in=kotlin.RequiresOptIn"]
     }
 }

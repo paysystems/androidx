@@ -128,9 +128,9 @@ Downloading file\:\$SUPPORT\/gradle\/wrapper\/.*
 [.]+10%[.]+20%[.]+30%[.]+40%[.]+50%[.]+60%[.]+70%[.]+80%[.]+90%[.]+100%
 Welcome to Gradle .*
 Here are the highlights of this release:
-\- Easily declare new test suites in Java projects
-\- Support for Java 17
-\- Support for Scala 3
+\- Aggregated test and JaCoCo reports
+\- Marking additional test source directories as tests in IntelliJ
+\- Support for Adoptium JDKs in Java toolchains
 For more details see .*
 Daemon will be stopped at the end of the build
 # > Configure project :appsearch:appsearch\-local\-backend
@@ -586,7 +586,6 @@ WARNING:The option setting 'android\.disableAutomaticComponentCreation=true' is 
 # b/195025261
 Unable to detect AGP versions for included builds\. All projects in the build should use the same AGP version\. Class name for the included build .*
 \- Gradle detected a problem with the following location: '\$OUT_DIR/androidx/benchmark/benchmark-common/build/generated/source/wire'\. Reason: Task ':benchmark:benchmark-common:.*' uses this output of task ':benchmark:benchmark-common:generate(Debug|Release)Protos' without declaring an explicit or implicit dependency. This can lead to incorrect results being produced, depending on what order the tasks are executed. Please refer to .*
-To honour the JVM settings for this build a single\-use Daemon process will be forked.*
 # > Task :work:work-benchmark:processReleaseAndroidTestManifest
 \$SUPPORT/work/work\-benchmark/src/androidTest/AndroidManifest\.xml:[0-9]+:[0-9]+\-[0-9]+:[0-9]+ Warning:
 [0-9]+ problems were found storing the configuration cache\.
