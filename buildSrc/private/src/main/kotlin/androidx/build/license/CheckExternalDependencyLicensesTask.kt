@@ -23,13 +23,16 @@ import org.gradle.api.artifacts.ExternalDependency
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository
 import org.gradle.api.artifacts.result.ResolvedArtifactResult
+import org.gradle.api.attributes.Category
 import org.gradle.api.attributes.Usage
+import org.gradle.api.attributes.plugin.GradlePluginApiVersion
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.FileCollection
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.TaskAction
+import org.gradle.util.GradleVersion
 import org.gradle.kotlin.dsl.named
 import java.io.File
 
@@ -111,6 +114,16 @@ fun Project.configureExternalDependencyLicenseCheck() {
                     it.attribute(
                         Usage.USAGE_ATTRIBUTE,
                         project.objects.named<Usage>(Usage.JAVA_RUNTIME)
+                    )
+                    it.attribute(
+                        Category.CATEGORY_ATTRIBUTE,
+                        project.objects.named<Category>(Category.LIBRARY)
+                    )
+                    it.attribute(
+                        GradlePluginApiVersion.GRADLE_PLUGIN_API_VERSION_ATTRIBUTE,
+                        project.objects.named<GradlePluginApiVersion>(
+                            GradleVersion.current().getVersion()
+                        )
                     )
                 }
 
