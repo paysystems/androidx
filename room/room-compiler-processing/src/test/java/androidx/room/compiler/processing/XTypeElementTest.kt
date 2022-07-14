@@ -118,12 +118,17 @@ class XTypeElementTest {
             }
             abstract class AbstractClass {}
             interface MyInterface {}
+            interface AnotherInterface : MyInterface {}
             """.trimIndent()
         )
         runProcessorTest(sources = listOf(src)) { invocation ->
             invocation.processingEnv.requireTypeElement("foo.bar.Baz").let {
-                assertThat(it.superType).isEqualTo(
+                assertThat(it.superClass).isEqualTo(
                     invocation.processingEnv.requireType("foo.bar.AbstractClass")
+                )
+                assertThat(it.superTypes).containsExactly(
+                    invocation.processingEnv.requireType("foo.bar.AbstractClass"),
+                    invocation.processingEnv.requireType("foo.bar.MyInterface")
                 )
                 assertThat(it.type).isEqualTo(
                     invocation.processingEnv.requireType("foo.bar.Baz")
@@ -133,16 +138,12 @@ class XTypeElementTest {
                 assertThat(it.isAbstract()).isFalse()
             }
             invocation.processingEnv.requireTypeElement("foo.bar.AbstractClass").let {
-                assertThat(it.superType).let {
-                    // KSP does not return Object / Any as super class
-                    if (invocation.isKsp) {
-                        it.isNull()
-                    } else {
-                        it.isEqualTo(
-                            invocation.processingEnv.requireType(TypeName.OBJECT)
-                        )
-                    }
-                }
+                assertThat(it.superClass).isEqualTo(
+                    invocation.processingEnv.requireType(TypeName.OBJECT)
+                )
+                assertThat(it.superTypes).containsExactly(
+                    invocation.processingEnv.requireType(TypeName.OBJECT)
+                )
                 assertThat(it.isAbstract()).isTrue()
                 assertThat(it.isInterface()).isFalse()
                 assertThat(it.type).isEqualTo(
@@ -150,10 +151,23 @@ class XTypeElementTest {
                 )
             }
             invocation.processingEnv.requireTypeElement("foo.bar.MyInterface").let {
-                assertThat(it.superType).isNull()
+                assertThat(it.superClass).isNull()
+                assertThat(it.superTypes).containsExactly(
+                    invocation.processingEnv.requireType(TypeName.OBJECT)
+                )
                 assertThat(it.isInterface()).isTrue()
                 assertThat(it.type).isEqualTo(
                     invocation.processingEnv.requireType("foo.bar.MyInterface")
+                )
+            }
+            invocation.processingEnv.requireTypeElement("foo.bar.AnotherInterface").let {
+                assertThat(it.superClass).isNull()
+                assertThat(it.superTypes).containsExactly(
+                    invocation.processingEnv.requireType("foo.bar.MyInterface")
+                )
+                assertThat(it.isInterface()).isTrue()
+                assertThat(it.type).isEqualTo(
+                    invocation.processingEnv.requireType("foo.bar.AnotherInterface")
                 )
             }
         }
