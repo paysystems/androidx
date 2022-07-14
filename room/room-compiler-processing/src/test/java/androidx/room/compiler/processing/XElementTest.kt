@@ -457,7 +457,7 @@ class XElementTest {
         ) {
             val element = it.processingEnv.requireTypeElement("java.lang.Object")
             // make sure we return null for not existing types
-            assertThat(element.superType).isNull()
+            assertThat(element.superClass).isNull()
         }
     }
 
