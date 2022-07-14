@@ -90,6 +90,7 @@ abstract class MetalavaWorkAction @Inject constructor(
     }
 }
 
+@Suppress("DEPRECATION")
 fun Project.getMetalavaClasspath(): FileCollection {
     @Suppress("UnstableApiUsage") // Usage of VersionCatalogsExtension
     val configuration = configurations.findByName("metalava") ?: configurations.create("metalava") {

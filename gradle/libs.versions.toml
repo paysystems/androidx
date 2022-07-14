@@ -2,10 +2,10 @@
 # -----------------------------------------------------------------------------
 # All of the following should be updated in sync.
 # -----------------------------------------------------------------------------
-androidGradlePlugin = "7.1.0-beta03"
+androidGradlePlugin = "7.2.1"
 # NOTE: When updating the lint version we also need to update the `api` version
 # supported by `IssueRegistry`'s.' For e.g. r.android.com/1331903
-androidLint = "30.1.0-beta03"
+androidLint = "30.2.1"
 # Once you have a chosen version of AGP to upgrade to, go to
 # https://developer.android.com/studio/archive and find the matching version of Studio.
 androidStudio = "2021.1.1.16"
@@ -28,10 +28,10 @@ espresso = "3.3.0"
 guavaJre = "29.0-jre"
 hilt = "2.40.1"
 incap = "0.2"
-kotlin = "1.6.10"
+kotlin = "1.7.0"
 kotlinCompileTesting = "1.4.1"
 kotlinCoroutines = "1.5.2"
-ksp = "1.6.10-1.0.2"
+ksp = "1.7.0-1.0.6"
 ktlint = "0.43.0"
 leakcanary = "2.7"
 mockito = "2.25.0"
@@ -108,7 +108,7 @@ kotlinCoroutinesRx2 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-rx2",
 kotlinCoroutinesRx3 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-rx3", version.ref = "kotlinCoroutines" }
 kotlinDaemonEmbeddable = { module = "org.jetbrains.kotlin:kotlin-daemon-embeddable", version.ref = "kotlin" }
 kotlinKlibCommonizer = { module = "org.jetbrains.kotlin:kotlin-klib-commonizer", version.ref = "kotlin" }
-kotlinMetadataJvm = { module = "org.jetbrains.kotlinx:kotlinx-metadata-jvm", version = "0.3.0" }
+kotlinMetadataJvm = { module = "org.jetbrains.kotlinx:kotlinx-metadata-jvm", version = "0.5.0" }
 kotlinStdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
 kotlinStdlibCommon = { module = "org.jetbrains.kotlin:kotlin-stdlib-common", version.ref = "kotlin" }
 kotlinStdlibJdk8 = { module = "org.jetbrains.kotlin:kotlin-stdlib-jdk8", version.ref = "kotlin" }

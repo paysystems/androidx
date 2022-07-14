@@ -17,7 +17,7 @@
 package sample.experimental
 
 @Suppress("DEPRECATION")
-@Experimental
+@RequiresOptIn
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS, AnnotationTarget.FUNCTION)
 annotation class ExperimentalDateTimeKt
