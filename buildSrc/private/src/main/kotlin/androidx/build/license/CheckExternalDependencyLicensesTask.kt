@@ -15,7 +15,9 @@
  */
 package androidx.build.license
 
-import androidx.build.getCheckoutRoot
+import androidx.build.enforceKtlintVersion
+import androidx.build.getPrebuiltsRoot
+import java.io.File
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
 import org.gradle.api.Project
@@ -31,10 +33,12 @@ import org.gradle.api.file.FileCollection
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
-import org.gradle.util.GradleVersion
 import org.gradle.kotlin.dsl.named
-import java.io.File
+import org.gradle.util.GradleVersion
+import org.gradle.work.DisableCachingByDefault
 
 /**
  * This task creates a configuration for the project that has all of its external dependencies
@@ -42,11 +46,12 @@ import java.io.File
  * a) come from prebuilts
  * b) has a license file.
  */
+@DisableCachingByDefault(because = "Too many inputs to declare")
 abstract class CheckExternalDependencyLicensesTask : DefaultTask() {
     @get:Input
     abstract val prebuiltsRoot: Property<String>
 
-    @get:InputFiles
+    @get:[InputFiles PathSensitive(PathSensitivity.ABSOLUTE)]
     abstract val filesToCheck: ConfigurableFileCollection
 
     @TaskAction
@@ -104,7 +109,9 @@ fun Project.configureExternalDependencyLicenseCheck() {
         CheckExternalDependencyLicensesTask.TASK_NAME,
         CheckExternalDependencyLicensesTask::class.java
     ) { task ->
-        task.prebuiltsRoot.set(File(project.getCheckoutRoot(), "prebuilts").absolutePath)
+        task.prebuiltsRoot.set(project.provider {
+            project.getPrebuiltsRoot().absolutePath
+        })
 
         task.filesToCheck.from(
             project.provider {
@@ -126,6 +133,8 @@ fun Project.configureExternalDependencyLicenseCheck() {
                         )
                     )
                 }
+                // workaround for b/234884534
+                project.enforceKtlintVersion(checkerConfig)
 
                 project
                     .configurations

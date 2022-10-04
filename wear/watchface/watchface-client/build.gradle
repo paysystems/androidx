@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-import androidx.build.LibraryGroups
-import androidx.build.LibraryVersions
 import androidx.build.Publish
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
@@ -43,20 +41,15 @@ dependencies {
     androidTestImplementation(libs.dexmakerMockito, excludes.bytebuddy) // DexMaker has it"s own MockMaker
     androidTestImplementation(libs.truth)
 
-    testImplementation(libs.testExtJunit)
-    testImplementation(libs.testCore)
-    testImplementation(libs.testRules)
+    testImplementation(libs.mockitoCore)
+    testImplementation(libs.mockitoKotlin)
     testImplementation(libs.robolectric)
+    testImplementation(libs.testCore)
+    testImplementation(libs.testExtJunit)
+    testImplementation(libs.testRules)
     testImplementation(libs.truth)
 
     implementation("androidx.core:core:1.1.0")
-}
-
-// Allow usage of Kotlin's @OptIn.
-tasks.withType(KotlinCompile).configureEach {
-    kotlinOptions {
-        freeCompilerArgs += ["-Xopt-in=kotlin.RequiresOptIn"]
-    }
 }
 
 android {
@@ -68,6 +61,7 @@ android {
 
     // Use Robolectric 4.+
     testOptions.unitTests.includeAndroidResources = true
+    namespace "androidx.wear.watchface.client"
 }
 
 androidx {

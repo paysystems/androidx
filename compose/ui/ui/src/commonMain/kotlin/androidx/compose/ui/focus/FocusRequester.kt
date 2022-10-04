@@ -19,7 +19,6 @@ package androidx.compose.ui.focus
 import androidx.compose.runtime.collection.MutableVector
 import androidx.compose.runtime.collection.mutableVectorOf
 import androidx.compose.ui.ExperimentalComposeUiApi
-import androidx.compose.ui.node.ModifiedFocusRequesterNode
 
 private const val focusRequesterNotInitialized = """
    FocusRequester is not initialized. Here are some possible fixes:
@@ -41,7 +40,8 @@ private const val focusRequesterNotInitialized = """
  */
 class FocusRequester {
 
-    internal val focusRequesterNodes: MutableVector<ModifiedFocusRequesterNode> = mutableVectorOf()
+    internal val focusRequesterModifierLocals: MutableVector<FocusRequesterModifierLocal> =
+        mutableVectorOf()
 
     /**
      * Use this function to request focus. If the system grants focus to a component associated
@@ -51,8 +51,34 @@ class FocusRequester {
      * @sample androidx.compose.ui.samples.RequestFocusSample
      */
     fun requestFocus() {
-        check(focusRequesterNodes.isNotEmpty()) { focusRequesterNotInitialized }
-        focusRequesterNodes.forEach { it.findFocusNode()?.requestFocus(propagateFocus = false) }
+        check(focusRequesterModifierLocals.isNotEmpty()) { focusRequesterNotInitialized }
+        performRequestFocus {
+            it.requestFocus()
+            // TODO(b/245755256): Make focusModifier.requestFocus() return a Boolean.
+            true
+        }
+    }
+
+    /**
+     * This function searches down the hierarchy and calls [onFound] for all focus nodes associated
+     * with this [FocusRequester].
+     * @param onFound the callback that is run when the child is found.
+     * @return false if no focus nodes were found or if the FocusRequester is
+     * [FocusRequester.Cancel]. Returns null if the FocusRequester is [FocusRequester.Default].
+     * Otherwise returns a logical or of the result of calling [onFound] for each focus node
+     * associated with this [FocusRequester].
+     */
+    @OptIn(ExperimentalComposeUiApi::class)
+    internal fun performRequestFocus(onFound: (FocusModifier) -> Boolean): Boolean? = when (this) {
+        Cancel -> false
+        Default -> null
+        else -> {
+            var success = false
+            focusRequesterModifierLocals.forEach {
+                it.findFocusNode()?.let { success = onFound.invoke(it) || success }
+            }
+            success
+        }
     }
 
     /**
@@ -71,9 +97,9 @@ class FocusRequester {
      * @sample androidx.compose.ui.samples.CaptureFocusSample
      */
     fun captureFocus(): Boolean {
-        check(focusRequesterNodes.isNotEmpty()) { focusRequesterNotInitialized }
+        check(focusRequesterModifierLocals.isNotEmpty()) { focusRequesterNotInitialized }
         var success = false
-        focusRequesterNodes.forEach {
+        focusRequesterModifierLocals.forEach {
             it.findFocusNode()?.apply {
                 if (captureFocus()) {
                     success = true
@@ -98,9 +124,9 @@ class FocusRequester {
      * @sample androidx.compose.ui.samples.CaptureFocusSample
      */
     fun freeFocus(): Boolean {
-        check(focusRequesterNodes.isNotEmpty()) { focusRequesterNotInitialized }
+        check(focusRequesterModifierLocals.isNotEmpty()) { focusRequesterNotInitialized }
         var success = false
-        focusRequesterNodes.forEach {
+        focusRequesterModifierLocals.forEach {
             it.findFocusNode()?.apply {
                 if (freeFocus()) {
                     success = true
@@ -112,11 +138,23 @@ class FocusRequester {
 
     companion object {
         /**
-         * Default [focusRequester], which when used in [Modifier.focusOrder][focusOrder] implies
-         * that we want to use the default system focus order, that is based on the position of the
-         * items on the screen.
+         * Default [focusRequester], which when used in [Modifier.focusProperties][focusProperties]
+         * implies that we want to use the default system focus order, that is based on the
+         * position of the items on the screen.
          */
         val Default = FocusRequester()
+
+        /**
+         * Cancelled [focusRequester], which when used in
+         * [Modifier.focusProperties][focusProperties] implies that we want to block focus search
+         * from proceeding in the specified [direction][FocusDirection].
+         *
+         * @sample androidx.compose.ui.samples.CancelFocusMoveSample()
+         */
+        @Suppress("OPT_IN_MARKER_ON_WRONG_TARGET")
+        @get:ExperimentalComposeUiApi
+        @ExperimentalComposeUiApi
+        val Cancel = FocusRequester()
 
         /**
          * Convenient way to create multiple [FocusRequester] instances.

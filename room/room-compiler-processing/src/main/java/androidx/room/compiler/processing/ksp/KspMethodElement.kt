@@ -24,7 +24,6 @@ import androidx.room.compiler.processing.XTypeElement
 import androidx.room.compiler.processing.ksp.synthetic.KspSyntheticContinuationParameterElement
 import androidx.room.compiler.processing.ksp.synthetic.KspSyntheticReceiverParameterElement
 import com.google.devtools.ksp.KspExperimental
-import com.google.devtools.ksp.closestClassDeclaration
 import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
@@ -32,14 +31,8 @@ import com.google.devtools.ksp.symbol.Modifier
 
 internal sealed class KspMethodElement(
     env: KspProcessingEnv,
-    containing: KspMemberContainer,
     declaration: KSFunctionDeclaration
-) : KspExecutableElement(
-    env = env,
-    containing = containing,
-    declaration = declaration
-),
-    XMethodElement {
+) : KspExecutableElement(env, declaration), XMethodElement {
 
     override val name: String
         get() = declaration.simpleName.asString()
@@ -54,14 +47,14 @@ internal sealed class KspMethodElement(
     }
 
     override val parameters: List<XExecutableParameterElement> by lazy {
-        buildList<XExecutableParameterElement> {
+        buildList {
             val extensionReceiver = declaration.extensionReceiver
             if (extensionReceiver != null) {
                 // Synthesize the receiver parameter to be consistent with KAPT
                 add(
                     KspSyntheticReceiverParameterElement(
                         env = env,
-                        enclosingMethodElement = this@KspMethodElement,
+                        enclosingElement = this@KspMethodElement,
                         receiverType = extensionReceiver,
                     )
                 )
@@ -70,7 +63,7 @@ internal sealed class KspMethodElement(
                 declaration.parameters.mapIndexed { index, param ->
                     KspExecutableParameterElement(
                         env = env,
-                        enclosingMethodElement = this@KspMethodElement,
+                        enclosingElement = this@KspMethodElement,
                         parameter = param,
                         parameterIndex = index
                     )
@@ -83,25 +76,8 @@ internal sealed class KspMethodElement(
         KspMethodType.create(
             env = env,
             origin = this,
-            containing = this.containing.type
+            containing = this.enclosingElement.type
         )
-    }
-
-    /**
-     * The method type for the declaration if it is inherited from a super.
-     * If this method is declared in the containing class (or in a file), it will be null.
-     */
-    val declarationMethodType: XMethodType? by lazy {
-        val declaredIn = declaration.closestClassDeclaration()
-        if (declaredIn == null || declaredIn == containing.declaration) {
-            null
-        } else {
-            create(
-                env = env,
-                containing = env.wrapClassDeclaration(declaredIn),
-                declaration = declaration
-            ).executableType
-        }
     }
 
     override fun isJavaDefault(): Boolean {
@@ -134,26 +110,14 @@ internal sealed class KspMethodElement(
         return env.resolver.overrides(this, other)
     }
 
-    override fun copyTo(newContainer: XTypeElement): KspMethodElement {
-        check(newContainer is KspTypeElement)
-        return create(
-            env = env,
-            containing = newContainer,
-            declaration = declaration
-        )
-    }
-
     private class KspNormalMethodElement(
         env: KspProcessingEnv,
-        containing: KspMemberContainer,
         declaration: KSFunctionDeclaration
-    ) : KspMethodElement(
-        env, containing, declaration
-    ) {
+    ) : KspMethodElement(env, declaration) {
         override val returnType: XType by lazy {
             declaration.returnKspType(
                 env = env,
-                containing = containing.type
+                containing = enclosingElement.type
             )
         }
         override fun isSuspendFunction() = false
@@ -161,11 +125,8 @@ internal sealed class KspMethodElement(
 
     private class KspSuspendMethodElement(
         env: KspProcessingEnv,
-        containing: KspMemberContainer,
         declaration: KSFunctionDeclaration
-    ) : KspMethodElement(
-        env, containing, declaration
-    ) {
+    ) : KspMethodElement(env, declaration) {
         override fun isSuspendFunction() = true
 
         override val returnType: XType by lazy {
@@ -178,20 +139,19 @@ internal sealed class KspMethodElement(
         override val parameters: List<XExecutableParameterElement>
             get() = super.parameters + KspSyntheticContinuationParameterElement(
                 env = env,
-                enclosingMethodElement = this
+                enclosingElement = this
             )
     }
 
     companion object {
         fun create(
             env: KspProcessingEnv,
-            containing: KspMemberContainer,
             declaration: KSFunctionDeclaration
         ): KspMethodElement {
             return if (declaration.modifiers.contains(Modifier.SUSPEND)) {
-                KspSuspendMethodElement(env, containing, declaration)
+                KspSuspendMethodElement(env, declaration)
             } else {
-                KspNormalMethodElement(env, containing, declaration)
+                KspNormalMethodElement(env, declaration)
             }
         }
     }

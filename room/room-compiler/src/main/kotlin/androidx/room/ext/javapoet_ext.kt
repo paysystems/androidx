@@ -16,8 +16,10 @@
 
 package androidx.room.ext
 
+import androidx.room.compiler.codegen.XClassName
 import com.squareup.javapoet.ArrayTypeName
 import com.squareup.javapoet.ClassName
+import com.squareup.javapoet.CodeBlock
 import com.squareup.javapoet.MethodSpec
 import com.squareup.javapoet.ParameterizedTypeName
 import com.squareup.javapoet.TypeName
@@ -58,6 +60,8 @@ object RoomTypeNames {
     val ROOM_DB_CONFIG: ClassName = ClassName.get(ROOM_PACKAGE, "DatabaseConfiguration")
     val INSERTION_ADAPTER: ClassName =
         ClassName.get(ROOM_PACKAGE, "EntityInsertionAdapter")
+    val UPSERTION_ADAPTER: ClassName =
+        ClassName.get(ROOM_PACKAGE, "EntityUpsertionAdapter")
     val DELETE_OR_UPDATE_ADAPTER: ClassName =
         ClassName.get(ROOM_PACKAGE, "EntityDeletionOrUpdateAdapter")
     val SHARED_SQLITE_STMT: ClassName =
@@ -99,6 +103,8 @@ object RoomTypeNames {
     )
     val UUID_UTIL: ClassName =
         ClassName.get("$ROOM_PACKAGE.util", "UUIDUtil")
+    val AMBIGUOUS_COLUMN_RESOLVER: ClassName =
+        ClassName.get(ROOM_PACKAGE, "AmbiguousColumnResolver")
 }
 
 object PagingTypeNames {
@@ -110,6 +116,12 @@ object PagingTypeNames {
         ClassName.get(PAGING_PACKAGE, "DataSource", "Factory")
     val PAGING_SOURCE: ClassName =
         ClassName.get(PAGING_PACKAGE, "PagingSource")
+    val LISTENABLE_FUTURE_PAGING_SOURCE: ClassName =
+        ClassName.get(PAGING_PACKAGE, "ListenableFuturePagingSource")
+    val RX2_PAGING_SOURCE: ClassName =
+        ClassName.get("$PAGING_PACKAGE.rxjava2", "RxPagingSource")
+    val RX3_PAGING_SOURCE: ClassName =
+        ClassName.get("$PAGING_PACKAGE.rxjava3", "RxPagingSource")
 }
 
 object LifecyclesTypeNames {
@@ -121,7 +133,7 @@ object LifecyclesTypeNames {
 }
 
 object AndroidTypeNames {
-    val CURSOR: ClassName = ClassName.get("android.database", "Cursor")
+    val CURSOR: XClassName = XClassName.get("android.database", "Cursor")
     val BUILD: ClassName = ClassName.get("android.os", "Build")
     val CANCELLATION_SIGNAL: ClassName = ClassName.get("android.os", "CancellationSignal")
 }
@@ -196,6 +208,30 @@ object RoomRxJava3TypeNames {
 object RoomPagingTypeNames {
     val LIMIT_OFFSET_PAGING_SOURCE: ClassName =
         ClassName.get("$ROOM_PACKAGE.paging", "LimitOffsetPagingSource")
+}
+
+object RoomPagingGuavaTypeNames {
+    val LIMIT_OFFSET_LISTENABLE_FUTURE_PAGING_SOURCE: ClassName =
+        ClassName.get(
+            "$ROOM_PACKAGE.paging.guava",
+            "LimitOffsetListenableFuturePagingSource"
+        )
+}
+
+object RoomPagingRx2TypeNames {
+    val LIMIT_OFFSET_RX_PAGING_SOURCE: ClassName =
+        ClassName.get(
+            "$ROOM_PACKAGE.paging.rxjava2",
+            "LimitOffsetRxPagingSource"
+        )
+}
+
+object RoomPagingRx3TypeNames {
+    val LIMIT_OFFSET_RX_PAGING_SOURCE: ClassName =
+        ClassName.get(
+            "$ROOM_PACKAGE.paging.rxjava3",
+            "LimitOffsetRxPagingSource"
+        )
 }
 
 object RoomCoroutinesTypeNames {
@@ -279,3 +315,43 @@ fun Function1TypeSpecBuilder(
         }.build()
     )
 }
+
+/**
+ * Generates a 2D array literal where the value at `i`,`j` will be produced by `valueProducer.
+ * For example:
+ * ```
+ * DoubleArrayLiteral(TypeName.INT, 2, { _ -> 3 }, { i, j -> i + j })
+ * ```
+ * will produce:
+ * ```
+ * new int[][] {
+ *   { 0, 1, 2 },
+ *   { 1, 2, 3 }
+ * }
+ * ```
+ */
+fun DoubleArrayLiteral(
+    type: TypeName,
+    rowSize: Int,
+    columnSizeProducer: (Int) -> Int,
+    valueProducer: (Int, Int) -> Any
+): CodeBlock = CodeBlock.of(
+    "new $T[][] {$W$L$W}", type,
+    CodeBlock.join(
+        List(rowSize) { i ->
+            CodeBlock.of(
+                "{$W$L$W}",
+                CodeBlock.join(
+                    List(columnSizeProducer(i)) { j ->
+                        CodeBlock.of(
+                            if (type == CommonTypeNames.STRING) S else L,
+                            valueProducer(i, j)
+                        )
+                    },
+                    ",$W"
+                ),
+            )
+        },
+        ",$W"
+    )
+)

@@ -1,3 +1,4 @@
+# Bug component: 856887
 clarabayarri@google.com
 popam@google.com
 andreykulikov@google.com
@@ -5,6 +6,7 @@ malkov@google.com
 lpf@google.com
 tianliu@google.com
 soboleva@google.com
+ashikov@google.com
 
 # Text
 include /TEXT_OWNERS

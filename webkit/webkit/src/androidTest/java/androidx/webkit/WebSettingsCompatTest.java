@@ -20,9 +20,11 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import android.os.Build;
 import android.webkit.WebSettings;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.filters.SdkSuppress;
 import androidx.test.filters.SmallTest;
 
 import org.junit.After;
@@ -32,6 +34,7 @@ import org.junit.runner.RunWith;
 
 @SmallTest
 @RunWith(AndroidJUnit4.class)
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.LOLLIPOP)
 public class WebSettingsCompatTest {
     WebViewOnUiThread mWebViewOnUiThread;
 
@@ -97,7 +100,7 @@ public class WebSettingsCompatTest {
         WebSettingsCompat.setDisabledActionModeMenuItems(mWebViewOnUiThread.getSettings(),
                 WebSettings.MENU_ITEM_PROCESS_TEXT | WebSettings.MENU_ITEM_WEB_SEARCH);
         assertEquals("Disabled action mode items should have been set to (MENU_ITEM_PROCESS_TEXT "
-                + "| MENU_ITEM_WEB_SEARCH)",
+                        + "| MENU_ITEM_WEB_SEARCH)",
                 WebSettings.MENU_ITEM_PROCESS_TEXT | WebSettings.MENU_ITEM_WEB_SEARCH,
                 WebSettingsCompat.getDisabledActionModeMenuItems(mWebViewOnUiThread.getSettings()));
     }
@@ -123,4 +126,21 @@ public class WebSettingsCompatTest {
         // bad navigation and then checks).
     }
 
+    @Test
+    public void testEnterpriseAuthenticationAppLinkPolicyEnabled() throws Throwable {
+        WebkitUtils.checkFeature(WebViewFeature.ENTERPRISE_AUTHENTICATION_APP_LINK_POLICY);
+
+        assertTrue(WebSettingsCompat.getEnterpriseAuthenticationAppLinkPolicyEnabled(
+                mWebViewOnUiThread.getSettings()));
+
+        WebSettingsCompat.setEnterpriseAuthenticationAppLinkPolicyEnabled(
+                mWebViewOnUiThread.getSettings(), false);
+        assertFalse(WebSettingsCompat.getEnterpriseAuthenticationAppLinkPolicyEnabled(
+                mWebViewOnUiThread.getSettings()));
+
+        WebSettingsCompat.setEnterpriseAuthenticationAppLinkPolicyEnabled(
+                mWebViewOnUiThread.getSettings(), true);
+        assertTrue(WebSettingsCompat.getEnterpriseAuthenticationAppLinkPolicyEnabled(
+                mWebViewOnUiThread.getSettings()));
+    }
 }

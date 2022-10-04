@@ -67,6 +67,26 @@ public class ActionsConstraintsTest {
     }
 
     @Test
+    public void create_allowedAlsoDisallowed() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new ActionsConstraints.Builder()
+                        .addAllowedActionType(Action.TYPE_BACK)
+                        .addDisallowedActionType(Action.TYPE_BACK)
+                        .build());
+    }
+
+    @Test
+    public void create_allowedAndDisallowedSet() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new ActionsConstraints.Builder()
+                        .addAllowedActionType(Action.TYPE_PAN)
+                        .addDisallowedActionType(Action.TYPE_BACK)
+                        .build());
+    }
+
+    @Test
     public void createConstraints() {
         ActionsConstraints constraints =
                 new ActionsConstraints.Builder()
@@ -88,6 +108,7 @@ public class ActionsConstraintsTest {
                         .setMaxCustomTitles(1)
                         .addRequiredActionType(Action.TYPE_CUSTOM)
                         .addDisallowedActionType(Action.TYPE_BACK)
+                        .setOnClickListenerAllowed(true)
                         .build();
 
         CarIcon carIcon = TestUtils.getTestCarIcon(ApplicationProvider.getApplicationContext(),
@@ -137,6 +158,77 @@ public class ActionsConstraintsTest {
                         new ActionStrip.Builder()
                                 .addAction(actionWithTitle)
                                 .addAction(actionWithTitle)
+                                .build()
+                                .getActions()));
+
+        ActionsConstraints constraintsNoOnClick =
+                new ActionsConstraints.Builder().setOnClickListenerAllowed(false).build();
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> constraintsNoOnClick.validateOrThrow(
+                        new ActionStrip.Builder()
+                                .addAction(actionWithIcon)
+                                .build()
+                                .getActions()));
+
+        // Positive case: OnClickListener disallowed only for custom action types and passes for
+        // standard action types like the back action.
+        constraintsNoOnClick.validateOrThrow(
+                new ActionStrip.Builder().addAction(Action.BACK).build().getActions());
+
+        ActionsConstraints constraintsAllowPan =
+                new ActionsConstraints.Builder().addAllowedActionType(Action.TYPE_PAN).build();
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> constraintsAllowPan.validateOrThrow(
+                        new ActionStrip.Builder()
+                                .addAction(Action.BACK)
+                                .build()
+                                .getActions()));
+        //Positive case: Only allows pan action types
+        constraintsAllowPan.validateOrThrow(
+                new ActionStrip.Builder().addAction(Action.PAN).build().getActions());
+    }
+
+    @Test
+    public void validateNavigationActionConstraints() {
+        // same constraints with ACTIONS_CONSTRAINTS_NAVIGATION
+        ActionsConstraints navigationConstraints =
+                new ActionsConstraints.Builder()
+                        .setMaxActions(4)
+                        .setMaxCustomTitles(4)
+                        .setTitleTextConstraints(CarTextConstraints.TEXT_AND_ICON)
+                        .setOnClickListenerAllowed(true)
+                        .build();
+
+        CarIcon carIcon = TestUtils.getTestCarIcon(ApplicationProvider.getApplicationContext(),
+                "ic_test_1");
+        Action action1 = TestUtils.createAction("Title1", carIcon);
+        Action action2 = TestUtils.createAction("Title2", carIcon);
+        Action action3 = TestUtils.createAction("Title3", carIcon);
+        Action action4 = TestUtils.createAction("Title4", carIcon);
+        Action action5 = TestUtils.createAction("Title5", carIcon);
+
+        // Positive case: instance that fits 4 max actions, both can have title and icon
+        navigationConstraints.validateOrThrow(
+                new ActionStrip.Builder()
+                        .addAction(action1)
+                        .addAction(action2)
+                        .addAction(action3)
+                        .addAction(action4)
+                        .build()
+                        .getActions());
+
+        // Over Max Allowed Actions
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> navigationConstraints.validateOrThrow(
+                        new ActionStrip.Builder()
+                                .addAction(action1)
+                                .addAction(action2)
+                                .addAction(action3)
+                                .addAction(action4)
+                                .addAction(action5)
                                 .build()
                                 .getActions()));
     }

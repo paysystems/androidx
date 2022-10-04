@@ -16,22 +16,28 @@
 
 package androidx.compose.ui.focus
 
+import androidx.compose.runtime.collection.MutableVector
+import androidx.compose.runtime.collection.mutableVectorOf
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.focus.FocusDirection.Companion.Down
-import androidx.compose.ui.focus.FocusDirection.Companion.In
+import androidx.compose.ui.focus.FocusDirection.Companion.Enter
+import androidx.compose.ui.focus.FocusDirection.Companion.Exit
 import androidx.compose.ui.focus.FocusDirection.Companion.Left
 import androidx.compose.ui.focus.FocusDirection.Companion.Next
-import androidx.compose.ui.focus.FocusDirection.Companion.Out
 import androidx.compose.ui.focus.FocusDirection.Companion.Previous
 import androidx.compose.ui.focus.FocusDirection.Companion.Right
 import androidx.compose.ui.focus.FocusDirection.Companion.Up
+import androidx.compose.ui.focus.FocusRequester.Companion.Cancel
+import androidx.compose.ui.focus.FocusRequester.Companion.Default
 import androidx.compose.ui.focus.FocusStateImpl.Active
 import androidx.compose.ui.focus.FocusStateImpl.ActiveParent
 import androidx.compose.ui.focus.FocusStateImpl.Captured
 import androidx.compose.ui.focus.FocusStateImpl.Deactivated
 import androidx.compose.ui.focus.FocusStateImpl.DeactivatedParent
 import androidx.compose.ui.focus.FocusStateImpl.Inactive
-import androidx.compose.ui.node.ModifiedFocusNode
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.input.key.KeyInputModifier
+import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.LayoutDirection.Ltr
 import androidx.compose.ui.unit.LayoutDirection.Rtl
@@ -44,8 +50,8 @@ private const val invalidFocusDirection = "Invalid FocusDirection"
  *
  * @sample androidx.compose.ui.samples.MoveFocusSample
  */
-@Suppress("INLINE_CLASS_DEPRECATED", "EXPERIMENTAL_FEATURE_WARNING")
-inline class FocusDirection internal constructor(@Suppress("unused") private val value: Int) {
+@kotlin.jvm.JvmInline
+value class FocusDirection internal constructor(@Suppress("unused") private val value: Int) {
 
     override fun toString(): String {
         return when (this) {
@@ -56,9 +62,9 @@ inline class FocusDirection internal constructor(@Suppress("unused") private val
             Up -> "Up"
             Down -> "Down"
             @OptIn(ExperimentalComposeUiApi::class)
-            In -> "In"
+            Enter -> "Enter"
             @OptIn(ExperimentalComposeUiApi::class)
-            Out -> "Out"
+            Exit -> "Exit"
             else -> invalidFocusDirection
         }
     }
@@ -116,15 +122,47 @@ inline class FocusDirection internal constructor(@Suppress("unused") private val
          *  Direction used in [FocusManager.moveFocus] to indicate that you are searching for the
          *  next focusable item that is a child of the currently focused item.
          */
+        @Suppress("OPT_IN_MARKER_ON_WRONG_TARGET")
+        @get:ExperimentalComposeUiApi
         @ExperimentalComposeUiApi
-        val In: FocusDirection = FocusDirection(7)
+        val Enter: FocusDirection = FocusDirection(7)
 
         /**
          *  Direction used in [FocusManager.moveFocus] to indicate that you want to move focus to
          *  the parent of the currently focused item.
          */
+        @Suppress("OPT_IN_MARKER_ON_WRONG_TARGET")
+        @get:ExperimentalComposeUiApi
         @ExperimentalComposeUiApi
-        val Out: FocusDirection = FocusDirection(8)
+        val Exit: FocusDirection = FocusDirection(8)
+
+        /**
+         *  Direction used in [FocusManager.moveFocus] to indicate that you are searching for the
+         *  next focusable item that is a child of the currently focused item.
+         */
+        @Suppress("OPT_IN_MARKER_ON_WRONG_TARGET", "Unused")
+        @get:ExperimentalComposeUiApi
+        @ExperimentalComposeUiApi
+        @Deprecated(
+            "Use FocusDirection.Enter instead.",
+            ReplaceWith("Enter", "androidx.compose.ui.focus.FocusDirection.Companion.Enter"),
+            DeprecationLevel.WARNING
+        )
+        val In: FocusDirection = Enter
+
+        /**
+         *  Direction used in [FocusManager.moveFocus] to indicate that you want to move focus to
+         *  the parent of the currently focused item.
+         */
+        @Suppress("OPT_IN_MARKER_ON_WRONG_TARGET", "Unused")
+        @get:ExperimentalComposeUiApi
+        @ExperimentalComposeUiApi
+        @Deprecated(
+            "Use FocusDirection.Exit instead.",
+            ReplaceWith("Exit", "androidx.compose.ui.focus.FocusDirection.Companion.Exit"),
+            DeprecationLevel.WARNING
+        )
+        val Out: FocusDirection = Exit
     }
 }
 
@@ -132,33 +170,34 @@ inline class FocusDirection internal constructor(@Suppress("unused") private val
  * Moves focus based on the requested focus direction.
  *
  * @param focusDirection The requested direction to move focus.
- * @return whether a focus node was found. If a focus node was found and the focus request was
- * not granted, this function still returns true.
+ * @param layoutDirection Whether the layout is RTL or LTR.
+ * @param onFound This lambda is invoked if focus search finds the next focus node.
+ * @return if no focus node is found, we return false. otherwise we return the result of [onFound].
  */
-internal fun ModifiedFocusNode.focusSearch(
+internal fun FocusModifier.focusSearch(
     focusDirection: FocusDirection,
-    layoutDirection: LayoutDirection
-): ModifiedFocusNode? {
+    layoutDirection: LayoutDirection,
+    onFound: (FocusModifier) -> Boolean
+): Boolean {
     return when (focusDirection) {
-        Next, Previous -> oneDimensionalFocusSearch(focusDirection)
-        Left, Right, Up, Down -> twoDimensionalFocusSearch(focusDirection)
+        Next, Previous -> oneDimensionalFocusSearch(focusDirection, onFound)
+        Left, Right, Up, Down -> twoDimensionalFocusSearch(focusDirection, onFound)
         @OptIn(ExperimentalComposeUiApi::class)
-        In -> {
+        Enter -> {
             // we search among the children of the active item.
             val direction = when (layoutDirection) { Rtl -> Left; Ltr -> Right }
-            findActiveFocusNode()?.twoDimensionalFocusSearch(direction)
+            findActiveFocusNode()?.twoDimensionalFocusSearch(direction, onFound) ?: false
         }
         @OptIn(ExperimentalComposeUiApi::class)
-        Out -> {
-            findActiveFocusNode()?.findActiveParent().let {
-                if (it == this) null else it
-            }
+        Exit -> findActiveFocusNode()?.findActiveParent().let {
+            if (it == this || it == null) false else onFound.invoke(it)
         }
         else -> error(invalidFocusDirection)
     }
 }
 
-internal fun ModifiedFocusNode.findActiveFocusNode(): ModifiedFocusNode? {
+@Suppress("ModifierFactoryExtensionFunction", "ModifierFactoryReturnType")
+internal fun FocusModifier.findActiveFocusNode(): FocusModifier? {
     return when (focusState) {
         Active, Captured -> this
         ActiveParent, DeactivatedParent -> focusedChild?.findActiveFocusNode()
@@ -166,9 +205,89 @@ internal fun ModifiedFocusNode.findActiveFocusNode(): ModifiedFocusNode? {
     }
 }
 
-internal fun ModifiedFocusNode.findActiveParent(): ModifiedFocusNode? = findParentFocusNode()?.let {
+@Suppress("ModifierFactoryExtensionFunction", "ModifierFactoryReturnType")
+internal fun FocusModifier.findActiveParent(): FocusModifier? = parent?.let {
         when (focusState) {
             Active, Captured, Deactivated, DeactivatedParent, Inactive -> it.findActiveParent()
             ActiveParent -> this
         }
     }
+
+/**
+ * Returns the bounding box of the focus layout area in the root or [Rect.Zero] if the
+ * FocusModifier has not had a layout.
+ */
+internal fun FocusModifier.focusRect(): Rect = coordinator?.let {
+    it.findRootCoordinates().localBoundingBoxOf(it, clipBounds = false)
+} ?: Rect.Zero
+/**
+ * Returns all [FocusModifier] children that are not [FocusStateImpl.isDeactivated]. Any
+ * child that is deactivated will add activated children instead, unless the deactivated
+ * node has a custom Enter specified.
+ */
+internal fun FocusModifier.activatedChildren(): MutableVector<FocusModifier> {
+    if (!children.any { it.focusState.isDeactivated }) {
+        return children
+    }
+    val activated = mutableVectorOf<FocusModifier>()
+    children.forEach { child ->
+        if (!child.focusState.isDeactivated) {
+            activated += child
+        } else {
+            // When we encounter a deactivated child, we add all its children,
+            // unless a custom Enter is specified.
+            @OptIn(ExperimentalComposeUiApi::class)
+            when (val customEnter = child.focusProperties.enter(Enter)) {
+                Cancel -> return mutableVectorOf()
+                Default -> activated.addAll(child.activatedChildren())
+                else -> customEnter.focusRequesterModifierLocals.forEach {
+                    it.findFocusNode()?.let { activated.add(it) }
+                }
+            }
+        }
+    }
+    return activated
+}
+
+/**
+ * Returns the inner-most KeyInputModifier on the same LayoutNode as this FocusModifier.
+ */
+@Suppress("ModifierFactoryExtensionFunction", "ModifierFactoryReturnType")
+internal fun FocusModifier.findLastKeyInputModifier(): KeyInputModifier? {
+    val layoutNode = coordinator?.layoutNode ?: return null
+    var best: KeyInputModifier? = null
+    keyInputChildren.forEach { keyInputModifier ->
+        if (keyInputModifier.layoutNode == layoutNode) {
+            best = lastOf(keyInputModifier, best)
+        }
+    }
+    if (best != null) {
+        return best
+    }
+    // There isn't a KeyInputModifier after this, but there may be one before this.
+    return keyInputModifier
+}
+
+/**
+ * Whether this node should be considered when searching for the next item during a traversal.
+ */
+internal val FocusModifier.isEligibleForFocusSearch: Boolean
+    get() = coordinator?.layoutNode?.isPlaced == true &&
+            coordinator?.layoutNode?.isAttached == true
+
+/**
+ * Returns [one] if it comes after [two] in the modifier chain or [two] if it comes after [one].
+ */
+@Suppress("ModifierFactoryExtensionFunction", "ModifierFactoryReturnType")
+private fun lastOf(one: KeyInputModifier, two: KeyInputModifier?): KeyInputModifier {
+    var mod = two ?: return one
+    val layoutNode = one.layoutNode
+    while (mod != one) {
+        val parent = mod.parent
+        if (parent == null || parent.layoutNode != layoutNode) {
+            return one
+        }
+        mod = parent
+    }
+    return two
+}

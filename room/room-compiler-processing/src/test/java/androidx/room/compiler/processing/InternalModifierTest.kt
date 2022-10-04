@@ -75,7 +75,7 @@ class InternalModifierTest {
         fun buildSource(pkg: String) = Source.kotlin(
             "Subject.kt",
             """
-            package $pkg;
+            package $pkg
             internal class InternalClass(val value: String)
             inline class InlineClass(val value:String)
             abstract class Subject {
@@ -101,15 +101,15 @@ class InternalModifierTest {
             """.trimIndent()
         )
 
-        fun XType.toSignature() = this.typeName.toString()
+        fun XType.toSignature() = this.asTypeName().java.toString()
 
-        fun XMemberContainer.toSignature() = className.toString()
+        fun XMemberContainer.toSignature() = asClassName().java.toString()
 
         fun XFieldElement.toSignature() =
-            "${enclosingElement.toSignature()}.$name : ${type.toSignature()}"
+            "${closestMemberContainer.toSignature()}.$name : ${type.toSignature()}"
 
         fun XMethodElement.toSignature() = buildString {
-            append(enclosingElement.toSignature())
+            append(closestMemberContainer.toSignature())
             append(".")
             append(jvmName)
             append("(")

@@ -33,6 +33,9 @@ import kotlinx.coroutines.CoroutineScope
  */
 @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
 public interface WatchFaceHostApi {
+    /** The [WatchFaceService.SystemTimeProvider]. */
+    public val systemTimeProvider: WatchFaceService.SystemTimeProvider
+
     /** Returns the watch face's [Context]. */
     public fun getContext(): Context
 
@@ -78,6 +81,8 @@ public interface WatchFaceHostApi {
     public fun setActiveComplicationSlots(complicationSlotIds: IntArray)
 
     /**
+     * For WSL flow, not used in androidx flow.
+     *
      * Accepts a list of custom complication data sources to attempt to set as the default
      * complication data source for the specified watch face [ComplicationSlot] id. The custom
      * complication data sources are tried in turn, if the first doesn't exist then the next one
@@ -124,4 +129,22 @@ public interface WatchFaceHostApi {
 
     /** Intent to launch the complication permission rationale activity. */
     public fun getComplicationRationaleIntent(): Intent?
+
+    /** Schedules a call to serialize [ComplicationSlotsManager]'s [ComplicationData]. */
+    @UiThread
+    public fun scheduleWriteComplicationDataCache()
+
+    /**
+     * Sent by the system at the top of the minute. This may trigger rendering if SysUI hasn't sent
+     * called setWatchUiState.
+     */
+    @UiThread
+    public fun onActionTimeTick() {}
+
+    /** The engine must notify the system that the watch face's colors have changed. */
+    @OptIn(WatchFaceExperimental::class)
+    public fun onWatchFaceColorsChanged(watchFaceColors: WatchFaceColors?) {}
+
+    /** Requests the system to capture an updated preview image. */
+    public fun sendPreviewImageNeedsUpdateRequest() {}
 }

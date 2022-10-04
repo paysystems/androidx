@@ -20,6 +20,7 @@ package androidx.camera.camera2.pipe.integration.adapter
 
 import android.annotation.SuppressLint
 import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraMetadata
 import android.view.Surface
 import androidx.annotation.RequiresApi
 import androidx.camera.camera2.pipe.CameraPipe
@@ -37,6 +38,7 @@ import androidx.camera.core.impl.CamcorderProfileProvider
 import androidx.camera.core.impl.CameraCaptureCallback
 import androidx.camera.core.impl.CameraInfoInternal
 import androidx.camera.core.impl.Quirks
+import androidx.camera.core.impl.Timebase
 import androidx.camera.core.impl.utils.CameraOrientationUtil
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -56,8 +58,9 @@ class CameraInfoAdapter @Inject constructor(
     private val cameraProperties: CameraProperties,
     private val cameraConfig: CameraConfig,
     private val cameraState: CameraStateAdapter,
-    private val cameraCallbackMap: CameraCallbackMap
+    private val cameraCallbackMap: CameraCallbackMap,
 ) : CameraInfoInternal {
+    private lateinit var camcorderProfileProviderAdapter: CamcorderProfileProviderAdapter
 
     override fun getCameraId(): String = cameraConfig.cameraId.value
     override fun getLensFacing(): Int? =
@@ -105,8 +108,21 @@ class CameraInfoAdapter @Inject constructor(
     override fun getImplementationType(): String = "CameraPipe"
 
     override fun getCamcorderProfileProvider(): CamcorderProfileProvider {
-        Log.warn { "TODO: CamcorderProfileProvider is not yet supported." }
-        return CamcorderProfileProvider.EMPTY
+        if (!::camcorderProfileProviderAdapter.isInitialized) {
+            camcorderProfileProviderAdapter = CamcorderProfileProviderAdapter(cameraId)
+        }
+        return camcorderProfileProviderAdapter
+    }
+
+    override fun getTimebase(): Timebase {
+        val timeSource = cameraProperties.metadata[
+            CameraCharacteristics.SENSOR_INFO_TIMESTAMP_SOURCE
+        ]!!
+        return when (timeSource) {
+            CameraMetadata.SENSOR_INFO_TIMESTAMP_SOURCE_REALTIME -> Timebase.REALTIME
+            CameraMetadata.SENSOR_INFO_TIMESTAMP_SOURCE_UNKNOWN -> Timebase.UPTIME
+            else -> Timebase.UPTIME
+        }
     }
 
     override fun toString(): String = "CameraInfoAdapter<$cameraConfig.cameraId>"
@@ -118,6 +134,16 @@ class CameraInfoAdapter @Inject constructor(
 
     override fun isFocusMeteringSupported(action: FocusMeteringAction): Boolean {
         Log.warn { "TODO: isFocusAndMeteringSupported are not yet supported." }
+        return false
+    }
+
+    override fun isZslSupported(): Boolean {
+        Log.warn { "TODO: isZslSupported are not yet supported." }
+        return false
+    }
+
+    override fun isPrivateReprocessingSupported(): Boolean {
+        Log.warn { "TODO: isPrivateReprocessingSupported are not yet supported." }
         return false
     }
 }

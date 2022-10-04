@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-import androidx.build.LibraryGroups
 import androidx.build.Publish
 
 plugins {
@@ -27,14 +26,15 @@ android {
     buildTypes.all {
         consumerProguardFiles "proguard-rules.pro"
     }
+    namespace "androidx.navigation.common"
 }
 
 dependencies {
     api("androidx.annotation:annotation:1.1.0")
-    api("androidx.lifecycle:lifecycle-runtime-ktx:2.3.1")
-    api("androidx.lifecycle:lifecycle-viewmodel-ktx:2.3.1")
-    api("androidx.savedstate:savedstate:1.0.0")
-    api("androidx.lifecycle:lifecycle-viewmodel-savedstate:2.3.1")
+    api("androidx.lifecycle:lifecycle-runtime-ktx:2.5.1")
+    api("androidx.lifecycle:lifecycle-viewmodel-ktx:2.5.1")
+    api("androidx.savedstate:savedstate-ktx:1.2.0")
+    api("androidx.lifecycle:lifecycle-viewmodel-savedstate:2.5.1")
     implementation("androidx.core:core-ktx:1.1.0")
     implementation("androidx.collection:collection-ktx:1.1.0")
 
@@ -45,6 +45,7 @@ dependencies {
     testImplementation(libs.mockitoCore)
     testImplementation(libs.truth)
     testImplementation(libs.kotlinStdlib)
+    testImplementation(libs.kotlinCoroutinesTest)
 
     androidTestImplementation(libs.testExtJunit)
     androidTestImplementation(libs.testCore)
@@ -54,19 +55,8 @@ dependencies {
     androidTestImplementation(libs.mockitoCore, excludes.bytebuddy)
     androidTestImplementation(libs.dexmakerMockito, excludes.bytebuddy)
     androidTestImplementation(libs.kotlinStdlib)
-}
 
-//used by testImplementation safe-args-generator
-android.libraryVariants.all { variant ->
-    def name = variant.name
-    def suffix = name.capitalize()
-    project.tasks.register("jar${suffix}", Copy).configure {
-        dependsOn("assemble$suffix")
-        from(zipTree("${project.buildDir}/outputs/aar/navigation-common-${name}.aar")) {
-            include("classes.jar")
-        }
-        destinationDir(new File(project.buildDir, "libJar"))
-    }
+    lintPublish(project(':navigation:navigation-common-lint'))
 }
 
 androidx {

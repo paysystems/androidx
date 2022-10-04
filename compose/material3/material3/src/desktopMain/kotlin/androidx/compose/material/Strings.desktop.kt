@@ -25,6 +25,11 @@ internal actual fun getString(string: Strings): String {
         Strings.CloseDrawer -> "Close navigation menu"
         Strings.CloseSheet -> "Close sheet"
         Strings.DefaultErrorMessage -> "Invalid input"
+        Strings.SliderRangeStart -> "Range Start"
+        Strings.SliderRangeEnd -> "Range End"
+        Strings.Dialog -> "Dialog"
+        Strings.MenuExpanded -> "Expanded"
+        Strings.MenuCollapsed -> "Collapsed"
         else -> ""
     }
 }

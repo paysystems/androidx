@@ -19,8 +19,10 @@ import android.app.Activity
 import android.content.ComponentName
 import android.content.Intent
 import android.util.Log
+import androidx.window.core.ActivityComponentInfo
 import androidx.window.core.ExperimentalWindowApi
 import androidx.window.embedding.MatcherUtils.areComponentsMatching
+import androidx.window.embedding.MatcherUtils.isIntentMatching
 import androidx.window.embedding.MatcherUtils.sDebugMatchers
 import androidx.window.embedding.MatcherUtils.sMatchersTag
 
@@ -33,18 +35,21 @@ class SplitPairFilter(
     /**
      * Component name of the primary activity in the split. Must be non-empty. Can contain a single
      * wildcard at the end.
-     * Supported formats: "package/class", "package&#47;&#42;", "package/suffix.&#42;",
-     * "&#42;&#47;&#42;"
+     * Supported formats:
+     * - package/class
+     * - `package/*`
+     * - `package/suffix.*`
+     * - `*/*`
      */
     val primaryActivityName: ComponentName,
     /**
      * Component name in the intent for the secondary activity in the split. Must be non-empty.
      * Can contain a single wildcard at the end.
      * Supported formats:
-     * <li>package/class</li>
-     * <li>package/\*</li>
-     * <li>package/suffix.\*</li>
-     * <li>\*\/\*</li>
+     * - package/class
+     * - `package/*`
+     * - `package/suffix.*`
+     * - `*/*`
      */
     val secondaryActivityName: ComponentName,
     /**
@@ -52,6 +57,10 @@ class SplitPairFilter(
      */
     val secondaryActivityIntentAction: String?
 ) {
+
+    private val secondaryActivityInfo: ActivityComponentInfo
+        get() = ActivityComponentInfo(secondaryActivityName)
+
     fun matchesActivityPair(primaryActivity: Activity, secondaryActivity: Activity): Boolean {
         // Check if the activity component names match
         var match = areComponentsMatching(primaryActivity.componentName, primaryActivityName) &&
@@ -82,7 +91,7 @@ class SplitPairFilter(
         ) {
             false
         } else if (
-            !areComponentsMatching(secondaryActivityIntent.component, secondaryActivityName)
+            !isIntentMatching(secondaryActivityIntent, secondaryActivityInfo)
         ) {
             false
         } else {

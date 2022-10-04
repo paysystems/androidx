@@ -20,7 +20,6 @@ package androidx.window.layout
 
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.content.ComponentCallbacks
 import android.content.Context
 import android.content.res.Configuration
 import android.os.IBinder
@@ -29,6 +28,8 @@ import android.util.Log
 import android.view.View
 import androidx.annotation.GuardedBy
 import androidx.annotation.VisibleForTesting
+import androidx.core.content.OnConfigurationChangedProvider
+import androidx.core.util.Consumer
 import androidx.window.core.Version
 import androidx.window.core.Version.Companion.parse
 import androidx.window.layout.ExtensionInterfaceCompat.ExtensionCallbackInterface
@@ -40,7 +41,6 @@ import androidx.window.sidecar.SidecarInterface.SidecarCallback
 import androidx.window.sidecar.SidecarProvider
 import androidx.window.sidecar.SidecarWindowLayoutInfo
 import java.lang.ref.WeakReference
-import java.util.ArrayList
 import java.util.WeakHashMap
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
@@ -56,8 +56,8 @@ internal class SidecarCompat @VisibleForTesting constructor(
     private val windowListenerRegisteredContexts = mutableMapOf<IBinder, Activity>()
     // Map of activities registered to their component callbacks so we can keep track and
     // remove when the activity is unregistered
-    private val componentCallbackMap = mutableMapOf<Activity, ComponentCallbacks>()
-    private var extensionCallback: ExtensionCallbackInterface? = null
+    private val componentCallbackMap = mutableMapOf<Activity, Consumer<Configuration>>()
+    private var extensionCallback: DistinctElementCallback? = null
 
     constructor(context: Context) : this(
         getSidecarCompat(context),
@@ -67,7 +67,7 @@ internal class SidecarCompat @VisibleForTesting constructor(
     override fun setExtensionCallback(extensionCallback: ExtensionCallbackInterface) {
         this.extensionCallback = DistinctElementCallback(extensionCallback)
         sidecar?.setSidecarCallback(
-            DistinctSidecarElementCallback(
+            DistinctElementSidecarCallback(
                 sidecarAdapter,
                 TranslatingCallback()
             )
@@ -115,23 +115,17 @@ internal class SidecarCompat @VisibleForTesting constructor(
     private fun registerConfigurationChangeListener(activity: Activity) {
         // Only register a component callback if we haven't already as register
         // may be called multiple times for the same activity
-        if (componentCallbackMap[activity] == null) {
+        if (componentCallbackMap[activity] == null && activity is OnConfigurationChangedProvider) {
             // Create a configuration change observer to send updated WindowLayoutInfo
             // when the configuration of the app changes: b/186647126
-            val configChangeObserver = object : ComponentCallbacks {
-                override fun onConfigurationChanged(newConfig: Configuration) {
-                    extensionCallback?.onWindowLayoutChanged(
-                        activity,
-                        getWindowLayoutInfo(activity)
-                    )
-                }
-
-                override fun onLowMemory() {
-                    return
-                }
+            val configChangeObserver = Consumer<Configuration> {
+                extensionCallback?.onWindowLayoutChanged(
+                    activity,
+                    getWindowLayoutInfo(activity)
+                )
             }
             componentCallbackMap[activity] = configChangeObserver
-            activity.registerComponentCallbacks(configChangeObserver)
+            activity.addOnConfigurationChangedListener(configChangeObserver)
         }
     }
 
@@ -139,6 +133,7 @@ internal class SidecarCompat @VisibleForTesting constructor(
         val windowToken = getActivityWindowToken(activity) ?: return
         sidecar?.onWindowLayoutChangeListenerRemoved(windowToken)
         unregisterComponentCallback(activity)
+        extensionCallback?.clearWindowLayoutInfo(activity)
         val isLast = windowListenerRegisteredContexts.size == 1
         windowListenerRegisteredContexts.remove(windowToken)
         if (isLast) {
@@ -147,8 +142,10 @@ internal class SidecarCompat @VisibleForTesting constructor(
     }
 
     private fun unregisterComponentCallback(activity: Activity) {
-        val configChangeObserver = componentCallbackMap[activity]
-        activity.unregisterComponentCallbacks(configChangeObserver)
+        val configChangeObserver = componentCallbackMap[activity] ?: return
+        if (activity is OnConfigurationChangedProvider) {
+            activity.removeOnConfigurationChangedListener(configChangeObserver)
+        }
         componentCallbackMap.remove(activity)
     }
 
@@ -326,6 +323,11 @@ internal class SidecarCompat @VisibleForTesting constructor(
         override fun onViewDetachedFromWindow(view: View) {}
     }
 
+    /**
+     * A callback to translate from Sidecar classes to local classes.
+     *
+     * If you change the name of this class, you must update the proguard file.
+     */
     internal inner class TranslatingCallback : SidecarCallback {
         @SuppressLint("SyntheticAccessor")
         override fun onDeviceStateChanged(newDeviceState: SidecarDeviceState) {
@@ -391,50 +393,11 @@ internal class SidecarCompat @VisibleForTesting constructor(
             }
             callbackInterface.onWindowLayoutChanged(activity, newLayout)
         }
-    }
 
-    /**
-     * A class to record the last calculated values from [SidecarInterface] and filter out
-     * duplicates. This class uses [SidecarAdapter] to compute equality since the methods
-     * [Object.equals] and [Object.hashCode] may not have been overridden.
-     */
-    private class DistinctSidecarElementCallback(
-        private val sidecarAdapter: SidecarAdapter,
-        private val callbackInterface: SidecarCallback
-    ) : SidecarCallback {
-        private val lock = ReentrantLock()
-
-        @GuardedBy("lock")
-        private var lastDeviceState: SidecarDeviceState? = null
-
-        /**
-         * A map from [Activity] to the last computed [WindowLayoutInfo] for the
-         * given activity. A [WeakHashMap] is used to avoid retaining the [Activity].
-         */
-        @GuardedBy("mLock")
-        private val mActivityWindowLayoutInfo = WeakHashMap<IBinder, SidecarWindowLayoutInfo>()
-        override fun onDeviceStateChanged(newDeviceState: SidecarDeviceState) {
+        fun clearWindowLayoutInfo(activity: Activity) {
             lock.withLock {
-                if (sidecarAdapter.isEqualSidecarDeviceState(lastDeviceState, newDeviceState)) {
-                    return
-                }
-                lastDeviceState = newDeviceState
-                callbackInterface.onDeviceStateChanged(newDeviceState)
+                activityWindowLayoutInfo[activity] = null
             }
-        }
-
-        override fun onWindowLayoutChanged(
-            token: IBinder,
-            newLayout: SidecarWindowLayoutInfo
-        ) {
-            synchronized(lock) {
-                val lastInfo = mActivityWindowLayoutInfo[token]
-                if (sidecarAdapter.isEqualSidecarWindowLayoutInfo(lastInfo, newLayout)) {
-                    return
-                }
-                mActivityWindowLayoutInfo.put(token, newLayout)
-            }
-            callbackInterface.onWindowLayoutChanged(token, newLayout)
         }
     }
 

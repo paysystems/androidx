@@ -94,6 +94,10 @@ class AppWidgetHostRule(
     val mHostView: TestAppWidgetHostView
         get() = checkNotNull(mMaybeHostView) { "No app widget installed on the host" }
 
+    val appWidgetId: Int get() = mAppWidgetId
+
+    val device: UiDevice get() = mUiDevice
+
     override fun apply(base: Statement, description: Description) = object : Statement() {
 
         override fun evaluate() {
@@ -121,6 +125,15 @@ class AppWidgetHostRule(
 
         runAndWaitForChildren {
             mAppWidgetId = hostView.appWidgetId
+            hostView.waitForRemoteViews()
+        }
+    }
+
+    suspend fun updateAppWidget() {
+        val hostView = checkNotNull(mMaybeHostView) { "Host view wasn't successfully started" }
+        hostView.resetRemoteViewsLatch()
+        TestGlanceAppWidget.update(mContext, AppWidgetId(mAppWidgetId))
+        runAndWaitForChildren {
             hostView.waitForRemoteViews()
         }
     }

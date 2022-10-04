@@ -298,9 +298,9 @@ class AnimatedContentScope<S> internal constructor(
      * [SlideDirection] defines the direction of the slide in/out for [slideIntoContainer] and
      * [slideOutOfContainer]. The supported directions are: [Left], [Right], [Up] and [Down].
      */
-    @Suppress("INLINE_CLASS_DEPRECATED", "EXPERIMENTAL_FEATURE_WARNING")
     @Immutable
-    inline class SlideDirection internal constructor(private val value: Int) {
+    @kotlin.jvm.JvmInline
+    value class SlideDirection internal constructor(private val value: Int) {
         companion object {
             val Left = SlideDirection(0)
             val Right = SlideDirection(1)
@@ -628,7 +628,11 @@ fun <S> Transition<S>.AnimatedContent(
                 // naturally.
                 val exit =
                     remember(segment.targetState == stateForContent) {
-                        rootScope.transitionSpec().initialContentExit
+                        if (segment.targetState == stateForContent) {
+                            ExitTransition.None
+                        } else {
+                            rootScope.transitionSpec().initialContentExit
+                        }
                     }
                 val childData = remember {
                     AnimatedContentScope.ChildData(stateForContent == targetState)

@@ -20,6 +20,7 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.net.Uri;
 import android.os.Handler;
+import android.webkit.CookieManager;
 import android.webkit.ValueCallback;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
@@ -95,10 +96,25 @@ public class WebViewFeature {
             WEB_MESSAGE_LISTENER,
             DOCUMENT_START_SCRIPT,
             PROXY_OVERRIDE_REVERSE_BYPASS,
+            GET_VARIATIONS_HEADER,
+            ALGORITHMIC_DARKENING,
+            ENTERPRISE_AUTHENTICATION_APP_LINK_POLICY,
+            GET_COOKIE_INFO,
     })
     @Retention(RetentionPolicy.SOURCE)
     @Target({ElementType.PARAMETER, ElementType.METHOD})
     public @interface WebViewSupportFeature {}
+
+    /**
+     * @hide
+     */
+    @RestrictTo(RestrictTo.Scope.LIBRARY)
+    @StringDef(value = {
+            SET_DATA_DIRECTORY_SUFFIX,
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    @Target({ElementType.PARAMETER, ElementType.METHOD})
+    public @interface WebViewStartupFeature {}
 
     /**
      * Feature for {@link #isFeatureSupported(String)}.
@@ -439,6 +455,14 @@ public class WebViewFeature {
 
     /**
      * Feature for {@link #isFeatureSupported(String)}.
+     * This feature covers
+     * {@link WebSettingsCompat#setAlgorithmicDarkeningAllowed(WebSettings, boolean)} and
+     * {@link WebSettingsCompat#isAlgorithmicDarkeningAllowed(WebSettings)}.
+     */
+    public static final String ALGORITHMIC_DARKENING = "ALGORITHMIC_DARKENING";
+
+    /**
+     * Feature for {@link #isFeatureSupported(String)}.
      * This feature covers {@link WebViewCompat#addWebMessageListener(android.webkit.WebView,
      * String, Set, WebViewCompat.WebMessageListener)} and {@link
      * WebViewCompat#removeWebMessageListener(android.webkit.WebView, String)}.
@@ -449,7 +473,11 @@ public class WebViewFeature {
      * Feature for {@link #isFeatureSupported(String)}.
      * This feature covers {@link WebViewCompat#addDocumentStartJavaScript(android.webkit.WebView,
      * String, Set)}.
+     *
+     * TODO(swestphal): unhide when ready.
+     * @hide
      */
+    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
     public static final String DOCUMENT_START_SCRIPT = "DOCUMENT_START_SCRIPT";
 
     /**
@@ -460,11 +488,50 @@ public class WebViewFeature {
     public static final String PROXY_OVERRIDE_REVERSE_BYPASS = "PROXY_OVERRIDE_REVERSE_BYPASS";
 
     /**
+     * Feature for {@link #isFeatureSupported(String)}.
+     * This feature covers {@link WebViewCompat#getVariationsHeader()}.
+     */
+    public static final String GET_VARIATIONS_HEADER = "GET_VARIATIONS_HEADER";
+
+    /**
+     * Feature for {@link #isFeatureSupported(String)}.
+     * This feature covers
+     * {@link WebSettingsCompat#setEnterpriseAuthenticationAppLinkPolicyEnabled(WebSettings, boolean)}and
+     * {@link WebSettingsCompat#getEnterpriseAuthenticationAppLinkPolicyEnabled(WebSettings)}.
+     *
+     */
+    public static final String ENTERPRISE_AUTHENTICATION_APP_LINK_POLICY =
+            "ENTERPRISE_AUTHENTICATION_APP_LINK_POLICY";
+
+    /**
+     * Feature for {@link #isFeatureSupported(String)}.
+     * This feature covers
+     * {@link CookieManagerCompat#getCookieInfo(CookieManager, String)}.
+     * @hide
+     */
+    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+    public static final String GET_COOKIE_INFO = "GET_COOKIE_INFO";
+
+    /**
+     * Feature for {@link #isFeatureSupported(String)}.
+     * This feature covers
+     * {@link androidx.webkit.ProcessGlobalConfig#setDataDirectorySuffix(String)}.
+     * @hide
+     */
+    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+    public static final String SET_DATA_DIRECTORY_SUFFIX = "SET_DATA_DIRECTORY_SUFFIX";
+
+    /**
      * Return whether a feature is supported at run-time. On devices running Android version {@link
      * android.os.Build.VERSION_CODES#LOLLIPOP} and higher, this will check whether a feature is
      * supported, depending on the combination of the desired feature, the Android version of
      * device, and the WebView APK on the device. If running on a device with a lower API level,
      * this will always return {@code false}.
+     *
+     * <p class="note"><b>Note:</b> This method is different from
+     * {@link #isStartupFeatureSupported(String, Context)} and this method only accepts
+     * certain features. Please verify that the correct feature checking method is used for a
+     * particular feature.
      *
      * <p class="note"><b>Note:</b> If this method returns {@code false}, it is not safe to invoke
      * the methods requiring the desired feature. Furthermore, if this method returns {@code false}
@@ -475,5 +542,33 @@ public class WebViewFeature {
      */
     public static boolean isFeatureSupported(@NonNull @WebViewSupportFeature String feature) {
         return WebViewFeatureInternal.isSupported(feature);
+    }
+
+    /**
+     * Return whether a startup feature is supported at run-time. On devices running Android
+     * version {@link
+     * android.os.Build.VERSION_CODES#LOLLIPOP} and higher, this will check whether a startup
+     * feature is
+     * supported, depending on the combination of the desired feature, the Android version of
+     * device, and the WebView APK on the device. If running on a device with a lower API level,
+     * this will always return {@code false}.
+     *
+     * <p class="note"><b>Note:</b> This method is different from
+     * {@link #isFeatureSupported(String)} and this method only accepts startup features. Please
+     * verify that the correct feature checking method is used for a particular feature.
+     *
+     * <p class="note"><b>Note:</b> If this method returns {@code false}, it is not safe to invoke
+     * the methods requiring the desired feature. Furthermore, if this method returns {@code false}
+     * for a particular feature, any callback guarded by that feature will not be invoked.
+     *
+     * @param startupFeature the startup feature to be checked
+     * @return whether the feature is supported given the current platform SDK and webview version
+     * @hide
+     */
+    @RestrictTo(RestrictTo.Scope.LIBRARY)
+    public static boolean isStartupFeatureSupported(
+            @NonNull @WebViewStartupFeature String startupFeature,
+            @NonNull Context context) {
+        return WebViewFeatureInternal.isStartupFeatureSupported(startupFeature, context);
     }
 }
