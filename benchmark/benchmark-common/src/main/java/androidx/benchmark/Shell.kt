@@ -18,6 +18,7 @@ package androidx.benchmark
 
 import android.os.Build
 import android.os.Looper
+import android.os.ParcelFileDescriptor
 import android.os.ParcelFileDescriptor.AutoCloseInputStream
 import android.os.SystemClock
 import android.util.Log
@@ -25,6 +26,7 @@ import androidx.annotation.RequiresApi
 import androidx.annotation.RestrictTo
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.tracing.trace
+import java.io.Closeable
 import java.io.File
 import java.io.InputStream
 import java.nio.charset.Charset
@@ -55,6 +57,17 @@ object Shell {
      */
     private fun psLineContainsProcess(psOutputLine: String, processName: String): Boolean {
         return psOutputLine.endsWith(" $processName") || psOutputLine.endsWith("/$processName")
+    }
+
+    /**
+     * Equivalent of [psLineContainsProcess], but to be used with full process name string
+     * (e.g. from pgrep)
+     */
+    private fun fullProcessNameMatchesProcess(
+        fullProcessName: String,
+        processName: String
+    ): Boolean {
+        return fullProcessName == processName || fullProcessName.endsWith("/$processName")
     }
 
     fun connectUiAutomation() {
@@ -149,12 +162,12 @@ object Shell {
     }
 
     /**
-     * Returns true if the shell session is rooted, and thus root commands can be run (e.g. atrace
-     * commands with root-only tags)
+     * Returns true if the shell session is rooted or su is usable, and thus root commands can be
+     * run (e.g. atrace commands with root-only tags)
      */
     @RequiresApi(21)
     fun isSessionRooted(): Boolean {
-        return ShellImpl.executeCommand("getprop service.adb.root").trim() == "1"
+        return ShellImpl.isSessionRooted || ShellImpl.isSuAvailable
     }
 
     /**
@@ -175,7 +188,11 @@ object Shell {
      */
     @RequiresApi(21)
     fun executeScript(script: String, stdin: String? = null): String {
-        return ShellImpl.executeScript(script, stdin, false).first
+        return ShellImpl
+            .createShellScript(script, stdin, false)
+            .start()
+            .getOutputAndClose()
+            .stdout
     }
 
     data class Output(val stdout: String, val stderr: String)
@@ -201,13 +218,33 @@ object Shell {
         script: String,
         stdin: String? = null
     ): Output {
-        return ShellImpl.executeScript(
-            script = script,
-            stdin = stdin,
-            includeStderr = true
-        ).run {
-            Output(first, second!!)
-        }
+        return ShellImpl
+            .createShellScript(script = script, stdin = stdin, includeStderr = true)
+            .start()
+            .getOutputAndClose()
+    }
+
+    /**
+     * Creates a executable shell script that can be started. Similar to [executeScriptWithStderr]
+     * but allows deferring and caching script execution.
+     *
+     * @param script Script content to run
+     * @param stdin String to pass in as stdin to first command in script
+     *
+     * @return ShellScript that can be started.
+     */
+    @RequiresApi(21)
+    fun createShellScript(
+        script: String,
+        stdin: String? = null,
+        includeStderr: Boolean = true
+    ): ShellScript {
+        return ShellImpl
+            .createShellScript(
+                script = script,
+                stdin = stdin,
+                includeStderr = includeStderr
+            )
     }
 
     @RequiresApi(21)
@@ -217,20 +254,24 @@ object Shell {
 
     @RequiresApi(21)
     fun getPidsForProcess(processName: String): List<Int> {
-        if (Build.VERSION.SDK_INT >= 24) {
-            // On API 23 (first version to offer it) we observe that 'pidof'
-            // returns list of all processes :|
-            return executeCommand("pidof $processName")
-                .trim()
-                .split(Regex("\\s+"))
-                .filter { it.isNotEmpty() }
-                .map {
-                    it.toInt()
+        if (Build.VERSION.SDK_INT >= 23) {
+            return pgrepLF(pattern = processName)
+                .mapNotNull { (pid, fullProcessName) ->
+                    // aggressive safety - ensure target isn't subset of another running package
+                    if (fullProcessNameMatchesProcess(fullProcessName, processName)) {
+                        pid
+                    } else {
+                        null
+                    }
                 }
         }
 
-        // Can't use ps -A on older platforms, arg isn't supported.
-        // Can't simply run ps, since it gets truncated
+        // NOTE: `pidof $processName` would work too, but filtering by process
+        // (the whole point of the command) doesn't work pre API 24
+
+        // Can't use ps -A pre API 26, arg isn't supported.
+        // Grep device side, since ps output by itself gets truncated
+        // NOTE: `ps | grep` is slow (multiple seconds), so avoid whenever possible!
         return executeScript("ps | grep $processName")
             .split(Regex("\r?\n"))
             .map { it.trim() }
@@ -239,6 +280,60 @@ object Shell {
                 // map to int - split, and take 2nd column (PID)
                 it.split(Regex("\\s+"))[1]
                     .toInt()
+            }
+    }
+
+    /**
+     * pgrep -l -f <pattern>
+     *
+     * pgrep is *fast*, way faster than ps | grep, but requires API 23
+     *
+     * -l, --list-name           list PID and process name
+     * -f, --full                use full process name to match
+     *
+     * @return List of processes - pid & full process name
+     */
+    @RequiresApi(23)
+    private fun pgrepLF(pattern: String): List<Pair<Int, String>> {
+        return executeCommand("pgrep -l -f $pattern")
+            .split(Regex("\r?\n"))
+            .filter { it.isNotEmpty() }
+            .map {
+                val (pidString, process) = it.trim().split(" ")
+                Pair(pidString.toInt(), process)
+            }
+    }
+
+    @RequiresApi(21)
+    fun getRunningProcessesForPackage(packageName: String): List<String> {
+        require(!packageName.contains(":")) { "Package $packageName must not contain ':'" }
+
+        // pgrep is nice and fast, but requires API 23
+        if (Build.VERSION.SDK_INT >= 23) {
+            return pgrepLF(pattern = packageName)
+                .mapNotNull { (_, process) ->
+                    // aggressive safety - ensure target isn't subset of another running package
+                    if (process == packageName || process.startsWith("$packageName:")) {
+                        process
+                    } else {
+                        null
+                    }
+                }
+        }
+
+        // Grep device side, since ps output by itself gets truncated
+        // NOTE: Can't use ps -A pre API 26, arg isn't supported, but would need
+        // to pass it on 26 to see all processes.
+        // NOTE: `ps | grep` is slow (multiple seconds), so avoid whenever possible!
+        return executeScript("ps | grep $packageName")
+            .split(Regex("\r?\n"))
+            .map {
+                // get process name from end
+                it.substringAfterLast(" ")
+            }
+            .filter {
+                // allow primary or sub process
+                it == packageName || it.startsWith("$packageName:")
             }
     }
 
@@ -318,21 +413,51 @@ private object ShellImpl {
     private val uiAutomation = InstrumentationRegistry.getInstrumentation().uiAutomation
 
     /**
-     * Reimplementation of UiAutomator's Device.executeShellCommand,
-     * to avoid the UiAutomator dependency
+     * When true, the session is already rooted and all commands run as root by default.
      */
-    fun executeCommand(cmd: String): String {
-        val parcelFileDescriptor = uiAutomation.executeShellCommand(cmd)
-        AutoCloseInputStream(parcelFileDescriptor).use { inputStream ->
-            return inputStream.readBytes().toString(Charset.defaultCharset())
-        }
+    var isSessionRooted = false
+
+    /**
+     * When true, su is available for running commands and scripts as root.
+     */
+    var isSuAvailable = false
+
+    init {
+        // These variables are used in executeCommand and executeScript, so we keep them as var
+        // instead of val and use a separate initializer
+        isSessionRooted = executeCommand("id").contains("uid=0(root)")
+        isSuAvailable = createShellScript(
+            "su root id",
+            null,
+            false
+        ).start().getOutputAndClose().stdout.contains("uid=0(root)")
     }
 
-    fun executeScript(
+    /**
+     * Reimplementation of UiAutomator's Device.executeShellCommand,
+     * to avoid the UiAutomator dependency, and add tracing
+     */
+    fun executeCommand(cmd: String): String = trace("executeCommand $cmd".take(127)) {
+        return@trace executeCommandNonBlocking(cmd).fullyReadInputStream()
+    }
+
+    fun executeCommandNonBlocking(cmd: String): ParcelFileDescriptor =
+        trace("executeCommandNonBlocking $cmd".take(127)) {
+            return@trace uiAutomation.executeShellCommand(
+                if (!isSessionRooted && isSuAvailable) {
+                    "su root $cmd"
+                } else {
+                    cmd
+                }
+            )
+        }
+
+    fun createShellScript(
         script: String,
         stdin: String?,
         includeStderr: Boolean
-    ): Pair<String, String?> {
+    ): ShellScript = trace("createShellScript $script".take(127)) {
+
         // dirUsableByAppAndShell is writable, but we can't execute there (as of Q),
         // so we copy to /data/local/tmp
         val externalDir = Outputs.dirUsableByAppAndShell
@@ -352,6 +477,8 @@ private object ShellImpl {
             null
         }
 
+        var shellScript: ShellScript? = null
+
         try {
             var scriptText: String = script
             if (stdinFile != null) {
@@ -368,17 +495,103 @@ private object ShellImpl {
             executeCommand("cp ${writableScriptFile.absolutePath} $runnableScriptPath")
             Shell.chmodExecutable(runnableScriptPath)
 
-            val stdout = trace("executeCommand") { executeCommand(runnableScriptPath) }
-            val stderr = stderrPath?.run { executeCommand("cat $stderrPath") }
+            shellScript = ShellScript(
+                stdinFile = stdinFile,
+                writableScriptFile = writableScriptFile,
+                stderrPath = stderrPath,
+                runnableScriptPath = runnableScriptPath
+            )
 
-            return Pair(stdout, stderr)
-        } finally {
-            stdinFile?.delete()
-            stderrPath?.run {
-                executeCommand("rm $stderrPath")
-            }
-            writableScriptFile.delete()
-            executeCommand("rm $runnableScriptPath")
+            return@trace shellScript
+        } catch (e: Exception) {
+            shellScript?.cleanUp()
+            throw Exception("Can't create shell script", e)
         }
+    }
+}
+
+@RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+@RequiresApi(Build.VERSION_CODES.LOLLIPOP)
+class ShellScript internal constructor(
+    private val stdinFile: File?,
+    private val writableScriptFile: File,
+    private val stderrPath: String?,
+    private val runnableScriptPath: String
+) {
+
+    private var cleanedUp: Boolean = false
+
+    /**
+     * Starts the shell script previously created.
+     *
+     * @param params a vararg string of parameters to be passed to the script.
+     *
+     * @return a [StartedShellScript] that contains streams to read output streams.
+     */
+    fun start(vararg params: String): StartedShellScript = trace("ShellScript#start") {
+        val cmd = "$runnableScriptPath ${params.joinToString(" ")}"
+        val stdoutDescriptor = ShellImpl.executeCommandNonBlocking(cmd)
+        val stderrDescriptorFn = stderrPath?.run { { ShellImpl.executeCommand("cat $stderrPath") } }
+
+        return@trace StartedShellScript(
+            stdoutDescriptor = stdoutDescriptor,
+            stderrDescriptorFn = stderrDescriptorFn,
+            cleanUpBlock = ::cleanUp
+        )
+    }
+
+    /**
+     * Manually clean up the shell script from the temp folder.
+     */
+    fun cleanUp() = trace("ShellScript#cleanUp") {
+        if (cleanedUp) {
+            return@trace
+        }
+        stdinFile?.delete()
+        writableScriptFile.delete()
+        if (stderrPath != null) {
+            ShellImpl.executeCommand("rm $stderrPath $runnableScriptPath")
+        } else {
+            ShellImpl.executeCommand("rm $runnableScriptPath")
+        }
+        cleanedUp = true
+    }
+}
+
+@RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+@RequiresApi(Build.VERSION_CODES.LOLLIPOP)
+class StartedShellScript internal constructor(
+    private val stdoutDescriptor: ParcelFileDescriptor,
+    private val stderrDescriptorFn: (() -> (String))?,
+    private val cleanUpBlock: () -> Unit
+) : Closeable {
+
+    /**
+     * Returns a [Sequence] of [String] containing the lines written by the process to stdOut.
+     */
+    fun stdOutLineSequence(): Sequence<String> =
+        AutoCloseInputStream(stdoutDescriptor).bufferedReader().lineSequence()
+
+    /**
+     * Cleans up this shell script.
+     */
+    override fun close() = cleanUpBlock()
+
+    /**
+     * Reads the full process output and cleans up the generated script
+     */
+    fun getOutputAndClose(): Shell.Output {
+        val output = Shell.Output(
+            stdout = stdoutDescriptor.fullyReadInputStream(),
+            stderr = stderrDescriptorFn?.invoke() ?: ""
+        )
+        close()
+        return output
+    }
+}
+
+internal fun ParcelFileDescriptor.fullyReadInputStream(): String {
+    AutoCloseInputStream(this).use { inputStream ->
+        return inputStream.readBytes().toString(Charset.defaultCharset())
     }
 }

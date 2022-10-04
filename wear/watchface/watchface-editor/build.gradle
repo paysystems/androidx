@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 
-import androidx.build.LibraryGroups
-import androidx.build.LibraryVersions
 import androidx.build.Publish
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     id("AndroidXPlugin")
@@ -34,6 +33,7 @@ dependencies {
     api(libs.kotlinCoroutinesAndroid)
 
     implementation("androidx.core:core:1.1.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.5.1")
     implementation("androidx.lifecycle:lifecycle-common-java8:2.3.1")
 
     androidTestImplementation(project(":wear:watchface:watchface-complications-rendering"))
@@ -55,6 +55,7 @@ android {
     defaultConfig {
         minSdkVersion 26
     }
+    namespace "androidx.wear.watchface.editor"
 }
 
 androidx {

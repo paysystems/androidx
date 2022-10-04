@@ -16,6 +16,9 @@
 
 import androidx.room.DatabaseView
 import androidx.room.Entity
+import androidx.room.compiler.codegen.CodeLanguage
+import androidx.room.compiler.codegen.XClassName
+import androidx.room.compiler.codegen.XTypeSpec
 import androidx.room.compiler.processing.XElement
 import androidx.room.compiler.processing.XFieldElement
 import androidx.room.compiler.processing.XType
@@ -29,6 +32,9 @@ import androidx.room.ext.PagingTypeNames
 import androidx.room.ext.ReactiveStreamsTypeNames
 import androidx.room.ext.RoomCoroutinesTypeNames
 import androidx.room.ext.RoomGuavaTypeNames
+import androidx.room.ext.RoomPagingGuavaTypeNames
+import androidx.room.ext.RoomPagingRx2TypeNames
+import androidx.room.ext.RoomPagingRx3TypeNames
 import androidx.room.ext.RoomPagingTypeNames
 import androidx.room.ext.RoomRxJava2TypeNames
 import androidx.room.ext.RoomRxJava3TypeNames
@@ -40,11 +46,11 @@ import androidx.room.processor.TableEntityProcessor
 import androidx.room.solver.CodeGenScope
 import androidx.room.testing.context
 import androidx.room.verifier.DatabaseVerifier
-import androidx.room.writer.ClassWriter
+import androidx.room.writer.TypeWriter
 import com.squareup.javapoet.ClassName
+import java.io.File
 import org.mockito.Mockito.doReturn
 import org.mockito.Mockito.mock
-import java.io.File
 
 object COMMON {
     val ARTIST by lazy {
@@ -232,6 +238,48 @@ object COMMON {
         )
     }
 
+    val LISTENABLE_FUTURE_PAGING_SOURCE by lazy {
+        loadJavaCode(
+            "common/input/ListenableFuturePagingSource.java",
+            PagingTypeNames.LISTENABLE_FUTURE_PAGING_SOURCE.toString()
+        )
+    }
+
+    val LIMIT_OFFSET_LISTENABLE_FUTURE_PAGING_SOURCE by lazy {
+        loadJavaCode(
+            "common/input/LimitOffsetListenableFuturePagingSource.java",
+            RoomPagingGuavaTypeNames.LIMIT_OFFSET_LISTENABLE_FUTURE_PAGING_SOURCE.toString()
+        )
+    }
+
+    val RX2_PAGING_SOURCE by lazy {
+        loadJavaCode(
+            "common/input/Rx2PagingSource.java",
+            PagingTypeNames.RX2_PAGING_SOURCE.toString()
+        )
+    }
+
+    val LIMIT_OFFSET_RX2_PAGING_SOURCE by lazy {
+        loadJavaCode(
+            "common/input/LimitOffsetRx2PagingSource.java",
+            RoomPagingRx2TypeNames.LIMIT_OFFSET_RX_PAGING_SOURCE.toString()
+        )
+    }
+
+    val RX3_PAGING_SOURCE by lazy {
+        loadJavaCode(
+            "common/input/Rx3PagingSource.java",
+            PagingTypeNames.RX3_PAGING_SOURCE.toString()
+        )
+    }
+
+    val LIMIT_OFFSET_RX3_PAGING_SOURCE by lazy {
+        loadJavaCode(
+            "common/input/LimitOffsetRx3PagingSource.java",
+            RoomPagingRx3TypeNames.LIMIT_OFFSET_RX_PAGING_SOURCE.toString()
+        )
+    }
+
     val COROUTINES_ROOM by lazy {
         loadJavaCode(
             "common/input/CoroutinesRoom.java",
@@ -269,17 +317,24 @@ object COMMON {
 }
 
 fun testCodeGenScope(): CodeGenScope {
-    return CodeGenScope(mock(ClassWriter::class.java))
+    return CodeGenScope(
+        object : TypeWriter(CodeLanguage.JAVA) {
+            override fun createTypeSpecBuilder(): XTypeSpec.Builder {
+                return XTypeSpec.classBuilder(codeLanguage, XClassName.get("test", "Foo"))
+            }
+        }
+    )
 }
 
 fun loadJavaCode(fileName: String, qName: String): Source {
-    val contents = File("src/test/data/$fileName").readText(Charsets.UTF_8)
+    val contents = File("src/test/test-data/$fileName").readText(Charsets.UTF_8)
     return Source.java(qName, contents)
 }
 
 fun loadTestSource(fileName: String, qName: String): Source {
-    val contents = File("src/test/data/$fileName")
-    return Source.load(contents, qName, fileName)
+    val contents = File("src/test/test-data/$fileName")
+    val relativePath = qName.replace('.', File.separatorChar) + "." + contents.extension
+    return Source.load(contents, qName, relativePath)
 }
 
 fun createVerifierFromEntitiesAndViews(invocation: XTestInvocation): DatabaseVerifier {

@@ -28,13 +28,17 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.testing.CameraPipeConfigTestRule
 import androidx.camera.testing.CameraUtil
+import androidx.camera.testing.CameraUtil.PreTestCameraIdList
 import androidx.camera.testing.LabTestRule
 import androidx.camera.testing.SurfaceTextureProvider
 import androidx.camera.testing.fakes.FakeLifecycleOwner
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.filters.LargeTest
 import com.google.common.truth.Truth
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.delay
@@ -47,8 +51,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 
 private val BACK_SELECTOR = CameraSelector.DEFAULT_BACK_CAMERA
 private const val BACK_LENS_FACING = CameraSelector.LENS_FACING_BACK
@@ -59,7 +61,14 @@ private const val CAPTURE_TIMEOUT = 10_000.toLong() //  10 seconds
 class FlashTest(private val implName: String, private val cameraXConfig: CameraXConfig) {
 
     @get:Rule
-    val cameraRule = CameraUtil.grantCameraPermissionAndPreTest()
+    val cameraPipeConfigTestRule = CameraPipeConfigTestRule(
+        active = implName == CameraPipeConfig::class.simpleName,
+    )
+
+    @get:Rule
+    val cameraRule = CameraUtil.grantCameraPermissionAndPreTest(
+        PreTestCameraIdList(cameraXConfig)
+    )
 
     @get:Rule
     val labTest: LabTestRule = LabTestRule()
@@ -96,7 +105,6 @@ class FlashTest(private val implName: String, private val cameraXConfig: CameraX
     @LabTestRule.LabTestRearCamera
     @Test
     fun canCaptureWithFlashOn() {
-        skipTestOnCameraPipeConfig()
         canTakePicture(
             flashMode = ImageCapture.FLASH_MODE_ON,
             captureMode = ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY
@@ -106,7 +114,6 @@ class FlashTest(private val implName: String, private val cameraXConfig: CameraX
     @LabTestRule.LabTestRearCamera
     @Test
     fun canCaptureWithFlashAuto() {
-        skipTestOnCameraPipeConfig()
         canTakePicture(
             flashMode = ImageCapture.FLASH_MODE_AUTO,
             captureMode = ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY
@@ -120,7 +127,6 @@ class FlashTest(private val implName: String, private val cameraXConfig: CameraX
     @LabTestRule.LabTestFrontCamera
     @Test
     fun canCaptureWithFlashOnInDarkEnvironment() {
-        skipTestOnCameraPipeConfig()
         canTakePicture(
             flashMode = ImageCapture.FLASH_MODE_ON,
             captureMode = ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY
@@ -130,7 +136,6 @@ class FlashTest(private val implName: String, private val cameraXConfig: CameraX
     @LabTestRule.LabTestFrontCamera
     @Test
     fun canCaptureWithFlashAutoInDarkEnvironment() {
-        skipTestOnCameraPipeConfig()
         canTakePicture(
             flashMode = ImageCapture.FLASH_MODE_AUTO,
             captureMode = ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY
@@ -144,7 +149,6 @@ class FlashTest(private val implName: String, private val cameraXConfig: CameraX
     @LabTestRule.LabTestFrontCamera
     @Test
     fun canCaptureMaxQualityPhoto_withFlashOn_inDarkEnvironment() {
-        skipTestOnCameraPipeConfig()
         canTakePicture(
             flashMode = ImageCapture.FLASH_MODE_ON,
             captureMode = ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY
@@ -154,7 +158,6 @@ class FlashTest(private val implName: String, private val cameraXConfig: CameraX
     @LabTestRule.LabTestFrontCamera
     @Test
     fun canCaptureMaxQualityPhoto_withFlashAuto_inDarkEnvironment() {
-        skipTestOnCameraPipeConfig()
         canTakePicture(
             flashMode = ImageCapture.FLASH_MODE_AUTO,
             captureMode = ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY
@@ -186,14 +189,6 @@ class FlashTest(private val implName: String, private val cameraXConfig: CameraX
 
         // Wait for the signal that the image has been captured.
         callback.awaitCapturesAndAssert(capturedImagesCount = 1)
-    }
-
-    // TODO(b/185913412): Remove when setting the flash mode is added to Camera-pipe-integration
-    private fun skipTestOnCameraPipeConfig() {
-        Assume.assumeFalse(
-            "Setting the flash mode isn't supported on Camera-pipe-integration (b/185913412)",
-            implName == CameraPipeConfig::class.simpleName
-        )
     }
 
     private fun getSurfaceProvider(): Preview.SurfaceProvider {

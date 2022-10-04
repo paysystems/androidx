@@ -16,15 +16,17 @@
 
 package androidx.room.writer
 
+import androidx.room.compiler.codegen.CodeLanguage
+import androidx.room.compiler.codegen.XClassName
+import androidx.room.compiler.codegen.XTypeSpec
+import androidx.room.compiler.codegen.XTypeSpec.Builder.Companion.apply
 import androidx.room.compiler.processing.util.Source
 import androidx.room.compiler.processing.util.XTestInvocation
 import androidx.room.processor.BaseEntityParserTest
-import com.squareup.javapoet.ClassName
-import com.squareup.javapoet.TypeSpec
+import javax.lang.model.element.Modifier
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
-import javax.lang.model.element.Modifier
 
 @RunWith(JUnit4::class)
 class EntityCursorConverterWriterTest : BaseEntityParserTest() {
@@ -32,6 +34,7 @@ class EntityCursorConverterWriterTest : BaseEntityParserTest() {
         val OUT_PREFIX = """
             package foo.bar;
             import android.database.Cursor;
+            import androidx.room.util.CursorUtil;
             import java.lang.SuppressWarnings;
             import javax.annotation.processing.Generated;
             @Generated("androidx.room.RoomProcessor")
@@ -56,10 +59,10 @@ class EntityCursorConverterWriterTest : BaseEntityParserTest() {
             """
                 private MyEntity __entityCursorConverter_fooBarMyEntity(Cursor cursor) {
                   final MyEntity _entity;
-                  final int _cursorIndexOfId = cursor.getColumnIndex("id");
-                  final int _cursorIndexOfName = cursor.getColumnIndex("name");
-                  final int _cursorIndexOfLastName = cursor.getColumnIndex("lastName");
-                  final int _cursorIndexOfAge = cursor.getColumnIndex("age");
+                  final int _cursorIndexOfId = CursorUtil.getColumnIndex(cursor, "id");
+                  final int _cursorIndexOfName = CursorUtil.getColumnIndex(cursor, "name");
+                  final int _cursorIndexOfLastName = CursorUtil.getColumnIndex(cursor, "lastName");
+                  final int _cursorIndexOfAge = CursorUtil.getColumnIndex(cursor, "age");
                   _entity = new MyEntity();
                   if (_cursorIndexOfId != -1) {
                     final int _tmpId;
@@ -112,13 +115,15 @@ class EntityCursorConverterWriterTest : BaseEntityParserTest() {
         handler: (XTestInvocation) -> Unit
     ) {
         singleEntity(input, attributes) { entity, invocation ->
-            val className = ClassName.get("foo.bar", "MyContainerClass")
-            val writer = object : ClassWriter(className) {
-                override fun createTypeSpecBuilder(): TypeSpec.Builder {
+            val className = XClassName.get("foo.bar", "MyContainerClass")
+            val writer = object : TypeWriter(CodeLanguage.JAVA) {
+                override fun createTypeSpecBuilder(): XTypeSpec.Builder {
                     getOrCreateMethod(EntityCursorConverterWriter(entity))
-                    return TypeSpec.classBuilder(className).apply {
-                        addModifiers(Modifier.PUBLIC)
-                    }
+                    return XTypeSpec.classBuilder(codeLanguage, className)
+                        .apply(
+                            javaTypeBuilder = { addModifiers(Modifier.PUBLIC) },
+                            kotlinTypeBuilder = { }
+                        )
                 }
             }
             writer.write(invocation.processingEnv)

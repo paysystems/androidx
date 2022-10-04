@@ -23,6 +23,7 @@ import androidx.annotation.RestrictTo
 import androidx.benchmark.Outputs
 import androidx.benchmark.Outputs.dateToFileName
 import androidx.benchmark.PropOverride
+import androidx.benchmark.perfetto.PerfettoHelper.Companion.isAbiSupported
 
 /**
  * Wrapper for [PerfettoCapture] which does nothing below L.
@@ -39,30 +40,55 @@ class PerfettoCaptureWrapper {
     }
 
     @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
-    private fun start(packages: List<String>): Boolean {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            Log.d(PerfettoHelper.LOG_TAG, "Recording perfetto trace")
-            capture?.start(packages)
+    private fun start(
+        appTagPackages: List<String>,
+        userspaceTracingPackage: String?
+    ): Boolean {
+        capture?.apply {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                Log.d(PerfettoHelper.LOG_TAG, "Recording perfetto trace")
+                if (userspaceTracingPackage != null &&
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                ) {
+                    enableAndroidxTracingPerfetto(
+                        targetPackage = userspaceTracingPackage,
+                        provideBinariesIfMissing = true
+                    )
+                }
+                start(appTagPackages)
+            }
         }
+
         return true
     }
 
     @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
-    private fun stop(benchmarkName: String, iteration: Int): String {
-        val iterString = iteration.toString().padStart(3, '0')
-        val traceName = "${benchmarkName}_iter${iterString}_${dateToFileName()}.perfetto-trace"
-        return Outputs.writeFile(fileName = traceName, reportKey = "perfetto_trace_$iterString") {
+    private fun stop(benchmarkName: String, iteration: Int?): String {
+        val traceName: String
+        val reportKey: String
+        if (iteration != null) {
+            val iterString = iteration.toString().padStart(3, '0')
+            traceName = "${benchmarkName}_iter${iterString}_${dateToFileName()}.perfetto-trace"
+            reportKey = "perfetto_trace_$iterString"
+        } else {
+            traceName = "${benchmarkName}_${dateToFileName()}.perfetto-trace"
+            reportKey = "perfetto_trace"
+        }
+        return Outputs.writeFile(fileName = traceName, reportKey = reportKey) {
             capture!!.stop(it.absolutePath)
         }
     }
 
     fun record(
         benchmarkName: String,
-        iteration: Int,
-        packages: List<String>,
+        appTagPackages: List<String>,
+        userspaceTracingPackage: String?,
+        iteration: Int? = null,
         block: () -> Unit
     ): String? {
-        if (Build.VERSION.SDK_INT < 21) {
+        // skip if Perfetto not supported, or on Cuttlefish (where tracing doesn't work)
+        if (Build.VERSION.SDK_INT < 21 || !isAbiSupported()) {
+            block()
             return null // tracing not supported
         }
 
@@ -73,9 +99,15 @@ class PerfettoCaptureWrapper {
         } else null
         try {
             propOverride?.forceValue()
-            start(packages)
-            block()
-            return stop(benchmarkName, iteration)
+            start(appTagPackages, userspaceTracingPackage)
+            val path: String
+            try {
+                block()
+            } finally {
+                // finally here to ensure trace is fully recorded if block throws
+                path = stop(benchmarkName, iteration)
+            }
+            return path
         } finally {
             propOverride?.resetIfOverridden()
         }

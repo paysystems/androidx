@@ -18,18 +18,12 @@ package androidx.compose.compiler.plugins.kotlin.lower.decoys
 
 import androidx.compose.compiler.plugins.kotlin.ComposeFqNames
 import androidx.compose.compiler.plugins.kotlin.ModuleMetrics
-import androidx.compose.compiler.plugins.kotlin.lower.AbstractComposeLowering
 import androidx.compose.compiler.plugins.kotlin.lower.ModuleLoweringPass
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
-import org.jetbrains.kotlin.backend.common.ir.addChild
-import org.jetbrains.kotlin.backend.common.ir.copyTo
-import org.jetbrains.kotlin.backend.common.ir.copyTypeParametersFrom
 import org.jetbrains.kotlin.backend.common.ir.moveBodyTo
-import org.jetbrains.kotlin.backend.common.ir.remapTypeParameters
 import org.jetbrains.kotlin.backend.common.lower.DeclarationIrBuilder
 import org.jetbrains.kotlin.backend.common.serialization.signature.IdSignatureSerializer
 import org.jetbrains.kotlin.ir.IrStatement
-import org.jetbrains.kotlin.ir.ObsoleteDescriptorBasedAPI
 import org.jetbrains.kotlin.ir.builders.declarations.IrFunctionBuilder
 import org.jetbrains.kotlin.ir.builders.declarations.buildConstructor
 import org.jetbrains.kotlin.ir.builders.declarations.buildFun
@@ -51,7 +45,10 @@ import org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl
 import org.jetbrains.kotlin.ir.types.IrSimpleType
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.util.DeepCopySymbolRemapper
+import org.jetbrains.kotlin.ir.util.addChild
 import org.jetbrains.kotlin.ir.util.constructors
+import org.jetbrains.kotlin.ir.util.copyTo
+import org.jetbrains.kotlin.ir.util.copyTypeParametersFrom
 import org.jetbrains.kotlin.ir.util.defaultType
 import org.jetbrains.kotlin.ir.util.hasAnnotation
 import org.jetbrains.kotlin.ir.util.hasDefaultValue
@@ -59,10 +56,10 @@ import org.jetbrains.kotlin.ir.util.isEnumClass
 import org.jetbrains.kotlin.ir.util.isLocal
 import org.jetbrains.kotlin.ir.util.parentAsClass
 import org.jetbrains.kotlin.ir.util.patchDeclarationParents
+import org.jetbrains.kotlin.ir.util.remapTypeParameters
 import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
 import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.resolve.BindingTrace
 
 /**
  * Copies each IR declaration that won't match descriptors after Compose transforms (see [shouldBeRemapped]).
@@ -91,17 +88,15 @@ import org.jetbrains.kotlin.resolve.BindingTrace
 class CreateDecoysTransformer(
     pluginContext: IrPluginContext,
     symbolRemapper: DeepCopySymbolRemapper,
-    bindingTrace: BindingTrace,
-    override val signatureBuilder: IdSignatureSerializer,
+    signatureBuilder: IdSignatureSerializer,
     metrics: ModuleMetrics,
-) : AbstractComposeLowering(
-    context = pluginContext,
+) : AbstractDecoysLowering(
+    pluginContext = pluginContext,
     symbolRemapper = symbolRemapper,
-    bindingTrace = bindingTrace,
-    metrics = metrics
-),
-    ModuleLoweringPass,
-    DecoyTransformBase {
+    metrics = metrics,
+    signatureBuilder = signatureBuilder
+), ModuleLoweringPass {
+
     private val originalFunctions: MutableMap<IrFunction, IrDeclarationParent> = mutableMapOf()
 
     private val decoyAnnotation by lazy {
@@ -169,14 +164,12 @@ class CreateDecoysTransformer(
         }
     }
 
-    @OptIn(ObsoleteDescriptorBasedAPI::class)
     private fun IrFunction.decoyImplementationName(): Name {
         return dexSafeName(
             Name.identifier(name.asString() + IMPLEMENTATION_FUNCTION_SUFFIX)
         )
     }
 
-    @OptIn(ObsoleteDescriptorBasedAPI::class)
     private fun IrFunction.copyWithName(
         newName: Name,
         factory: (IrFunctionBuilder.() -> Unit) -> IrFunction = context.irFactory::buildFun
@@ -186,7 +179,7 @@ class CreateDecoysTransformer(
             updateFrom(original)
             name = newName
             returnType = original.returnType
-            isPrimary = false
+            isPrimary = (original as? IrConstructor)?.isPrimary ?: false
             isOperator = false
         }
         newFunction.annotations = original.annotations

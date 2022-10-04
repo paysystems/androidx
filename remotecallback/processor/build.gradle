@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-import androidx.build.LibraryGroups
 import androidx.build.LibraryType
 
 plugins {
@@ -29,7 +28,7 @@ dependencies {
 
 androidx {
     name = "Remote Callback Compiler"
-    type = LibraryType.COMPILER_PLUGIN
+    type = LibraryType.ANNOTATION_PROCESSOR
     mavenGroup = LibraryGroups.REMOTECALLBACK
     inceptionYear = "2018"
     description = "Compiler for RemoteCallback implementations"

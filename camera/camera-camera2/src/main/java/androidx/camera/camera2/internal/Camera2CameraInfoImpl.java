@@ -16,8 +16,15 @@
 
 package androidx.camera.camera2.internal;
 
+import static android.hardware.camera2.CameraMetadata.REQUEST_AVAILABLE_CAPABILITIES_PRIVATE_REPROCESSING;
+import static android.hardware.camera2.CameraMetadata.SENSOR_INFO_TIMESTAMP_SOURCE_REALTIME;
+import static android.hardware.camera2.CameraMetadata.SENSOR_INFO_TIMESTAMP_SOURCE_UNKNOWN;
+
+import static androidx.camera.camera2.internal.ZslUtil.isCapabilitySupported;
+
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraMetadata;
+import android.os.Build;
 import android.util.Pair;
 import android.view.Surface;
 
@@ -30,6 +37,7 @@ import androidx.camera.camera2.internal.compat.CameraAccessExceptionCompat;
 import androidx.camera.camera2.internal.compat.CameraCharacteristicsCompat;
 import androidx.camera.camera2.internal.compat.CameraManagerCompat;
 import androidx.camera.camera2.internal.compat.quirk.CameraQuirks;
+import androidx.camera.camera2.internal.compat.workaround.FlashAvailabilityChecker;
 import androidx.camera.camera2.interop.Camera2CameraInfo;
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop;
 import androidx.camera.core.CameraSelector;
@@ -43,6 +51,7 @@ import androidx.camera.core.impl.CameraCaptureCallback;
 import androidx.camera.core.impl.CameraInfoInternal;
 import androidx.camera.core.impl.ImageOutputConfig.RotationValue;
 import androidx.camera.core.impl.Quirks;
+import androidx.camera.core.impl.Timebase;
 import androidx.camera.core.impl.utils.CameraOrientationUtil;
 import androidx.core.util.Preconditions;
 import androidx.lifecycle.LiveData;
@@ -186,7 +195,7 @@ public final class Camera2CameraInfoImpl implements CameraInfoInternal {
 
     @Override
     public int getSensorRotationDegrees(@RotationValue int relativeRotation) {
-        Integer sensorOrientation = getSensorOrientation();
+        int sensorOrientation = getSensorOrientation();
         int relativeRotationDegrees =
                 CameraOrientationUtil.surfaceRotationToDegrees(relativeRotation);
         // Currently this assumes that a back-facing camera is always opposite to the screen.
@@ -255,10 +264,7 @@ public final class Camera2CameraInfoImpl implements CameraInfoInternal {
 
     @Override
     public boolean hasFlashUnit() {
-        Boolean hasFlashUnit = mCameraCharacteristicsCompat.get(
-                CameraCharacteristics.FLASH_INFO_AVAILABLE);
-        Preconditions.checkNotNull(hasFlashUnit);
-        return hasFlashUnit;
+        return FlashAvailabilityChecker.isFlashAvailable(mCameraCharacteristicsCompat);
     }
 
     @NonNull
@@ -350,11 +356,37 @@ public final class Camera2CameraInfoImpl implements CameraInfoInternal {
         }
     }
 
+    @Override
+    public boolean isZslSupported() {
+        return Build.VERSION.SDK_INT >= 23 && isPrivateReprocessingSupported();
+    }
+
+    @Override
+    public boolean isPrivateReprocessingSupported() {
+        return isCapabilitySupported(mCameraCharacteristicsCompat,
+                REQUEST_AVAILABLE_CAPABILITIES_PRIVATE_REPROCESSING);
+    }
+
     /** {@inheritDoc} */
     @NonNull
     @Override
     public CamcorderProfileProvider getCamcorderProfileProvider() {
         return mCamera2CamcorderProfileProvider;
+    }
+
+    @NonNull
+    @Override
+    public Timebase getTimebase() {
+        Integer timeSource = mCameraCharacteristicsCompat.get(
+                CameraCharacteristics.SENSOR_INFO_TIMESTAMP_SOURCE);
+        Preconditions.checkNotNull(timeSource);
+        switch (timeSource) {
+            case SENSOR_INFO_TIMESTAMP_SOURCE_REALTIME:
+                return Timebase.REALTIME;
+            case SENSOR_INFO_TIMESTAMP_SOURCE_UNKNOWN:
+            default:
+                return Timebase.UPTIME;
+        }
     }
 
     @Override
@@ -445,7 +477,7 @@ public final class Camera2CameraInfoImpl implements CameraInfoInternal {
      */
     static class RedirectableLiveData<T> extends MediatorLiveData<T> {
         private LiveData<T> mLiveDataSource;
-        private T mInitialValue;
+        private final T mInitialValue;
 
         RedirectableLiveData(T initialValue) {
             mInitialValue = initialValue;

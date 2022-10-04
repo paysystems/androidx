@@ -22,10 +22,12 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.annotation.RestrictTo;
+import androidx.camera.core.ImageCapture;
 import androidx.camera.core.UseCase;
 import androidx.camera.core.impl.Config;
 import androidx.camera.core.impl.UseCaseConfig;
 import androidx.camera.core.impl.UseCaseConfigFactory;
+import androidx.camera.core.impl.UseCaseConfigFactory.CaptureType;
 
 /**
  * A fake {@link UseCase}.
@@ -33,12 +35,21 @@ import androidx.camera.core.impl.UseCaseConfigFactory;
 @RequiresApi(21) // TODO(b/200306659): Remove and replace with annotation on package-info.java
 public class FakeUseCase extends UseCase {
     private volatile boolean mIsDetached = false;
+    private final CaptureType mCaptureType;
+
+    /**
+     * Creates a new instance of a {@link FakeUseCase} with a given configuration and capture type.
+     */
+    public FakeUseCase(@NonNull FakeUseCaseConfig config, @NonNull CaptureType captureType) {
+        super(config);
+        mCaptureType = captureType;
+    }
 
     /**
      * Creates a new instance of a {@link FakeUseCase} with a given configuration.
      */
     public FakeUseCase(@NonNull FakeUseCaseConfig config) {
-        super(config);
+        this(config, CaptureType.PREVIEW);
     }
 
     /**
@@ -71,7 +82,9 @@ public class FakeUseCase extends UseCase {
     @Override
     public UseCaseConfig<?> getDefaultConfig(boolean applyDefaultConfig,
             @NonNull UseCaseConfigFactory factory) {
-        Config config = factory.getConfig(UseCaseConfigFactory.CaptureType.PREVIEW);
+        Config config = factory.getConfig(
+                mCaptureType,
+                ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY);
         return config == null ? null : getUseCaseConfigBuilder(config).getUseCaseConfig();
     }
 

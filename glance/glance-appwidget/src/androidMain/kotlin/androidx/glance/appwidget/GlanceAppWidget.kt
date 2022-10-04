@@ -37,22 +37,27 @@ import androidx.compose.runtime.Recomposer
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.glance.Applier
+import androidx.glance.GlanceComposable
 import androidx.glance.GlanceId
 import androidx.glance.LocalContext
 import androidx.glance.LocalGlanceId
 import androidx.glance.LocalSize
 import androidx.glance.LocalState
 import androidx.glance.appwidget.state.getAppWidgetState
-import kotlinx.coroutines.CancellationException
 import androidx.glance.state.GlanceState
 import androidx.glance.state.GlanceStateDefinition
+import androidx.glance.state.PreferencesGlanceStateDefinition
+import kotlin.math.ceil
+import kotlin.math.min
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.ceil
-import kotlin.math.min
 
 /**
  * Object handling the composition and the communication with [AppWidgetManager].
@@ -64,7 +69,7 @@ import kotlin.math.min
  * @param errorUiLayout If different from 0 and an error occurs within this GlanceAppWidget,
  * the App Widget is updated with an error UI using this layout resource ID.
  */
-public abstract class GlanceAppWidget(
+abstract class GlanceAppWidget(
     @LayoutRes
     private val errorUiLayout: Int = R.layout.glance_error_layout
 ) {
@@ -72,29 +77,30 @@ public abstract class GlanceAppWidget(
      * Definition of the UI.
      */
     @Composable
-    public abstract fun Content()
+    @GlanceComposable
+    abstract fun Content()
 
     /**
      * Defines the handling of sizes.
      */
-    public open val sizeMode: SizeMode = SizeMode.Single
+    open val sizeMode: SizeMode = SizeMode.Single
 
     /**
      * Data store for widget data specific to the view.
      */
-    public open val stateDefinition: GlanceStateDefinition<*>? = null
+    open val stateDefinition: GlanceStateDefinition<*>? = PreferencesGlanceStateDefinition
 
     /**
      * Method called by the framework when an App Widget has been removed from its host.
      *
      * When the method returns, the state associated with the [glanceId] will be deleted.
      */
-    public open suspend fun onDelete(glanceId: GlanceId) { }
+    open suspend fun onDelete(context: Context, glanceId: GlanceId) {}
 
     /**
      * Triggers the composition of [Content] and sends the result to the [AppWidgetManager].
      */
-    public suspend fun update(context: Context, glanceId: GlanceId) {
+    suspend fun update(context: Context, glanceId: GlanceId) {
         require(glanceId is AppWidgetId) {
             "The glanceId '$glanceId' is not a valid App Widget glance id"
         }
@@ -109,7 +115,7 @@ public abstract class GlanceAppWidget(
     internal suspend fun deleted(context: Context, appWidgetId: Int) {
         val glanceId = AppWidgetId(appWidgetId)
         try {
-            onDelete(glanceId)
+            onDelete(context, glanceId)
         } catch (cancelled: CancellationException) {
             // Nothing to do here
         } catch (t: Throwable) {
@@ -167,24 +173,8 @@ public abstract class GlanceAppWidget(
         appWidgetManager: AppWidgetManager,
         appWidgetId: Int
     ): DpSize {
-        val info = appWidgetManager.getAppWidgetInfo(appWidgetId)
-        val minWidth = min(
-            info.minWidth,
-            if (info.resizeMode and AppWidgetProviderInfo.RESIZE_HORIZONTAL != 0) {
-                info.minResizeWidth
-            } else {
-                Int.MAX_VALUE
-            }
-        )
-        val minHeight = min(
-            info.minHeight,
-            if (info.resizeMode and AppWidgetProviderInfo.RESIZE_VERTICAL != 0) {
-                info.minResizeHeight
-            } else {
-                Int.MAX_VALUE
-            }
-        )
-        return DpSize(minWidth.pixelsToDp(displayMetrics), minHeight.pixelsToDp(displayMetrics))
+        val info = appWidgetManager.getAppWidgetInfo(appWidgetId) ?: return DpSize.Zero
+        return info.getMinSize(displayMetrics)
     }
 
     // Trigger the composition of the View to create the RemoteViews.
@@ -375,15 +365,8 @@ public abstract class GlanceAppWidget(
         val recomposer = Recomposer(coroutineContext)
         val composition = Composition(applier, recomposer)
         val glanceId = AppWidgetId(appWidgetId)
-        composition.setContent {
-            CompositionLocalProvider(
-                LocalContext provides context,
-                LocalGlanceId provides glanceId,
-                LocalAppWidgetOptions provides options,
-                LocalState provides state,
-                LocalSize provides size,
-            ) { Content() }
-        }
+        composition.setContent(context, glanceId, options, state, size)
+
         launch { recomposer.runRecomposeAndApplyChanges() }
         recomposer.close()
         recomposer.join()
@@ -393,11 +376,29 @@ public abstract class GlanceAppWidget(
         translateComposition(
             context,
             appWidgetId,
-            this@GlanceAppWidget.javaClass,
             root,
             layoutConfig,
-            layoutConfig.addLayout(root)
+            layoutConfig.addLayout(root),
+            size
         )
+    }
+
+    private fun Composition.setContent(
+        context: Context,
+        glanceId: AppWidgetId,
+        options: Bundle,
+        state: Any?,
+        size: DpSize
+    ) {
+        setContent {
+            CompositionLocalProvider(
+                LocalContext provides context,
+                LocalGlanceId provides glanceId,
+                LocalAppWidgetOptions provides options,
+                LocalState provides state,
+                LocalSize provides size,
+            ) { Content() }
+        }
     }
 
     private companion object {
@@ -456,6 +457,33 @@ public abstract class GlanceAppWidget(
             appWidgetManager.updateAppWidget(appWidgetId, rv)
         }
     }
+
+    /**
+     * Creates a snapshot of the GlanceAppWidget content without running recomposition.
+     * Useful to only generate once the composed RemoteViews instance.
+     *
+     * @see GlanceAppWidget.composeForSize
+     * @see GlanceAppWidgetManager.requestPinGlanceAppWidget
+     */
+    internal fun snapshot(
+        context: Context,
+        appWidgetId: Int,
+        state: Any?,
+        options: Bundle,
+        size: DpSize,
+    ): RemoteViews {
+        // The maximum depth must be reduced if the compositions are combined
+        val root = RemoteViewsRoot(maxDepth = MaxComposeTreeDepth)
+        val applier = Applier(root)
+        val scope = CoroutineScope(Job() + Dispatchers.Main)
+        val recomposer = Recomposer(scope.coroutineContext)
+        val composition = Composition(applier, recomposer)
+        val glanceId = AppWidgetId(appWidgetId)
+
+        composition.setContent(context, glanceId, options, state, size)
+        normalizeCompositionTree(root)
+        return translateComposition(context, appWidgetId, root, null, 0, size)
+    }
 }
 
 internal fun createUniqueRemoteUiName(appWidgetId: Int) = "appWidget-$appWidgetId"
@@ -463,9 +491,15 @@ internal fun createUniqueRemoteUiName(appWidgetId: Int) = "appWidget-$appWidgetI
 internal data class AppWidgetId(val appWidgetId: Int) : GlanceId
 
 // Extract the sizes from the bundle
-internal fun Bundle.extractAllSizes(minSize: () -> DpSize): List<DpSize> =
-    getParcelableArrayList<SizeF>(AppWidgetManager.OPTION_APPWIDGET_SIZES)
-        ?.map { DpSize(it.width.dp, it.height.dp) } ?: estimateSizes(minSize)
+@Suppress("DEPRECATION")
+internal fun Bundle.extractAllSizes(minSize: () -> DpSize): List<DpSize> {
+    val sizes = getParcelableArrayList<SizeF>(AppWidgetManager.OPTION_APPWIDGET_SIZES)
+    return if (sizes.isNullOrEmpty()) {
+        estimateSizes(minSize)
+    } else {
+        sizes.map { DpSize(it.width.dp, it.height.dp) }
+    }
+}
 
 // If the list of sizes is not available, estimate it from the min/max width and height.
 // We can assume that the min width and max height correspond to the portrait mode and the max
@@ -525,6 +559,29 @@ internal fun findBestSize(widgetSize: DpSize, layoutSizes: Collection<DpSize>): 
         }
     }.minByOrNull { it.second }?.first
 
+/**
+ * @return the minimum size as configured by the App Widget provider.
+ */
+internal fun AppWidgetProviderInfo.getMinSize(displayMetrics: DisplayMetrics): DpSize {
+    val minWidth = min(
+        minWidth,
+        if (resizeMode and AppWidgetProviderInfo.RESIZE_HORIZONTAL != 0) {
+            minResizeWidth
+        } else {
+            Int.MAX_VALUE
+        }
+    )
+    val minHeight = min(
+        minHeight,
+        if (resizeMode and AppWidgetProviderInfo.RESIZE_VERTICAL != 0) {
+            minResizeHeight
+        } else {
+            Int.MAX_VALUE
+        }
+    )
+    return DpSize(minWidth.pixelsToDp(displayMetrics), minHeight.pixelsToDp(displayMetrics))
+}
+
 private fun Collection<DpSize>.sortedBySize() =
     sortedWith(compareBy({ it.width.value * it.height.value }, { it.width.value }))
 
@@ -533,7 +590,7 @@ internal fun logException(throwable: Throwable) {
 }
 
 /** Update all App Widgets managed by the [GlanceAppWidget] class. */
-public suspend fun GlanceAppWidget.updateAll(@Suppress("ContextFirst") context: Context) {
+suspend fun GlanceAppWidget.updateAll(@Suppress("ContextFirst") context: Context) {
     val manager = GlanceAppWidgetManager(context)
     manager.getGlanceIds(javaClass).forEach { update(context, it) }
 }
@@ -541,7 +598,7 @@ public suspend fun GlanceAppWidget.updateAll(@Suppress("ContextFirst") context: 
 /**
  * Update all App Widgets managed by the [GlanceAppWidget] class, if they fulfill some condition.
  */
-public suspend inline fun <reified State> GlanceAppWidget.updateIf(
+suspend inline fun <reified State> GlanceAppWidget.updateIf(
     @Suppress("ContextFirst") context: Context,
     predicate: (State) -> Boolean
 ) {
