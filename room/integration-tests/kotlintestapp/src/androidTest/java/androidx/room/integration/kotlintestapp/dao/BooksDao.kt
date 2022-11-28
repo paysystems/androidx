@@ -136,6 +136,9 @@ interface BooksDao {
     @Query("SELECT * FROM book")
     suspend fun getBooksSuspend(): List<Book>
 
+    @Query("SELECT * FROM publisher")
+    suspend fun getPublishersSuspend(): List<Publisher>
+
     @Query("UPDATE book SET salesCnt = salesCnt + 1 WHERE bookId = :bookId")
     fun increaseBookSales(bookId: String)
 
