@@ -16,11 +16,16 @@
 
 package androidx.webkit;
 
+import static androidx.webkit.WebViewFeature.isFeatureSupported;
+
+import android.os.Build;
 import android.webkit.WebSettings;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
+import androidx.test.filters.SdkSuppress;
 
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -28,13 +33,68 @@ import org.junit.runner.RunWith;
 
 @LargeTest
 @RunWith(AndroidJUnit4.class)
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.LOLLIPOP)
 public class ServiceWorkerWebSettingsCompatTest {
+
     private ServiceWorkerWebSettingsCompat mSettings;
 
+
+    /**
+     * Class to hold the default values of the ServiceWorkerWebSettings while we run the test so
+     * we can restore them afterwards.
+     */
+    private static class ServiceWorkerWebSettingsCompatCache {
+        private int mCacheMode;
+        private boolean mAllowContentAccess;
+        private boolean mAllowFileAccess;
+        private boolean mBlockNetworkLoads;
+
+        ServiceWorkerWebSettingsCompatCache(ServiceWorkerWebSettingsCompat settingsCompat) {
+            if (isFeatureSupported(WebViewFeature.SERVICE_WORKER_CACHE_MODE)) {
+                mCacheMode = settingsCompat.getCacheMode();
+            }
+            if (isFeatureSupported(WebViewFeature.SERVICE_WORKER_CONTENT_ACCESS)) {
+                mAllowContentAccess = settingsCompat.getAllowContentAccess();
+            }
+            if (isFeatureSupported(WebViewFeature.SERVICE_WORKER_FILE_ACCESS)) {
+                mAllowFileAccess = settingsCompat.getAllowFileAccess();
+            }
+            if (isFeatureSupported(WebViewFeature.SERVICE_WORKER_BLOCK_NETWORK_LOADS)) {
+                mBlockNetworkLoads = settingsCompat.getBlockNetworkLoads();
+            }
+        }
+
+        void restoreSavedValues(ServiceWorkerWebSettingsCompat mSettings) {
+            if (isFeatureSupported(WebViewFeature.SERVICE_WORKER_CACHE_MODE)) {
+                mSettings.setCacheMode(mCacheMode);
+            }
+            if (isFeatureSupported(WebViewFeature.SERVICE_WORKER_CONTENT_ACCESS)) {
+                mSettings.setAllowContentAccess(mAllowContentAccess);
+            }
+            if (isFeatureSupported(WebViewFeature.SERVICE_WORKER_FILE_ACCESS)) {
+                mSettings.setAllowFileAccess(mAllowFileAccess);
+            }
+            if (isFeatureSupported(WebViewFeature.SERVICE_WORKER_BLOCK_NETWORK_LOADS)) {
+                mSettings.setBlockNetworkLoads(mBlockNetworkLoads);
+            }
+        }
+    }
+    private ServiceWorkerWebSettingsCompatCache mSavedDefaults;
+
     @Before
-    public void setUp() throws Exception {
+    public void setUp() {
         WebkitUtils.checkFeature(WebViewFeature.SERVICE_WORKER_BASIC_USAGE);
         mSettings = ServiceWorkerControllerCompat.getInstance().getServiceWorkerWebSettings();
+        // Remember to update this constructor when adding new settings to this test case
+        mSavedDefaults = new ServiceWorkerWebSettingsCompatCache(mSettings);
+    }
+
+    @After
+    public void tearDown() {
+        // Remember to update the restore method when adding new settings to this test case
+        if (mSavedDefaults != null) {
+            mSavedDefaults.restoreSavedValues(mSettings);
+        }
     }
 
     /**
@@ -105,4 +165,7 @@ public class ServiceWorkerWebSettingsCompatTest {
             Assert.assertEquals(b, mSettings.getBlockNetworkLoads());
         }
     }
+
+
 }
+

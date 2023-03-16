@@ -25,7 +25,7 @@ import androidx.room.compiler.processing.testcode.OtherAnnotation
 import androidx.room.compiler.processing.testcode.SingleTypeValueAnnotation
 import androidx.room.compiler.processing.util.CompilationTestCapabilities
 import androidx.room.compiler.processing.util.Source
-import androidx.room.compiler.processing.util.className
+import androidx.room.compiler.processing.util.asJClassName
 import androidx.room.compiler.processing.util.compiler.TestCompilationArguments
 import androidx.room.compiler.processing.util.compiler.compile
 import com.google.common.truth.Truth.assertAbout
@@ -40,13 +40,12 @@ import com.google.testing.compile.JavaSourcesSubjectFactory
 import com.squareup.javapoet.AnnotationSpec
 import com.squareup.javapoet.ClassName
 import com.squareup.javapoet.JavaFile
-import com.squareup.javapoet.TypeName
 import com.squareup.javapoet.TypeSpec
+import javax.tools.Diagnostic
+import kotlin.reflect.KClass
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
-import javax.tools.Diagnostic
-import kotlin.reflect.KClass
 
 class XProcessingStepTest {
     @field:Rule
@@ -59,8 +58,12 @@ class XProcessingStepTest {
         val processingStep = object : XProcessingStep {
             override fun process(
                 env: XProcessingEnv,
-                elementsByAnnotation: Map<String, Set<XElement>>
+                elementsByAnnotation: Map<String, Set<XElement>>,
+                isLastRound: Boolean
             ): Set<XTypeElement> {
+                if (isLastRound) {
+                    return emptySet()
+                }
                 elementsByAnnotation[OtherAnnotation::class.qualifiedName]
                     ?.filterIsInstance<XTypeElement>()
                     ?.forEach {
@@ -126,13 +129,17 @@ class XProcessingStepTest {
 
     @Test
     fun multiStepProcessing() {
-        val otherAnnotatedElements = mutableListOf<TypeName>()
+        val otherAnnotatedElements = mutableListOf<String>()
         // create a scenario where we run multi-step processing so that we can test caching
         val processingStep = object : XProcessingStep {
             override fun process(
                 env: XProcessingEnv,
-                elementsByAnnotation: Map<String, Set<XElement>>
+                elementsByAnnotation: Map<String, Set<XElement>>,
+                isLastRound: Boolean
             ): Set<XTypeElement> {
+                if (isLastRound) {
+                    return emptySet()
+                }
                 // for each element annotated with Main annotation, create a class with Other
                 // annotation to trigger another round
                 elementsByAnnotation[MainAnnotation::class.qualifiedName]
@@ -153,7 +160,7 @@ class XProcessingStepTest {
                 elementsByAnnotation[OtherAnnotation::class.qualifiedName]
                     ?.filterIsInstance<XTypeElement>()
                     ?.forEach {
-                        otherAnnotatedElements.add(it.type.typeName)
+                        otherAnnotatedElements.add(it.type.toString())
                     }
                 return emptySet()
             }
@@ -189,9 +196,7 @@ class XProcessingStepTest {
                 override fun processingSteps() = listOf(processingStep)
             }
         ).compilesWithoutError()
-        assertThat(otherAnnotatedElements).containsExactly(
-            ClassName.get("foo.bar", "Main_Impl")
-        )
+        assertThat(otherAnnotatedElements).containsExactly("foo.bar.Main_Impl")
     }
 
     @Test
@@ -202,8 +207,12 @@ class XProcessingStepTest {
             var roundCounter = 0
             override fun process(
                 env: XProcessingEnv,
-                elementsByAnnotation: Map<String, Set<XElement>>
+                elementsByAnnotation: Map<String, Set<XElement>>,
+                isLastRound: Boolean
             ): Set<XTypeElement> {
+                if (isLastRound) {
+                    return emptySet()
+                }
                 elementPerRound[roundCounter++] = listOf(
                     env.requireTypeElement("foo.bar.Main"),
                     env.requireTypeElement("foo.bar.Main")
@@ -296,8 +305,12 @@ class XProcessingStepTest {
             var roundCounter = 0
             override fun process(
                 env: XProcessingEnv,
-                elementsByAnnotation: Map<String, Set<XElement>>
+                elementsByAnnotation: Map<String, Set<XElement>>,
+                isLastRound: Boolean
             ): Set<XTypeElement> {
+                if (isLastRound) {
+                    return emptySet()
+                }
                 processingEnvPerRound[roundCounter++] = env
                 // trigger another round
                 elementsByAnnotation[MainAnnotation::class.qualifiedName]
@@ -374,8 +387,12 @@ class XProcessingStepTest {
             var roundCounter = 0
             override fun process(
                 env: XProcessingEnv,
-                elementsByAnnotation: Map<String, Set<XElement>>
+                elementsByAnnotation: Map<String, Set<XElement>>,
+                isLastRound: Boolean
             ): Set<XTypeElement> {
+                if (isLastRound) {
+                    return emptySet()
+                }
                 processingEnvPerRound[roundCounter++] = env
                 // trigger another round
                 elementsByAnnotation[MainAnnotation::class.qualifiedName]
@@ -465,8 +482,12 @@ class XProcessingStepTest {
             override fun annotations(): Set<String> = setOf(MainAnnotation::class.qualifiedName!!)
             override fun process(
                 env: XProcessingEnv,
-                elementsByAnnotation: Map<String, Set<XElement>>
+                elementsByAnnotation: Map<String, Set<XElement>>,
+                isLastRound: Boolean
             ): Set<XTypeElement> {
+                if (isLastRound) {
+                    return emptySet()
+                }
                 elementsByStep[this] = env.requireTypeElement("foo.bar.Main")
                 return emptySet()
             }
@@ -475,8 +496,12 @@ class XProcessingStepTest {
             override fun annotations(): Set<String> = setOf(OtherAnnotation::class.qualifiedName!!)
             override fun process(
                 env: XProcessingEnv,
-                elementsByAnnotation: Map<String, Set<XElement>>
+                elementsByAnnotation: Map<String, Set<XElement>>,
+                isLastRound: Boolean
             ): Set<XTypeElement> {
+                if (isLastRound) {
+                    return emptySet()
+                }
                 elementsByStep[this] = env.requireTypeElement("foo.bar.Main")
                 return emptySet()
             }
@@ -500,8 +525,12 @@ class XProcessingStepTest {
         val processingStep = object : XProcessingStep {
             override fun process(
                 env: XProcessingEnv,
-                elementsByAnnotation: Map<String, Set<XElement>>
+                elementsByAnnotation: Map<String, Set<XElement>>,
+                isLastRound: Boolean
             ): Set<XElement> {
+                if (isLastRound) {
+                    return emptySet()
+                }
                 return elementsByAnnotation.values.flatten().toSet()
             }
             override fun annotations(): Set<String> {
@@ -542,8 +571,12 @@ class XProcessingStepTest {
         val processingStep = object : XProcessingStep {
             override fun process(
                 env: XProcessingEnv,
-                elementsByAnnotation: Map<String, Set<XElement>>
+                elementsByAnnotation: Map<String, Set<XElement>>,
+                isLastRound: Boolean
             ): Set<XElement> {
+                if (isLastRound) {
+                    return emptySet()
+                }
                 return elementsByAnnotation.values
                     .flatten()
                     .toSet()
@@ -630,8 +663,12 @@ class XProcessingStepTest {
             override fun annotations() = setOf(MainAnnotation::class.qualifiedName!!)
             override fun process(
                 env: XProcessingEnv,
-                elementsByAnnotation: Map<String, Set<XElement>>
+                elementsByAnnotation: Map<String, Set<XElement>>,
+                isLastRound: Boolean
             ): Set<XElement> {
+                if (isLastRound) {
+                    return emptySet()
+                }
                 elementsByStep[this] = elementsByAnnotation.values.flatten()
                     .map { (it as XTypeElement).qualifiedName }
                 return emptySet()
@@ -641,8 +678,12 @@ class XProcessingStepTest {
             override fun annotations() = setOf(OtherAnnotation::class.qualifiedName!!)
             override fun process(
                 env: XProcessingEnv,
-                elementsByAnnotation: Map<String, Set<XElement>>
+                elementsByAnnotation: Map<String, Set<XElement>>,
+                isLastRound: Boolean
             ): Set<XElement> {
+                if (isLastRound) {
+                    return emptySet()
+                }
                 elementsByStep[this] = elementsByAnnotation.values.flatten()
                     .map { (it as XTypeElement).qualifiedName }
                 return emptySet()
@@ -687,8 +728,13 @@ class XProcessingStepTest {
             override fun annotations() = setOf(MainAnnotation::class.qualifiedName!!)
             override fun process(
                 env: XProcessingEnv,
-                elementsByAnnotation: Map<String, Set<XElement>>
+                elementsByAnnotation: Map<String, Set<XElement>>,
+                isLastRound: Boolean
             ): Set<XElement> {
+                if (isLastRound) {
+                    invokedLifecycles.add("processOver")
+                    return emptySet()
+                }
                 invokedLifecycles.add("process")
                 stepsProcessed.add(this)
                 val deferredElements = if (round++ == 0) {
@@ -705,13 +751,6 @@ class XProcessingStepTest {
                     emptySet()
                 }
                 return deferredElements
-            }
-
-            override fun processOver(
-                env: XProcessingEnv,
-                elementsByAnnotation: Map<String, Set<XElement>>
-            ) {
-                invokedLifecycles.add("processOver")
             }
         }
         val invokedPostRound = mutableListOf<Boolean>()
@@ -789,8 +828,12 @@ class XProcessingStepTest {
             override fun annotations() = setOf(MainAnnotation::class.qualifiedName!!)
             override fun process(
                 env: XProcessingEnv,
-                elementsByAnnotation: Map<String, Set<XElement>>
+                elementsByAnnotation: Map<String, Set<XElement>>,
+                isLastRound: Boolean
             ): Set<XElement> {
+                if (isLastRound) {
+                    return emptySet()
+                }
                 if (round++ == 0) {
                     // Generate the interface, should not be resolvable in 1st round
                     val spec = TypeSpec.interfaceBuilder(genClassName).build()
@@ -802,14 +845,15 @@ class XProcessingStepTest {
                     elementsByAnnotation[MainAnnotation::class.qualifiedName!!]!!.single()
                 try {
                     val otherElement = env.requireTypeElement(
-                        mainElement.requireAnnotation(MainAnnotation::class.className())
-                            .getAsType("singleType")
-                            .typeName
+                        mainElement.requireAnnotation(
+                            MainAnnotation::class.asJClassName()
+                        ).getAsType("singleType").asTypeName().java
                     )
                     val generatedType =
-                        otherElement.requireAnnotation(SingleTypeValueAnnotation::class.className())
-                            .getAsType("value")
-                    assertThat(generatedType.typeName).isEqualTo(genClassName)
+                        otherElement.requireAnnotation(
+                            SingleTypeValueAnnotation::class.asJClassName()
+                        ).getAsType("value")
+                    assertThat(generatedType.asTypeName().java).isEqualTo(genClassName)
                     return emptySet()
                 } catch (ex: TypeNotPresentException) {
                     return setOf(mainElement)
@@ -854,8 +898,12 @@ class XProcessingStepTest {
             override fun annotations() = setOf(MainAnnotation::class.qualifiedName!!)
             override fun process(
                 env: XProcessingEnv,
-                elementsByAnnotation: Map<String, Set<XElement>>
+                elementsByAnnotation: Map<String, Set<XElement>>,
+                isLastRound: Boolean
             ): Set<XElement> {
+                if (isLastRound) {
+                    return emptySet()
+                }
                 stepsProcessed.add(this)
                 return emptySet()
             }
@@ -864,8 +912,12 @@ class XProcessingStepTest {
             override fun annotations() = setOf(OtherAnnotation::class.qualifiedName!!)
             override fun process(
                 env: XProcessingEnv,
-                elementsByAnnotation: Map<String, Set<XElement>>
+                elementsByAnnotation: Map<String, Set<XElement>>,
+                isLastRound: Boolean
             ): Set<XElement> {
+                if (isLastRound) {
+                    return emptySet()
+                }
                 stepsProcessed.add(this)
                 return emptySet()
             }
@@ -907,8 +959,12 @@ class XProcessingStepTest {
             override fun annotations() = setOf(MainAnnotation::class.qualifiedName!!)
             override fun process(
                 env: XProcessingEnv,
-                elementsByAnnotation: Map<String, Set<XElement>>
+                elementsByAnnotation: Map<String, Set<XElement>>,
+                isLastRound: Boolean
             ): Set<XElement> {
+                if (isLastRound) {
+                    return emptySet()
+                }
                 elementsByStep[this] = elementsByAnnotation.values.flatten()
                     .map { (it as XTypeElement).qualifiedName }
                 return emptySet()
@@ -918,8 +974,12 @@ class XProcessingStepTest {
             override fun annotations() = setOf(OtherAnnotation::class.qualifiedName!!)
             override fun process(
                 env: XProcessingEnv,
-                elementsByAnnotation: Map<String, Set<XElement>>
+                elementsByAnnotation: Map<String, Set<XElement>>,
+                isLastRound: Boolean
             ): Set<XElement> {
+                if (isLastRound) {
+                    return emptySet()
+                }
                 elementsByStep[this] = elementsByAnnotation.values.flatten()
                     .map { (it as XTypeElement).qualifiedName }
                 return emptySet()
@@ -969,8 +1029,13 @@ class XProcessingStepTest {
             override fun annotations() = setOf(MainAnnotation::class.qualifiedName!!)
             override fun process(
                 env: XProcessingEnv,
-                elementsByAnnotation: Map<String, Set<XElement>>
+                elementsByAnnotation: Map<String, Set<XElement>>,
+                isLastRound: Boolean
             ): Set<XElement> {
+                if (isLastRound) {
+                    invokedLifecycles.add("processOver")
+                    return emptySet()
+                }
                 invokedLifecycles.add("process")
                 stepsProcessed.add(this)
                 val deferredElements = if (round++ == 0) {
@@ -987,13 +1052,6 @@ class XProcessingStepTest {
                     emptySet()
                 }
                 return deferredElements
-            }
-
-            override fun processOver(
-                env: XProcessingEnv,
-                elementsByAnnotation: Map<String, Set<XElement>>
-            ) {
-                invokedLifecycles.add("processOver")
             }
         }
         val invokedPostRound = mutableListOf<Boolean>()
@@ -1067,8 +1125,12 @@ class XProcessingStepTest {
             override fun annotations() = setOf(MainAnnotation::class.qualifiedName!!)
             override fun process(
                 env: XProcessingEnv,
-                elementsByAnnotation: Map<String, Set<XElement>>
+                elementsByAnnotation: Map<String, Set<XElement>>,
+                isLastRound: Boolean
             ): Set<XElement> {
+                if (isLastRound) {
+                    return emptySet()
+                }
                 stepsProcessed.add(this)
                 return emptySet()
             }
@@ -1077,8 +1139,12 @@ class XProcessingStepTest {
             override fun annotations() = setOf(OtherAnnotation::class.qualifiedName!!)
             override fun process(
                 env: XProcessingEnv,
-                elementsByAnnotation: Map<String, Set<XElement>>
+                elementsByAnnotation: Map<String, Set<XElement>>,
+                isLastRound: Boolean
             ): Set<XElement> {
+                if (isLastRound) {
+                    return emptySet()
+                }
                 stepsProcessed.add(this)
                 return emptySet()
             }
@@ -1145,8 +1211,12 @@ class XProcessingStepTest {
             override fun annotations() = setOf(AnywhereAnnotation::class.qualifiedName!!)
             override fun process(
                 env: XProcessingEnv,
-                elementsByAnnotation: Map<String, Set<XElement>>
+                elementsByAnnotation: Map<String, Set<XElement>>,
+                isLastRound: Boolean
             ): Set<XElement> {
+                if (isLastRound) {
+                    return emptySet()
+                }
                 elementsByAnnotation.values.flatten().let {
                     assertRound(round, it)
                     roundReceivedElementsHashes.add(it.map { it.hashCode() }.toSet())
@@ -1189,6 +1259,118 @@ class XProcessingStepTest {
         assertThat(
             roundReceivedElementsHashes[0].none { roundReceivedElementsHashes[1].contains(it) }
         ).isTrue()
+    }
+
+    @Test
+    fun javacDisableValidatingAnnotatedElements() {
+        val processingStep = object : XProcessingStep {
+            var round = 0
+            override fun process(
+                env: XProcessingEnv,
+                elementsByAnnotation: Map<String, Set<XElement>>,
+                isLastRound: Boolean
+            ): Set<XElement> {
+                if (isLastRound) {
+                    return emptySet()
+                }
+                if (round++ == 0) {
+                    val className = ClassName.get("foo.bar", "ToBeGenerated")
+                    val spec = TypeSpec.classBuilder(className).build()
+                    JavaFile.builder(className.packageName(), spec)
+                        .build()
+                        .writeTo(env.filer)
+                }
+                return elementsByAnnotation.values.flatten().toSet()
+            }
+            override fun annotations(): Set<String> {
+                return setOf(OtherAnnotation::class.qualifiedName!!)
+            }
+        }
+        val main = Source.java(
+            "foo.bar.Other",
+            """
+            package foo.bar;
+            import androidx.room.compiler.processing.testcode.*;
+            @OtherAnnotation("y")
+            class Other extends ToBeGenerated {
+            }
+            """.trimIndent()
+        )
+        assertAbout(
+            JavaSourcesSubjectFactory.javaSources()
+        ).that(
+            listOf(main.toJFO())
+        ).processedWith(
+            object : JavacBasicAnnotationProcessor(
+                configureEnv = {
+                    XProcessingEnvConfig.DEFAULT.copy(disableAnnotatedElementValidation = true)
+                }
+            ) {
+                override fun processingSteps() = listOf(processingStep)
+            }
+        ).compilesWithoutError()
+    }
+
+    @Test
+    fun kspDisableValidatingAnnotatedElements() {
+        CompilationTestCapabilities.assumeKspIsEnabled()
+        val processingStep = object : XProcessingStep {
+            var round = 0
+            override fun process(
+                env: XProcessingEnv,
+                elementsByAnnotation: Map<String, Set<XElement>>,
+                isLastRound: Boolean
+            ): Set<XElement> {
+                if (isLastRound) {
+                    return emptySet()
+                }
+                if (round++ == 0) {
+                    val className = ClassName.get("foo.bar", "ToBeGenerated")
+                    val spec = TypeSpec.classBuilder(className).build()
+                    JavaFile.builder(className.packageName(), spec)
+                        .build()
+                        .writeTo(env.filer)
+                }
+                return elementsByAnnotation.values.flatten().toSet()
+            }
+
+            override fun annotations(): Set<String> {
+                return setOf(OtherAnnotation::class.qualifiedName!!)
+            }
+        }
+        val processorProvider = SymbolProcessorProvider { environment ->
+            object : KspBasicAnnotationProcessor(
+                symbolProcessorEnvironment = environment,
+                config = XProcessingEnvConfig.DEFAULT.copy(
+                    disableAnnotatedElementValidation = true
+                )
+            ) {
+                override fun processingSteps() = listOf(processingStep)
+            }
+        }
+        val main = Source.kotlin(
+            "Other.kt",
+            """
+            package foo.bar
+            import androidx.room.compiler.processing.testcode.*
+            @OtherAnnotation("y")
+            internal class Other : ToBeGenerated() {
+            }
+            """.trimIndent()
+        )
+
+        val result = compile(
+            workingDir = temporaryFolder.root,
+            arguments = TestCompilationArguments(
+                sources = listOf(main),
+                symbolProcessorProviders = listOf(processorProvider)
+            )
+        )
+        assertThat(result.success).isTrue()
+        // no error due to invalid elements in last round because validation is skipped
+        assertThat(
+            result.diagnostics[Diagnostic.Kind.ERROR]?.map { it.msg } ?: emptyList<String>()
+        ).isEmpty()
     }
 
     @Test
@@ -1236,8 +1418,12 @@ class XProcessingStepTest {
             override fun annotations() = setOf(AnywhereAnnotation::class.qualifiedName!!)
             override fun process(
                 env: XProcessingEnv,
-                elementsByAnnotation: Map<String, Set<XElement>>
+                elementsByAnnotation: Map<String, Set<XElement>>,
+                isLastRound: Boolean
             ): Set<XElement> {
+                if (isLastRound) {
+                    return emptySet()
+                }
                 elementsByAnnotation.values.flatten().let {
                     assertRound(round, it)
                     roundReceivedElementsHashes.add(it.map { it.hashCode() }.toSet())

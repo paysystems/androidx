@@ -19,8 +19,6 @@ package androidx.compose.compiler.plugins.kotlin.lower.decoys
 import androidx.compose.compiler.plugins.kotlin.lower.hasAnnotationSafe
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContextImpl
-import org.jetbrains.kotlin.backend.common.ir.isTopLevel
-import org.jetbrains.kotlin.backend.common.ir.remapTypeParameters
 import org.jetbrains.kotlin.backend.common.serialization.signature.IdSignatureSerializer
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.ir.IrElement
@@ -48,7 +46,9 @@ import org.jetbrains.kotlin.ir.util.IdSignature
 import org.jetbrains.kotlin.ir.util.TypeRemapper
 import org.jetbrains.kotlin.ir.util.deepCopyWithSymbols
 import org.jetbrains.kotlin.ir.util.getAnnotation
+import org.jetbrains.kotlin.ir.util.isTopLevel
 import org.jetbrains.kotlin.ir.util.module
+import org.jetbrains.kotlin.ir.util.remapTypeParameters
 
 internal interface DecoyTransformBase {
     val context: IrPluginContext
@@ -70,7 +70,7 @@ internal interface DecoyTransformBase {
             is IdSignature.LoweredDeclarationSignature -> TODO()
             is IdSignature.FileSignature -> TODO()
             is IdSignature.CommonSignature -> id!!
-            is IdSignature.CompositeSignature -> this.getSignatureId()
+            is IdSignature.CompositeSignature -> this.nearestPublicSig().getSignatureId()
             is IdSignature.LocalSignature -> this.getSignatureId()
         }
     }
@@ -176,11 +176,9 @@ internal interface DecoyTransformBase {
     ): IrSymbol = resolveBySignatureInModule(idSignature, FUNCTION_SYMBOL, moduleDescriptor.name)
 }
 
-@OptIn(ObsoleteDescriptorBasedAPI::class)
 fun IrDeclaration.isDecoy(): Boolean =
     hasAnnotationSafe(DecoyFqNames.Decoy)
 
-@OptIn(ObsoleteDescriptorBasedAPI::class)
 fun IrDeclaration.isDecoyImplementation(): Boolean =
     hasAnnotationSafe(DecoyFqNames.DecoyImplementation)
 

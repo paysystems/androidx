@@ -16,58 +16,59 @@
 
 package androidx.room.solver.query.result
 
+import androidx.room.compiler.codegen.CodeLanguage
+import androidx.room.compiler.codegen.VisibilityModifier
+import androidx.room.compiler.codegen.XClassName
+import androidx.room.compiler.codegen.XFunSpec
+import androidx.room.compiler.codegen.XTypeName
+import androidx.room.compiler.codegen.XTypeSpec
+import androidx.room.compiler.codegen.addOriginatingElement
+import androidx.room.compiler.codegen.toJavaPoet
 import androidx.room.compiler.processing.XType
+import androidx.room.ext.AndroidTypeNames
 import androidx.room.ext.L
-import androidx.room.ext.RoomTypeNames
-import androidx.room.ext.S
 import androidx.room.ext.T
-import androidx.room.ext.capitalize
-import androidx.room.ext.stripNonJava
 import androidx.room.parser.ParsedQuery
 import androidx.room.processor.Context
 import androidx.room.processor.ProcessorErrors
-import androidx.room.processor.ProcessorErrors.ISSUE_TRACKER_LINK
 import androidx.room.solver.CodeGenScope
 import androidx.room.verifier.QueryResultInfo
+import androidx.room.vo.ColumnIndexVar
 import androidx.room.vo.Field
 import androidx.room.vo.FieldWithIndex
 import androidx.room.vo.Pojo
 import androidx.room.vo.RelationCollector
-import androidx.room.vo.findFieldByColumnName
 import androidx.room.writer.FieldReadWriteWriter
-import com.squareup.javapoet.TypeName
-import java.util.Locale
+import androidx.room.writer.TypeWriter
+import kotlin.math.abs
 
 /**
  * Creates the entity from the given info.
- * <p>
+ *
  * The info comes from the query processor so we know about the order of columns in the result etc.
  */
 class PojoRowAdapter(
-    context: Context,
+    private val context: Context,
     private val info: QueryResultInfo?,
     private val query: ParsedQuery?,
     val pojo: Pojo,
     out: XType
-) : RowAdapter(out), QueryMappedRowAdapter {
+) : QueryMappedRowAdapter(out) {
     override val mapping: PojoMapping
     val relationCollectors: List<RelationCollector>
 
+    private val indexAdapter: PojoIndexAdapter
+
     // Set when cursor is ready.
-    lateinit var fieldsWithIndices: List<FieldWithIndex>
+    private lateinit var fieldsWithIndices: List<FieldWithIndex>
 
     init {
-
-        // toMutableList documentation is not clear if it copies so lets be safe.
-        val remainingFields = pojo.fields.mapTo(mutableListOf(), { it })
+        val remainingFields = pojo.fields.toMutableList()
         val unusedColumns = arrayListOf<String>()
         val matchedFields: List<Field>
         if (info != null) {
             matchedFields = info.columns.mapNotNull { column ->
-                // first check remaining, otherwise check any. maybe developer wants to map the same
-                // column into 2 fields. (if they want to post process etc)
                 val field = remainingFields.firstOrNull { it.columnName == column.name }
-                    ?: pojo.findFieldByColumnName(column.name)
                 if (field == null) {
                     unusedColumns.add(column.name)
                     null
@@ -80,7 +81,7 @@ class PojoRowAdapter(
             if (nonNulls.isNotEmpty()) {
                 context.logger.e(
                     ProcessorErrors.pojoMissingNonNull(
-                        pojoTypeName = pojo.typeName,
+                        pojoTypeName = pojo.typeName.toJavaPoet(),
                         missingPojoFields = nonNulls.map { it.name },
                         allQueryColumns = info.columns.map { it.name }
                     )
@@ -101,6 +102,8 @@ class PojoRowAdapter(
             unusedColumns = unusedColumns,
             unusedFields = remainingFields
         )
+
+        indexAdapter = PojoIndexAdapter(mapping, info, query)
     }
 
     fun relationTableNames(): List<String> {
@@ -114,41 +117,19 @@ class PojoRowAdapter(
         }.distinct()
     }
 
-    override fun onCursorReady(cursorVarName: String, scope: CodeGenScope) {
-        fieldsWithIndices = mapping.matchedFields.map {
-            val indexVar = scope.getTmpVar(
-                "_cursorIndexOf${it.name.stripNonJava().capitalize(Locale.US)}"
-            )
-            if (info != null && query != null && query.hasTopStarProjection == false) {
-                // When result info is available and query does not have a top-level star
-                // projection we can generate column to field index since the column result order
-                // is deterministic.
-                val infoIndex = info.columns.indexOfFirst { columnInfo ->
-                    columnInfo.name == it.columnName
-                }
-                check(infoIndex != -1) {
-                    "Result column index not found for field '$it' with column name " +
-                        "'${it.columnName}'. Query: ${query.original}. Please file a bug at " +
-                        ISSUE_TRACKER_LINK
-                }
-                scope.builder().addStatement(
-                    "final $T $L = $L",
-                    TypeName.INT, indexVar, infoIndex
-                )
-            } else {
-                val indexMethod = if (info == null) {
-                    "getColumnIndex"
-                } else {
-                    "getColumnIndexOrThrow"
-                }
-                scope.builder().addStatement(
-                    "final $T $L = $T.$L($L, $S)",
-                    TypeName.INT, indexVar, RoomTypeNames.CURSOR_UTIL, indexMethod, cursorVarName,
-                    it.columnName
-                )
-            }
-            FieldWithIndex(field = it, indexVar = indexVar, alwaysExists = info != null)
+    override fun onCursorReady(
+        cursorVarName: String,
+        scope: CodeGenScope,
+        indices: List<ColumnIndexVar>
+    ) {
+        fieldsWithIndices = indices.map { (column, indexVar) ->
+            val field = mapping.matchedFields.first { it.columnName == column }
+            FieldWithIndex(field = field, indexVar = indexVar, alwaysExists = info != null)
         }
+        emitRelationCollectorsReady(cursorVarName, scope)
+    }
+
+    private fun emitRelationCollectorsReady(cursorVarName: String, scope: CodeGenScope) {
         if (relationCollectors.isNotEmpty()) {
             relationCollectors.forEach { it.writeInitCode(scope) }
             scope.builder().apply {
@@ -165,7 +146,7 @@ class PojoRowAdapter(
     }
 
     override fun convert(outVarName: String, cursorVarName: String, scope: CodeGenScope) {
-        scope.builder().apply {
+        fun doReadFromCursor(outVarName: String, scope: CodeGenScope) {
             FieldReadWriteWriter.readFromCursor(
                 outVar = outVarName,
                 outPojo = pojo,
@@ -175,14 +156,62 @@ class PojoRowAdapter(
                 scope = scope
             )
         }
+        // TODO(b/127483380): Inline in code gen scope once Kotlin code gen progresses.
+        if (relationCollectors.isEmpty() && context.codeLanguage == CodeLanguage.KOTLIN) {
+            // The name of the class is based on the query, possible to be collisions, but good,
+            // enough for now.
+            val nameHash = abs(query?.original?.hashCode() ?: out.asTypeName().hashCode())
+            val className = XClassName.get("androidx.room.temp", "PojoRowAdapter_$nameHash")
+            object : TypeWriter(CodeLanguage.KOTLIN) {
+                override fun createTypeSpecBuilder(): XTypeSpec.Builder {
+                    val readFunction = XFunSpec.builder(
+                        CodeLanguage.KOTLIN,
+                        "readFromCursor",
+                        VisibilityModifier.PUBLIC
+                    )
+                        .returns(out.asTypeName())
+                        .addParameter(AndroidTypeNames.CURSOR, cursorVarName)
+                        .apply {
+                            fieldsWithIndices.forEach {
+                                addParameter(XTypeName.PRIMITIVE_INT, it.indexVar)
+                            }
+                        }
+                        .addCode(
+                            CodeGenScope(this).apply {
+                                builder.addLocalVariable(outVarName, out.asTypeName())
+                                doReadFromCursor(outVarName, this)
+                                builder.addStatement("return %L", outVarName)
+                            }.generate()
+                        )
+                        .build()
+                    return XTypeSpec.classBuilder(codeLanguage, className)
+                        .addOriginatingElement(pojo.element)
+                        .addFunction(readFunction)
+                }
+            }.write(context.processingEnv)
+            scope.builder().apply {
+                addStatement("$L = new $T().readFromCursor($L, $L)",
+                    outVarName,
+                    className.toJavaPoet(),
+                    cursorVarName,
+                    fieldsWithIndices.joinToString { it.indexVar }
+                )
+            }
+        } else {
+            scope.builder().apply {
+                doReadFromCursor(outVarName, scope)
+            }
+        }
     }
+
+    override fun getDefaultIndexAdapter() = indexAdapter
 
     data class PojoMapping(
         val pojo: Pojo,
         val matchedFields: List<Field>,
         val unusedColumns: List<String>,
         val unusedFields: List<Field>
-    ) : QueryMappedRowAdapter.Mapping() {
+    ) : Mapping() {
         override val usedColumns = matchedFields.map { it.columnName }
     }
 }

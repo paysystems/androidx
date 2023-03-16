@@ -53,7 +53,7 @@ public class CoroutinesRoom private constructor() {
             inTransaction: Boolean,
             callable: Callable<R>
         ): R {
-            if (db.isOpen && db.inTransaction()) {
+            if (db.isOpenInternal && db.inTransaction()) {
                 return callable.call()
             }
 
@@ -74,7 +74,7 @@ public class CoroutinesRoom private constructor() {
             cancellationSignal: CancellationSignal,
             callable: Callable<R>
         ): R {
-            if (db.isOpen && db.inTransaction()) {
+            if (db.isOpenInternal && db.inTransaction()) {
                 return callable.call()
             }
 
@@ -111,7 +111,7 @@ public class CoroutinesRoom private constructor() {
                 // Observer channel receives signals from the invalidation tracker to emit queries.
                 val observerChannel = Channel<Unit>(Channel.CONFLATED)
                 val observer = object : InvalidationTracker.Observer(tableNames) {
-                    override fun onInvalidated(tables: MutableSet<String>) {
+                    override fun onInvalidated(tables: Set<String>) {
                         observerChannel.trySend(Unit)
                     }
                 }

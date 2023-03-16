@@ -28,10 +28,10 @@ import android.util.Size
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Logger
 import androidx.camera.core.Preview
-import androidx.camera.core.VideoCapture
 import androidx.camera.core.impl.utils.executor.CameraXExecutors
 import androidx.camera.core.internal.CameraUseCaseAdapter
 import androidx.camera.testing.CameraUtil
+import androidx.camera.testing.CameraUtil.PreTestCameraIdList
 import androidx.camera.testing.CameraXUtil
 import androidx.camera.testing.SurfaceTextureProvider
 import androidx.core.content.ContextCompat
@@ -42,18 +42,17 @@ import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
 import com.google.common.truth.Truth.assertThat
+import java.io.File
+import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Assume
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TestRule
 import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers
 import org.mockito.Mockito
-import java.io.File
-import java.util.concurrent.TimeUnit
 
 @LargeTest
 @RunWith(AndroidJUnit4::class)
@@ -63,7 +62,9 @@ class VideoCaptureTestWithoutAudioPermissionTest {
         const val TAG: String = "VideoCaptureTestWithoutAudioPermission"
     }
     @get:Rule
-    val useCamera: TestRule = CameraUtil.grantCameraPermissionAndPreTest()
+    val useCamera = CameraUtil.grantCameraPermissionAndPreTest(
+        PreTestCameraIdList(Camera2Config.defaultConfig())
+    )
 
     @get:Rule
     val permissionRule: GrantPermissionRule =
@@ -127,6 +128,7 @@ class VideoCaptureTestWithoutAudioPermissionTest {
      * It's conceivable this test will be skipped because it's not the first case to test.
      */
     @Test
+    @Suppress("DEPRECATION")
     fun videoCapture_saveResultToFileWithoutAudioPermission() {
         val checkPermissionResult =
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
@@ -139,7 +141,7 @@ class VideoCaptureTestWithoutAudioPermissionTest {
         val file = File.createTempFile("CameraX", ".tmp").apply { deleteOnExit() }
 
         val preview = Preview.Builder().build()
-        val videoCapture = VideoCapture.Builder().build()
+        val videoCapture = androidx.camera.core.VideoCapture.Builder().build()
 
         assumeTrue(
             "This combination (videoCapture, preview) is not supported.",
@@ -153,9 +155,10 @@ class VideoCaptureTestWithoutAudioPermissionTest {
             cameraUseCaseAdapter.addUseCases(listOf(videoCapture, preview))
         }
 
-        val callback = Mockito.mock(VideoCapture.OnVideoSavedCallback::class.java)
+        val callback =
+            Mockito.mock(androidx.camera.core.VideoCapture.OnVideoSavedCallback::class.java)
         videoCapture.startRecording(
-            VideoCapture.OutputFileOptions.Builder(file).build(),
+            androidx.camera.core.VideoCapture.OutputFileOptions.Builder(file).build(),
             CameraXExecutors.mainThreadExecutor(),
             callback
         )

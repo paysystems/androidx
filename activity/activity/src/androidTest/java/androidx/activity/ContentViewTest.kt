@@ -23,11 +23,12 @@ import android.widget.TextView
 import androidx.activity.test.R
 import androidx.lifecycle.ViewTreeLifecycleOwner
 import androidx.lifecycle.ViewTreeViewModelStoreOwner
-import androidx.savedstate.ViewTreeSavedStateRegistryOwner
+import androidx.savedstate.findViewTreeSavedStateRegistryOwner
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
 import androidx.testutils.withActivity
+import androidx.testutils.withUse
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Test
@@ -39,7 +40,7 @@ class ContentViewTest {
 
     @Test
     fun testLifecycleObserver() {
-        with(ActivityScenario.launch(ContentViewActivity::class.java)) {
+       withUse(ActivityScenario.launch(ContentViewActivity::class.java)) {
             val inflatedTextView: TextView = withActivity { findViewById(R.id.inflated_text_view) }
             assertThat(inflatedTextView)
                 .isNotNull()
@@ -48,7 +49,7 @@ class ContentViewTest {
 
     @Test
     fun testViewTreeInflation() {
-        with(ActivityScenario.launch(ContentViewActivity::class.java)) {
+       withUse(ActivityScenario.launch(ContentViewActivity::class.java)) {
             val inflatedTextView: TextView = withActivity { findViewById(R.id.inflated_text_view) }
 
             withActivity {
@@ -59,7 +60,7 @@ class ContentViewTest {
                     .that(ViewTreeViewModelStoreOwner.get(inflatedTextView))
                     .isSameInstanceAs(this@withActivity)
                 assertWithMessage("inflated view has correct ViewTreeSavedStateRegistryOwner")
-                    .that(ViewTreeSavedStateRegistryOwner.get(inflatedTextView))
+                    .that(inflatedTextView.findViewTreeSavedStateRegistryOwner())
                     .isSameInstanceAs(this@withActivity)
             }
         }
@@ -80,7 +81,7 @@ class ContentViewTest {
         message: String,
         attach: ComponentActivity.(View) -> Unit
     ) {
-        with(ActivityScenario.launch(EmptyContentActivity::class.java)) {
+       withUse(ActivityScenario.launch(EmptyContentActivity::class.java)) {
             withActivity {
                 val view = View(this)
 
@@ -88,14 +89,14 @@ class ContentViewTest {
                 var attachedViewModelStoreOwner: Any? = "did not attach"
                 var attachedSavedStateRegistryOwner: Any? = "did not attach"
                 view.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
-                    override fun onViewDetachedFromWindow(v: View?) {
+                    override fun onViewDetachedFromWindow(v: View) {
                         // Do nothing
                     }
 
-                    override fun onViewAttachedToWindow(v: View?) {
+                    override fun onViewAttachedToWindow(v: View) {
                         attachedLifecycleOwner = ViewTreeLifecycleOwner.get(view)
                         attachedViewModelStoreOwner = ViewTreeViewModelStoreOwner.get(view)
-                        attachedSavedStateRegistryOwner = ViewTreeSavedStateRegistryOwner.get(view)
+                        attachedSavedStateRegistryOwner = view.findViewTreeSavedStateRegistryOwner()
                     }
                 })
                 attach(view)

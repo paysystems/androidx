@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 /*
  * Copyright 2021 The Android Open Source Project
  *
@@ -24,6 +26,7 @@ android {
     defaultConfig {
         minSdkVersion 29
     }
+    namespace "androidx.wear.compose.integration.macrobenchmark"
 }
 
 dependencies {

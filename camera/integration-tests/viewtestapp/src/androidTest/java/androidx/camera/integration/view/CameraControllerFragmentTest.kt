@@ -24,7 +24,10 @@ import android.graphics.PointF
 import android.net.Uri
 import android.os.Build
 import android.view.Surface
+import androidx.camera.camera2.Camera2Config
+import androidx.camera.camera2.pipe.integration.CameraPipeConfig
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.CameraXConfig
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -33,6 +36,7 @@ import androidx.camera.core.impl.utils.executor.CameraXExecutors
 import androidx.camera.core.impl.utils.futures.FutureCallback
 import androidx.camera.core.impl.utils.futures.Futures
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.testing.CameraPipeConfigTestRule
 import androidx.camera.testing.CameraUtil
 import androidx.camera.testing.CoreAppTestUtil
 import androidx.camera.view.CameraController.TAP_TO_FOCUS_FAILED
@@ -48,7 +52,6 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.matcher.ViewMatchers.withId
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
@@ -57,46 +60,38 @@ import androidx.test.uiautomator.UiSelector
 import com.google.common.collect.ImmutableList
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
+import java.util.concurrent.Semaphore
+import java.util.concurrent.TimeUnit
 import org.junit.After
+import org.junit.Assert
 import org.junit.Assume
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.ExpectedException
-import org.junit.rules.TestRule
 import org.junit.runner.RunWith
-import java.util.concurrent.Semaphore
-import java.util.concurrent.TimeUnit
+import org.junit.runners.Parameterized
 
 /**
  * Instrument tests for [CameraControllerFragment].
  */
 @LargeTest
-@RunWith(AndroidJUnit4::class)
-class CameraControllerFragmentTest {
-
-    companion object {
-        // The right shift needed to get color component from a Int color, in the order of R, G
-        // and B.
-        private val RGB_SHIFTS = ImmutableList.of(/*R*/16, /*G*/ 8, /*B*/0)
-        private const val COLOR_MASK = 0xFF
-
-        // The minimum luminance for comparing pictures. Arbitrarily chosen.
-        private const val MIN_LUMINANCE = 50F
-
-        @JvmField
-        val testCameraRule = CameraUtil.PreTestCamera()
-
-        const val TIMEOUT_SECONDS = 10L
-    }
+@RunWith(Parameterized::class)
+class CameraControllerFragmentTest(
+    private val implName: String,
+    private val cameraConfig: CameraXConfig
+) {
+    @get:Rule
+    val cameraPipeConfigTestRule = CameraPipeConfigTestRule(
+        active = implName == CameraPipeConfig::class.simpleName,
+    )
 
     @get:Rule
-    val thrown: ExpectedException = ExpectedException.none()
-
-    @get:Rule
-    val useCamera: TestRule = CameraUtil.grantCameraPermissionAndPreTest(testCameraRule)
+    val useCameraRule = CameraUtil.grantCameraPermissionAndPreTest(
+        testCameraRule,
+        CameraUtil.PreTestCameraIdList(cameraConfig)
+    )
 
     @get:Rule
     val grantPermissionRule: GrantPermissionRule = GrantPermissionRule.grant(
@@ -115,6 +110,7 @@ class CameraControllerFragmentTest {
         // Clear the device UI and check if there is no dialog or lock screen on the top of the
         // window before start the test.
         CoreAppTestUtil.prepareDeviceUI(instrumentation)
+        ProcessCameraProvider.configureInstance(cameraConfig)
         cameraProvider = ProcessCameraProvider.getInstance(
             ApplicationProvider.getApplicationContext()
         )[10000, TimeUnit.MILLISECONDS]
@@ -132,6 +128,23 @@ class CameraControllerFragmentTest {
         if (::cameraProvider.isInitialized) {
             cameraProvider.shutdown()[10000, TimeUnit.MILLISECONDS]
         }
+    }
+
+    @Test
+    fun enableEffect_effectIsEnabled() {
+        // Arrange: launch app and verify effect is inactive.
+        fragment.assertPreviewIsStreaming()
+        val processor =
+            fragment.mToneMappingPreviewEffect.surfaceProcessor as ToneMappingSurfaceProcessor
+        assertThat(processor.isSurfaceRequestedAndProvided()).isFalse()
+
+        // Act: turn on effect.
+        val effectToggleId = "androidx.camera.integration.view:id/effect_toggle"
+        uiDevice.findObject(UiSelector().resourceId(effectToggleId)).click()
+        instrumentation.waitForIdleSync()
+
+        // Assert: verify that effect is active.
+        assertThat(processor.isSurfaceRequestedAndProvided()).isTrue()
     }
 
     @Test
@@ -193,8 +206,10 @@ class CameraControllerFragmentTest {
     @UiThreadTest
     @Test
     fun controllerNotBound_cameraInfoIsNull() {
-        fragment.previewView.controller = null
-        assertThat(fragment.cameraController.cameraInfo).isNull()
+        instrumentation.runOnMainSync {
+            fragment.previewView.controller = null
+            assertThat(fragment.cameraController.cameraInfo).isNull()
+        }
     }
 
     @Test
@@ -379,13 +394,13 @@ class CameraControllerFragmentTest {
     @Test
     fun captureDisabled_cannotTakePicture() {
         // Arrange.
-        thrown.expectMessage("ImageCapture disabled")
-
-        // Act.
         onView(withId(R.id.capture_enabled)).perform(click())
 
-        // Assert.
-        fragment.assertCanTakePicture()
+        // Act and assert.
+        val exception = Assert.assertThrows(IllegalStateException::class.java) {
+            fragment.assertCanTakePicture()
+        }
+        assertThat(exception).hasMessageThat().isEqualTo("ImageCapture disabled.")
     }
 
     @Test
@@ -610,4 +625,26 @@ class CameraControllerFragmentTest {
         val isFlippedHorizontally: Boolean,
         val isFlippedVertically: Boolean
     )
+
+    companion object {
+        // The right shift needed to get color component from a Int color, in the order of R, G
+        // and B.
+        private val RGB_SHIFTS = ImmutableList.of(/*R*/16, /*G*/ 8, /*B*/0)
+        private const val COLOR_MASK = 0xFF
+
+        // The minimum luminance for comparing pictures. Arbitrarily chosen.
+        private const val MIN_LUMINANCE = 50F
+
+        @JvmField
+        val testCameraRule = CameraUtil.PreTestCamera()
+
+        const val TIMEOUT_SECONDS = 10L
+
+        @JvmStatic
+        @Parameterized.Parameters(name = "{0}")
+        fun data() = listOf(
+            arrayOf(Camera2Config::class.simpleName, Camera2Config.defaultConfig()),
+            arrayOf(CameraPipeConfig::class.simpleName, CameraPipeConfig.defaultConfig())
+        )
+    }
 }

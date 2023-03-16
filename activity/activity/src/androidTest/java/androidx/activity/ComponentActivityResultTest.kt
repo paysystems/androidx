@@ -28,6 +28,7 @@ import androidx.activity.result.contract.ActivityResultContracts.StartActivityFo
 import androidx.core.app.ActivityOptionsCompat
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.filters.FlakyTest
 import androidx.test.filters.LargeTest
 import androidx.testutils.withActivity
 import com.google.common.truth.Truth.assertThat
@@ -75,6 +76,7 @@ class ComponentActivityResultTest {
         }
     }
 
+    @FlakyTest(bugId = 249285459)
     @Test
     fun registerInInitTest() {
         ActivityScenario.launch(RegisterInInitActivity::class.java).use { scenario ->
@@ -90,12 +92,31 @@ class ComponentActivityResultTest {
     }
 
     @Test
-    fun noActivityAvailableTest() {
+    fun noActivityAvailableLifecycleTest() {
         ActivityScenario.launch(RegisterInInitActivity::class.java).use { scenario ->
             var exceptionThrown = false
             scenario.withActivity {
                 try {
                     launcher.launch(Intent("no action"))
+                } catch (e: ActivityNotFoundException) {
+                    exceptionThrown = true
+                }
+            }
+
+            scenario.withActivity {
+                assertThat(exceptionThrown).isTrue()
+                assertThat(launchCount).isEqualTo(0)
+            }
+        }
+    }
+
+    @Test
+    fun noActivityAvailableNoLifecycleTest() {
+        ActivityScenario.launch(RegisterInInitActivity::class.java).use { scenario ->
+            var exceptionThrown = false
+            scenario.withActivity {
+                try {
+                    launcherNoLifecycle.launch(Intent("no action"))
                 } catch (e: ActivityNotFoundException) {
                     exceptionThrown = true
                 }
@@ -115,6 +136,7 @@ class PassThroughActivity : ComponentActivity() {
             finish()
         }
     }
+    @Suppress("DEPRECATION")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         launcher.launch(intent.getParcelableExtra("destinationIntent"))
@@ -175,10 +197,14 @@ class RegisterBeforeOnCreateActivity : ComponentActivity() {
 
 class RegisterInInitActivity : ComponentActivity() {
     var launcher: ActivityResultLauncher<Intent>
+    val launcherNoLifecycle: ActivityResultLauncher<Intent>
     var launchCount = 0
 
     init {
         launcher = registerForActivityResult(StartActivityForResult()) {
+            launchCount++
+        }
+        launcherNoLifecycle = activityResultRegistry.register("test", StartActivityForResult()) {
             launchCount++
         }
     }

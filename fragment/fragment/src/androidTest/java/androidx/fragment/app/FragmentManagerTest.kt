@@ -22,6 +22,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.MediumTest
 import androidx.testutils.withActivity
+import androidx.testutils.withUse
 import com.google.common.truth.Truth.assertThat
 import org.junit.Assert.fail
 import org.junit.Test
@@ -33,7 +34,7 @@ class FragmentManagerTest {
 
     @Test
     fun addRemoveFragmentOnAttachListener() {
-        with(ActivityScenario.launch(FragmentTestActivity::class.java)) {
+       withUse(ActivityScenario.launch(FragmentTestActivity::class.java)) {
             val fm = withActivity {
                 supportFragmentManager
             }
@@ -71,7 +72,7 @@ class FragmentManagerTest {
 
     @Test
     fun removeReentrantFragmentOnAttachListener() {
-        with(ActivityScenario.launch(FragmentTestActivity::class.java)) {
+       withUse(ActivityScenario.launch(FragmentTestActivity::class.java)) {
             val fm = withActivity {
                 supportFragmentManager
             }
@@ -105,7 +106,7 @@ class FragmentManagerTest {
 
     @Test
     fun findFragmentChildFragment() {
-        with(ActivityScenario.launch(FragmentTestActivity::class.java)) {
+       withUse(ActivityScenario.launch(FragmentTestActivity::class.java)) {
             val fm = withActivity {
                 setContentView(R.layout.simple_container)
                 supportFragmentManager
@@ -146,7 +147,7 @@ class FragmentManagerTest {
 
     @Test
     fun findFragmentWithoutChildFragment() {
-        with(ActivityScenario.launch(FragmentTestActivity::class.java)) {
+       withUse(ActivityScenario.launch(FragmentTestActivity::class.java)) {
             val fm = withActivity {
                 setContentView(R.layout.simple_container)
                 supportFragmentManager
@@ -188,7 +189,7 @@ class FragmentManagerTest {
 
     @Test
     fun findFragmentManagerChildFragment() {
-        with(ActivityScenario.launch(FragmentTestActivity::class.java)) {
+       withUse(ActivityScenario.launch(FragmentTestActivity::class.java)) {
             val fm = withActivity {
                 setContentView(R.layout.simple_container)
                 supportFragmentManager
@@ -248,7 +249,7 @@ class FragmentManagerTest {
 
     @Test
     fun findFragmentManagerWithoutChildFragment() {
-        with(ActivityScenario.launch(FragmentTestActivity::class.java)) {
+       withUse(ActivityScenario.launch(FragmentTestActivity::class.java)) {
             val fm = withActivity {
                 setContentView(R.layout.simple_container)
                 supportFragmentManager
@@ -302,7 +303,7 @@ class FragmentManagerTest {
 
     @Test
     fun addRemoveReorderingAllowedWithoutExecutePendingTransactions() {
-        with(ActivityScenario.launch(FragmentTestActivity::class.java)) {
+       withUse(ActivityScenario.launch(FragmentTestActivity::class.java)) {
             val fm = withActivity {
                 supportFragmentManager
             }
@@ -310,12 +311,14 @@ class FragmentManagerTest {
 
             val originalWho = fragment1.mWho
 
-            fm.beginTransaction()
-                .add(fragment1, "fragment1")
-                .setReorderingAllowed(true)
-                .addToBackStack("stack1")
-                .commit()
-            fm.popBackStack()
+            withActivity {
+                fm.beginTransaction()
+                    .add(fragment1, "fragment1")
+                    .setReorderingAllowed(true)
+                    .addToBackStack("stack1")
+                    .commit()
+                fm.popBackStack()
+            }
             executePendingTransactions()
 
             assertThat(fragment1.mWho).isNotEqualTo(originalWho)
@@ -326,8 +329,45 @@ class FragmentManagerTest {
     }
 
     @Test
+    fun reAddRemovedBeforeAttached() {
+       withUse(ActivityScenario.launch(FragmentTestActivity::class.java)) {
+            val fm = withActivity {
+                supportFragmentManager
+            }
+            val fragment1 = StrictFragment()
+
+            val originalWho = fragment1.mWho
+
+            withActivity {
+                fm.beginTransaction()
+                    .add(fragment1, "fragment1")
+                    .setReorderingAllowed(true)
+                    .addToBackStack("stack1")
+                    .commit()
+                fm.popBackStack()
+            }
+            executePendingTransactions()
+
+            assertThat(fragment1.mWho).isNotEqualTo(originalWho)
+            assertThat(fragment1.mFragmentManager).isNull()
+            assertThat(fm.findFragmentByWho(originalWho)).isNull()
+            assertThat(fm.findFragmentByWho(fragment1.mWho)).isNull()
+
+            val afterRemovalWho = fragment1.mWho
+
+            fm.beginTransaction()
+                .add(fragment1, "fragment1")
+                .setReorderingAllowed(true)
+                .commit()
+            executePendingTransactions()
+
+            assertThat(fragment1.mWho).isEqualTo(afterRemovalWho)
+        }
+    }
+
+    @Test
     fun popBackStackImmediate() {
-        with(ActivityScenario.launch(FragmentTestActivity::class.java)) {
+       withUse(ActivityScenario.launch(FragmentTestActivity::class.java)) {
             val fm = withActivity {
                 supportFragmentManager
             }

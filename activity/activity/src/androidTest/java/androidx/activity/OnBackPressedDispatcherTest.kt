@@ -24,6 +24,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
 import androidx.test.filters.SmallTest
 import androidx.testutils.withActivity
+import androidx.testutils.withUse
 import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Before
 import org.junit.Test
@@ -352,7 +353,8 @@ class OnBackPressedHandlerTest {
     fun testLifecycleCallback_whenDestroyed() {
         val lifecycleOnBackPressedCallback = CountingOnBackPressedCallback()
 
-        val lifecycleOwner = TestLifecycleOwner(Lifecycle.State.DESTROYED)
+        val lifecycleOwner = TestLifecycleOwner(Lifecycle.State.CREATED)
+        lifecycleOwner.lifecycle.currentState = Lifecycle.State.DESTROYED
 
         dispatcher.addCallback(lifecycleOwner, lifecycleOnBackPressedCallback)
 
@@ -381,7 +383,7 @@ class OnBackPressedHandlerTest {
     @LargeTest
     @Test
     fun testCallOnBackPressedWhenStopped() {
-        with(ActivityScenario.launch(ContentViewActivity::class.java)) {
+       withUse(ActivityScenario.launch(ContentViewActivity::class.java)) {
             val realDispatcher = withActivity { onBackPressedDispatcher }
             moveToState(Lifecycle.State.CREATED)
             withActivity { realDispatcher.onBackPressed() }

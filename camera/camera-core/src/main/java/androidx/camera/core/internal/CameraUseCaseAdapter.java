@@ -16,6 +16,9 @@
 
 package androidx.camera.core.internal;
 
+import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
+
 import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.graphics.RectF;
@@ -27,8 +30,10 @@ import androidx.annotation.GuardedBy;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
+import androidx.annotation.VisibleForTesting;
 import androidx.camera.core.Camera;
 import androidx.camera.core.CameraControl;
+import androidx.camera.core.CameraEffect;
 import androidx.camera.core.CameraInfo;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.ImageCapture;
@@ -36,6 +41,7 @@ import androidx.camera.core.Logger;
 import androidx.camera.core.Preview;
 import androidx.camera.core.UseCase;
 import androidx.camera.core.ViewPort;
+import androidx.camera.core.impl.AttachedSurfaceInfo;
 import androidx.camera.core.impl.CameraConfig;
 import androidx.camera.core.impl.CameraConfigs;
 import androidx.camera.core.impl.CameraControlInternal;
@@ -47,12 +53,12 @@ import androidx.camera.core.impl.SurfaceConfig;
 import androidx.camera.core.impl.UseCaseConfig;
 import androidx.camera.core.impl.UseCaseConfigFactory;
 import androidx.camera.core.impl.utils.executor.CameraXExecutors;
+import androidx.camera.core.processing.SurfaceProcessorWithExecutor;
 import androidx.core.util.Preconditions;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -87,6 +93,10 @@ public final class CameraUseCaseAdapter implements Camera {
     @GuardedBy("mLock")
     @Nullable
     private ViewPort mViewPort;
+
+    @GuardedBy("mLock")
+    @NonNull
+    private List<CameraEffect> mEffects = emptyList();
 
     // Additional configs to apply onto the UseCases when added to this Camera
     @GuardedBy("mLock")
@@ -162,6 +172,15 @@ public final class CameraUseCaseAdapter implements Camera {
     }
 
     /**
+     * Set the effects that will be used for the {@link UseCase} attached to the camera.
+     */
+    public void setEffects(@Nullable List<CameraEffect> effects) {
+        synchronized (mLock) {
+            mEffects = effects;
+        }
+    }
+
+    /**
      * Add the specified collection of {@link UseCase} to the adapter.
      *
      * @throws CameraException Thrown if the combination of newly added UseCases and the
@@ -169,8 +188,9 @@ public final class CameraUseCaseAdapter implements Camera {
      */
     public void addUseCases(@NonNull Collection<UseCase> useCases) throws CameraException {
         synchronized (mLock) {
+            // TODO: merge UseCase for stream sharing. e.g. replace Preview and VideoCapture with a
+            //  StreamSharing UseCase.
             List<UseCase> newUseCases = new ArrayList<>();
-
             for (UseCase useCase : useCases) {
                 if (mUseCases.contains(useCase)) {
                     Logger.d(TAG, "Attempting to attach already attached UseCase");
@@ -180,8 +200,8 @@ public final class CameraUseCaseAdapter implements Camera {
             }
 
             List<UseCase> allUseCases = new ArrayList<>(mUseCases);
-            List<UseCase> requiredExtraUseCases = Collections.emptyList();
-            List<UseCase> removedExtraUseCases = Collections.emptyList();
+            List<UseCase> requiredExtraUseCases = emptyList();
+            List<UseCase> removedExtraUseCases = emptyList();
 
             if (isCoexistingPreviewImageCaptureRequired()) {
                 // Collects all use cases that will be finally bound by the application
@@ -222,6 +242,7 @@ public final class CameraUseCaseAdapter implements Camera {
                 throw new CameraException(e.getMessage());
             }
             updateViewPort(suggestedResolutionsMap, useCases);
+            updateEffects(mEffects, useCases);
 
             // Saves the updated extra use cases set after confirming the use case combination
             // can be supported.
@@ -270,7 +291,7 @@ public final class CameraUseCaseAdapter implements Camera {
 
                 try {
                     // Calls addUseCases with empty list to add required extra fake use case.
-                    addUseCases(Collections.emptyList());
+                    addUseCases(emptyList());
                 } catch (CameraException e) {
                     // This should not happen because the extra fake use case should be only
                     // added to replace the removed one which the use case combination can be
@@ -321,6 +342,18 @@ public final class CameraUseCaseAdapter implements Camera {
     }
 
     /**
+     * When in active resuming mode, it will actively retry opening the camera periodically to
+     * resume regardless of the camera availability if the camera is interrupted in
+     * OPEN/OPENING/PENDING_OPEN state.
+     *
+     * When not in actively resuming mode, it will retry opening camera only when camera
+     * becomes available.
+     */
+    public void setActiveResumingMode(boolean enabled) {
+        mCameraInternal.setActiveResumingMode(enabled);
+    }
+
+    /**
      * Detach the UseCases from the {@link CameraInternal} so that the UseCases stop receiving data.
      *
      * <p> This will stop the underlying {@link CameraInternal} instance.
@@ -365,7 +398,7 @@ public final class CameraUseCaseAdapter implements Camera {
             @NonNull List<UseCase> newUseCases,
             @NonNull List<UseCase> currentUseCases,
             @NonNull Map<UseCase, ConfigPair> configPairMap) {
-        List<SurfaceConfig> existingSurfaces = new ArrayList<>();
+        List<AttachedSurfaceInfo> existingSurfaces = new ArrayList<>();
         String cameraId = cameraInfoInternal.getCameraId();
         Map<UseCase, Size> suggestedResolutions = new HashMap<>();
 
@@ -375,7 +408,9 @@ public final class CameraUseCaseAdapter implements Camera {
                     mCameraDeviceSurfaceManager.transformSurfaceConfig(cameraId,
                             useCase.getImageFormat(),
                             useCase.getAttachedSurfaceResolution());
-            existingSurfaces.add(surfaceConfig);
+            existingSurfaces.add(AttachedSurfaceInfo.create(surfaceConfig,
+                    useCase.getImageFormat(), useCase.getAttachedSurfaceResolution(),
+                    useCase.getCurrentConfig().getTargetFramerate(null)));
             suggestedResolutions.put(useCase, useCase.getAttachedSurfaceResolution());
         }
 
@@ -404,12 +439,45 @@ public final class CameraUseCaseAdapter implements Camera {
         return suggestedResolutions;
     }
 
+    @VisibleForTesting
+    static void updateEffects(@NonNull List<CameraEffect> effects,
+            @NonNull Collection<UseCase> useCases) {
+        Map<Integer, CameraEffect> effectsByTargets = new HashMap<>();
+        for (CameraEffect effect : effects) {
+            effectsByTargets.put(effect.getTargets(), effect);
+        }
+
+        // Set effects on the UseCases. This also removes existing effects if necessary.
+        for (UseCase useCase : useCases) {
+            if (useCase instanceof Preview) {
+                Preview preview = ((Preview) useCase);
+                CameraEffect effect = effectsByTargets.get(CameraEffect.PREVIEW);
+                if (effect == null) {
+                    preview.setProcessor(null);
+                    continue;
+                }
+                preview.setProcessor(new SurfaceProcessorWithExecutor(
+                        requireNonNull(effect.getSurfaceProcessor()),
+                        effect.getProcessorExecutor()));
+            }
+        }
+    }
+
     private void updateViewPort(@NonNull Map<UseCase, Size> suggestedResolutionsMap,
             @NonNull Collection<UseCase> useCases) {
         synchronized (mLock) {
             if (mViewPort != null) {
-                boolean isFrontCamera = mCameraInternal.getCameraInfoInternal().getLensFacing()
-                        == CameraSelector.LENS_FACING_FRONT;
+                Integer lensFacing = mCameraInternal.getCameraInfoInternal().getLensFacing();
+                boolean isFrontCamera;
+                if (lensFacing == null) {
+                    // TODO(b/122975195): If the lens facing is null, it's probably an external
+                    //  camera. We treat it as like a front camera with unverified behaviors. Will
+                    //  have to define this later.
+                    Logger.w(TAG, "The lens facing is null, probably an external.");
+                    isFrontCamera = true;
+                } else {
+                    isFrontCamera = lensFacing == CameraSelector.LENS_FACING_FRONT;
+                }
                 // Calculate crop rect if view port is provided.
                 Map<UseCase, Rect> cropRectMap = ViewPorts.calculateViewPortRects(
                         mCameraInternal.getCameraControlInternal().getSensorRect(),
@@ -577,7 +645,7 @@ public final class CameraUseCaseAdapter implements Camera {
                 Map<UseCase, ConfigPair> configs = getConfigs(Arrays.asList(useCases),
                         mCameraConfig.getUseCaseConfigFactory(), mUseCaseConfigFactory);
                 calculateSuggestedResolutions(mCameraInternal.getCameraInfoInternal(),
-                        Arrays.asList(useCases), Collections.emptyList(), configs);
+                        Arrays.asList(useCases), emptyList(), configs);
             } catch (IllegalArgumentException e) {
                 return false;
             }

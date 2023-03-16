@@ -22,7 +22,9 @@ import android.util.Log;
 import android.util.SparseIntArray;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.GridView;
 
+import androidx.annotation.NonNull;
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat;
 
 import java.util.Arrays;
@@ -160,6 +162,16 @@ public class GridLayoutManager extends LinearLayoutManager {
                     spanGroupIndex , 1,
                     glp.getSpanIndex(), glp.getSpanSize(), false, false));
         }
+    }
+
+    @Override
+    public void onInitializeAccessibilityNodeInfo(@NonNull RecyclerView.Recycler recycler,
+            @NonNull RecyclerView.State state, @NonNull AccessibilityNodeInfoCompat info) {
+        super.onInitializeAccessibilityNodeInfo(recycler, state, info);
+        // Set the class name so this is treated as a grid. A11y services should identify grids
+        // and list via CollectionInfos, but an almost empty grid may be incorrectly identified
+        // as a list.
+        info.setClassName(GridView.class.getName());
     }
 
     @Override
@@ -952,6 +964,9 @@ public class GridLayoutManager extends LinearLayoutManager {
         /**
          * Returns the final span index of the provided position.
          * <p>
+         * If {@link #getOrientation()} is {@link #VERTICAL}, this is a column value.
+         * If {@link #getOrientation()} is {@link #HORIZONTAL}, this is a row value.
+         * <p>
          * If you have a faster way to calculate span index for your items, you should override
          * this method. Otherwise, you should enable span index cache
          * ({@link #setSpanIndexCacheEnabled(boolean)}) for better performance. When caching is
@@ -1027,6 +1042,9 @@ public class GridLayoutManager extends LinearLayoutManager {
 
         /**
          * Returns the index of the group this position belongs.
+         * <p>
+         * If {@link #getOrientation()} is {@link #VERTICAL}, this is a row value.
+         * If {@link #getOrientation()} is {@link #HORIZONTAL}, this is a column value.
          * <p>
          * For example, if grid has 3 columns and each item occupies 1 span, span group index
          * for item 1 will be 0, item 5 will be 1.

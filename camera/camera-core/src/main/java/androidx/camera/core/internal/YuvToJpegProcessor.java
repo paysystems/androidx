@@ -31,17 +31,18 @@ import androidx.annotation.RequiresApi;
 import androidx.camera.core.ImageProxy;
 import androidx.camera.core.Logger;
 import androidx.camera.core.impl.CaptureProcessor;
+import androidx.camera.core.impl.ImageOutputConfig;
 import androidx.camera.core.impl.ImageProxyBundle;
 import androidx.camera.core.impl.utils.ExifData;
 import androidx.camera.core.impl.utils.ExifOutputStream;
+import androidx.camera.core.impl.utils.futures.Futures;
 import androidx.camera.core.internal.compat.ImageWriterCompat;
 import androidx.camera.core.internal.utils.ImageUtil;
+import androidx.concurrent.futures.CallbackToFutureAdapter;
 import androidx.core.util.Preconditions;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
-import java.io.EOFException;
-import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -55,11 +56,16 @@ public class YuvToJpegProcessor implements CaptureProcessor {
 
     private static final Rect UNINITIALIZED_RECT = new Rect(0, 0, 0, 0);
 
-    @IntRange(from = 0, to = 100)
-    private int mQuality;
     private final int mMaxImages;
 
     private final Object mLock = new Object();
+
+    @GuardedBy("mLock")
+    @IntRange(from = 0, to = 100)
+    private int mQuality;
+    @GuardedBy("mLock")
+    @ImageOutputConfig.RotationDegreesValue
+    private int mRotationDegrees = 0;
 
     @GuardedBy("mLock")
     private boolean mClosed = false;
@@ -70,6 +76,11 @@ public class YuvToJpegProcessor implements CaptureProcessor {
     @GuardedBy("mLock")
     private Rect mImageRect = UNINITIALIZED_RECT;
 
+    @GuardedBy("mLock")
+    CallbackToFutureAdapter.Completer<Void> mCloseCompleter;
+    @GuardedBy("mLock")
+    private ListenableFuture<Void> mCloseFuture;
+
     public YuvToJpegProcessor(@IntRange(from = 0, to = 100) int quality, int maxImages) {
         mQuality = quality;
         mMaxImages = maxImages;
@@ -79,7 +90,20 @@ public class YuvToJpegProcessor implements CaptureProcessor {
      * Sets the compression quality for the output JPEG image.
      */
     public void setJpegQuality(@IntRange(from = 0, to = 100) int quality) {
-        mQuality = quality;
+        synchronized (mLock) {
+            mQuality = quality;
+        }
+    }
+
+    /**
+     * Sets the rotation degrees value of the output images.
+     *
+     * @param rotationDegrees The rotation in degrees which will be a value in {0, 90, 180, 270}.
+     */
+    public void setRotationDegrees(@ImageOutputConfig.RotationDegreesValue int rotationDegrees) {
+        synchronized (mLock) {
+            mRotationDegrees = rotationDegrees;
+        }
     }
 
     @Override
@@ -110,6 +134,8 @@ public class YuvToJpegProcessor implements CaptureProcessor {
         ImageWriter imageWriter;
         Rect imageRect;
         boolean processing;
+        int quality;
+        int rotationDegrees;
         synchronized (mLock) {
             imageWriter = mImageWriter;
             processing = !mClosed;
@@ -117,6 +143,8 @@ public class YuvToJpegProcessor implements CaptureProcessor {
             if (processing) {
                 mProcessingImages++;
             }
+            quality = mQuality;
+            rotationDegrees = mRotationDegrees;
         }
 
         ImageProxy imageProxy = null;
@@ -143,8 +171,8 @@ public class YuvToJpegProcessor implements CaptureProcessor {
             ByteBuffer jpegBuf = jpegImage.getPlanes()[0].getBuffer();
             int initialPos = jpegBuf.position();
             OutputStream os = new ExifOutputStream(new ByteBufferOutputStream(jpegBuf),
-                    getExifData(imageProxy));
-            yuvImage.compressToJpeg(imageRect, mQuality, os);
+                    ExifData.create(imageProxy, rotationDegrees));
+            yuvImage.compressToJpeg(imageRect, quality, os);
 
             // Input can now be closed.
             imageProxy.close();
@@ -178,9 +206,12 @@ public class YuvToJpegProcessor implements CaptureProcessor {
             }
         } finally {
             boolean shouldCloseImageWriter;
+            CallbackToFutureAdapter.Completer<Void> closeCompleter;
+
             synchronized (mLock) {
                 // Note: order of condition is important here due to short circuit of &&
                 shouldCloseImageWriter = processing && (mProcessingImages-- == 0) && mClosed;
+                closeCompleter = mCloseCompleter;
             }
 
             // Fallback in case something went wrong during processing.
@@ -194,6 +225,11 @@ public class YuvToJpegProcessor implements CaptureProcessor {
             if (shouldCloseImageWriter) {
                 imageWriter.close();
                 Logger.d(TAG, "Closed after completion of last image processed.");
+
+                if (closeCompleter != null) {
+                    // Notify listeners of close
+                    closeCompleter.set(null);
+                }
             }
         }
     }
@@ -204,69 +240,66 @@ public class YuvToJpegProcessor implements CaptureProcessor {
      * This should only be called once no more images will be produced for processing. Otherwise
      * the images may not be propagated to the output surface and the pipeline could stall.
      */
+    @Override
     public void close() {
+        CallbackToFutureAdapter.Completer<Void> closeCompleter = null;
+
         synchronized (mLock) {
-            if (!mClosed) {
-                mClosed = true;
-                // Close the ImageWriter if no images are currently processing. Otherwise the
-                // ImageWriter will be closed once the last image is closed.
-                if (mProcessingImages == 0 && mImageWriter != null) {
-                    Logger.d(TAG, "No processing in progress. Closing immediately.");
-                    mImageWriter.close();
-                } else {
-                    Logger.d(TAG, "close() called while processing. Will close after completion.");
-                }
+            if (mClosed) {
+                return;
+            }
+
+            mClosed = true;
+            // Close the ImageWriter if no images are currently processing. Otherwise the
+            // ImageWriter will be closed once the last image is closed.
+            if (mProcessingImages == 0 && mImageWriter != null) {
+                Logger.d(TAG, "No processing in progress. Closing immediately.");
+                mImageWriter.close();
+                closeCompleter = mCloseCompleter;
+            } else {
+                Logger.d(TAG, "close() called while processing. Will close after completion.");
             }
         }
+
+        if (closeCompleter != null) {
+            closeCompleter.set(null);
+        }
+    }
+
+    /**
+     * Returns a future that will complete when the YuvToJpegProcessor is actually closed.
+     *
+     * @return A future that signals when the YuvToJpegProcessor is actually closed
+     * (after all processing). Cancelling this future has no effect.
+     */
+    @NonNull
+    @Override
+    public ListenableFuture<Void> getCloseFuture() {
+        ListenableFuture<Void> closeFuture;
+        synchronized (mLock) {
+            if (mClosed && mProcessingImages == 0) {
+                // Everything should be closed. Return immediate future.
+                closeFuture = Futures.immediateFuture(null);
+            } else {
+                if (mCloseFuture == null) {
+                    mCloseFuture = CallbackToFutureAdapter.getFuture(completer -> {
+                        // Should already be locked, but lock again to satisfy linter.
+                        synchronized (mLock) {
+                            mCloseCompleter = completer;
+                        }
+                        return "YuvToJpegProcessor-close";
+                    });
+                }
+                closeFuture = Futures.nonCancellationPropagating(mCloseFuture);
+            }
+        }
+        return closeFuture;
     }
 
     @Override
     public void onResolutionUpdate(@NonNull Size size) {
         synchronized (mLock) {
             mImageRect = new Rect(0, 0, size.getWidth(), size.getHeight());
-        }
-    }
-
-    @NonNull
-    private static ExifData getExifData(@NonNull ImageProxy imageProxy) {
-        ExifData.Builder builder = ExifData.builderForDevice();
-        imageProxy.getImageInfo().populateExifData(builder);
-        return builder.setImageWidth(imageProxy.getWidth())
-                .setImageHeight(imageProxy.getHeight())
-                .build();
-    }
-
-    private static final class ByteBufferOutputStream extends OutputStream {
-
-        private final ByteBuffer mByteBuffer;
-
-        ByteBufferOutputStream(@NonNull ByteBuffer buf) {
-            mByteBuffer = buf;
-        }
-
-        @Override
-        public void write(int b) throws IOException {
-            if (!mByteBuffer.hasRemaining()) {
-                throw new EOFException("Output ByteBuffer has no bytes remaining.");
-            }
-
-            mByteBuffer.put((byte) b);
-        }
-
-        @Override
-        public void write(byte[] b, int off, int len) throws IOException {
-            if (b == null) {
-                throw new NullPointerException();
-            } else if ((off < 0) || (off > b.length) || (len < 0)
-                    || ((off + len) > b.length) || ((off + len) < 0)) {
-                throw new IndexOutOfBoundsException();
-            } else if (len == 0) {
-                return;
-            } else if (mByteBuffer.remaining() < len) {
-                throw new EOFException("Output ByteBuffer has insufficient bytes remaining.");
-            }
-
-            mByteBuffer.put(b, off, len);
         }
     }
 }

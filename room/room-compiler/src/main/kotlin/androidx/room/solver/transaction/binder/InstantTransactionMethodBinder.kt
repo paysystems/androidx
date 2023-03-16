@@ -16,8 +16,8 @@
 
 package androidx.room.solver.transaction.binder
 
-import androidx.room.ext.N
 import androidx.room.compiler.processing.XType
+import androidx.room.ext.N
 import androidx.room.ext.isNotVoid
 import androidx.room.solver.CodeGenScope
 import androidx.room.solver.transaction.result.TransactionMethodAdapter
@@ -49,7 +49,7 @@ class InstantTransactionMethodBinder(
                 }
 
                 val adapterScope = scope.fork()
-                adapter.createDelegateToSuperStatement(
+                adapter.createDelegateToSuperCode(
                     returnType = returnType,
                     parameterNames = parameterNames,
                     daoName = daoName,
@@ -57,7 +57,7 @@ class InstantTransactionMethodBinder(
                     resultVar = resultVar,
                     scope = adapterScope
                 )
-                add(adapterScope.generate())
+                addStatement(adapterScope.builder().build())
 
                 addStatement("$N.setTransactionSuccessful()", dbField)
                 if (returnsValue) {

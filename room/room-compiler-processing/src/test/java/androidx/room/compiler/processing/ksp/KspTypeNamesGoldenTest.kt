@@ -54,7 +54,7 @@ class KspTypeNamesGoldenTest {
             fun XExecutableElement.createNewUniqueKey(
                 owner: String
             ): String {
-                val prefix = this.enclosingElement.className.canonicalName()
+                val prefix = this.closestMemberContainer.className.canonicalName()
                 val jvmName = if (this is XMethodElement) {
                     jvmName
                 } else {
@@ -92,9 +92,10 @@ class KspTypeNamesGoldenTest {
                     }
                     .forEach { method ->
                         val testKey = method.createNewUniqueKey(klass.qualifiedName)
+                        val methodType = method.asMemberOf(klass.type)
                         val types = listOf(
-                            method.returnType
-                        ) + method.parameters.map { it.type }
+                            methodType.returnType
+                        ) + methodType.parameterTypes
                         output[testKey] = types.map {
                             it.typeName
                         }
@@ -406,6 +407,8 @@ class KspTypeNamesGoldenTest {
                 var tListProp: List<T>
                 var definedProp: Number
                 var definedPropList: List<Number>
+                var definedPropFinal: String
+                var definedPropListFinal: List<String>
                 fun receiveReturnT(t: T): T
                 suspend fun suspendReceiveReturnT(t:T):T
                 fun receiveReturnTList(t:List<T>): List<T>
@@ -414,6 +417,11 @@ class KspTypeNamesGoldenTest {
                 suspend fun suspendReceiveReturnTOverridden(t:T):T
                 fun receiveReturnTListOverridden(t:List<T>): List<T>
                 suspend fun suspendReceiveReturnTListOverridden(t:List<T>): List<T>
+                // b/217210973
+                suspend fun suspendDefinedTypesFinal(objList: List<Long>): List<Long>
+                suspend fun suspendDefinedTypesOpen(objList: List<Number>): List<Number>
+                suspend fun suspendDefinedTypesFinal2(objList: List<List<Long>>): List<List<Long>>
+                suspend fun suspendDefinedTypesOpen2(objList: List<List<Number>>): List<List<Number>>
             }
         """.trimIndent()
 

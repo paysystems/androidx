@@ -22,6 +22,7 @@ import androidx.car.app.Screen;
 import androidx.car.app.model.Action;
 import androidx.car.app.model.PlaceListMapTemplate;
 import androidx.car.app.model.Template;
+import androidx.car.app.sample.showcase.common.R;
 import androidx.car.app.sample.showcase.common.common.SamplePlaces;
 
 /** Creates a screen using the {@link PlaceListMapTemplate} */
@@ -37,8 +38,8 @@ public final class PlaceListTemplateDemoScreen extends Screen {
     @Override
     public Template onGetTemplate() {
         return new PlaceListMapTemplate.Builder()
-                .setItemList(mPlaces.getPlaceList())
-                .setTitle("Place List Template Demo")
+                .setItemList(mPlaces.getPlaceList(/* randomOrder =*/false))
+                .setTitle(getCarContext().getString(R.string.place_list_template_demo_title))
                 .setHeaderAction(Action.BACK)
                 .build();
     }

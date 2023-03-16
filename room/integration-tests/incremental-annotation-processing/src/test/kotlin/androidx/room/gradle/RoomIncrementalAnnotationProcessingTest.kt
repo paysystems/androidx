@@ -110,7 +110,7 @@ class RoomIncrementalAnnotationProcessingTest(
      * prebuilts (SNAPSHOT).
      */
     private val roomVersion by lazy {
-        val metadataFile = File(projectSetup.props.localSupportRepo).resolve(
+        val metadataFile = File(projectSetup.props.tipOfTreeMavenRepoPath).resolve(
             "androidx/room/room-compiler/maven-metadata.xml"
         )
         check(metadataFile.exists()) {
@@ -157,7 +157,7 @@ class RoomIncrementalAnnotationProcessingTest(
                 projectSetup.props.kspVersion
 
         // copy test project
-        File("src/test/data/simple-project").copyRecursively(projectRoot)
+        File("src/test/test-data/simple-project").copyRecursively(projectRoot)
 
         if (useKsp) {
             // add a kotlin file to trigger kotlin compilation
@@ -281,7 +281,8 @@ class RoomIncrementalAnnotationProcessingTest(
     private fun runGradleTasks(vararg args: String): BuildResult {
         return GradleRunner.create()
             .withProjectDir(projectSetup.rootDir)
-            .withArguments(*args)
+            // workaround for b/231154556
+            .withArguments("-Dorg.gradle.jvmargs=-Xmx1g -XX:MaxMetaspaceSize=512m", *args)
             .build()
     }
 

@@ -22,6 +22,7 @@ import android.transition.TransitionSet
 import android.view.View
 import android.widget.TextView
 import androidx.annotation.LayoutRes
+import androidx.annotation.RequiresApi
 import androidx.core.app.SharedElementCallback
 import androidx.fragment.app.test.FragmentTestActivity
 import androidx.fragment.test.R
@@ -34,6 +35,7 @@ import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.testutils.waitForExecution
 import androidx.testutils.withActivity
+import androidx.testutils.withUse
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import org.junit.After
@@ -1255,7 +1257,7 @@ class FragmentTransitionTest(
 
     @Test
     fun ignoreWhenViewNotAttached() {
-        with(ActivityScenario.launch(AddTransitionFragmentInActivity::class.java)) {
+       withUse(ActivityScenario.launch(AddTransitionFragmentInActivity::class.java)) {
             val fragment = withActivity { fragment }
             assertThat(fragment.calledOnResume).isTrue()
         }
@@ -1265,7 +1267,7 @@ class FragmentTransitionTest(
     fun testPopRemoveWithHide() {
         // The StrictViewFragment runs the appropriate checks to make sure
         // we're moving through the states appropriately
-        with(ActivityScenario.launch(FragmentTestActivity::class.java)) {
+       withUse(ActivityScenario.launch(FragmentTestActivity::class.java)) {
             val fm = withActivity { supportFragmentManager }
 
             val fragment1 = TransitionFragment()
@@ -1679,6 +1681,7 @@ class FragmentTransitionTest(
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.LOLLIPOP)
 class AddTransitionFragmentInActivity : FragmentActivity() {
     val fragment = TransitionFragment()
 
