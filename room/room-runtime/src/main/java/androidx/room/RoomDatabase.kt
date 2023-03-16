@@ -713,6 +713,7 @@ abstract class RoomDatabase {
         private var journalMode: JournalMode = JournalMode.AUTOMATIC
         private var multiInstanceInvalidationIntent: Intent? = null
         private var requireMigration: Boolean = true
+        private var createTables: Boolean = true
         private var allowDestructiveMigrationOnDowngrade = false
         private var autoCloseTimeout = -1L
         private var autoCloseTimeUnit: TimeUnit? = null
@@ -1117,6 +1118,10 @@ abstract class RoomDatabase {
             this.allowDestructiveMigrationOnDowngrade = true
         }
 
+        open fun skipTablesCreation() = apply {
+            createTables = false
+        }
+
         /**
          * Allows Room to destructively recreate database tables if [Migration]s are not
          * available when downgrading to old schema versions.
@@ -1344,6 +1349,7 @@ abstract class RoomDatabase {
                 requireNotNull(transactionExecutor),
                 multiInstanceInvalidationIntent,
                 requireMigration,
+                createTables,
                 allowDestructiveMigrationOnDowngrade,
                 migrationsNotRequiredFrom,
                 copyFromAssetPath,
@@ -1487,7 +1493,7 @@ abstract class RoomDatabase {
     abstract class Callback {
         /**
          * Called when the database is created for the first time. This is called after all the
-         * tables are created.
+         * tables are created. If tables creation is skipped, this is called immediately.
          *
          * @param db The database.
          */

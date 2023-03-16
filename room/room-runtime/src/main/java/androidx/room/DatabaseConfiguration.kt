@@ -99,6 +99,9 @@ constructor(
     val requireMigration: Boolean,
 
     @JvmField
+    val createTables: Boolean,
+
+    @JvmField
     val allowDestructiveMigrationOnDowngrade: Boolean,
 
     private val migrationNotRequiredFrom: Set<Int>?,
@@ -165,6 +168,7 @@ constructor(
         journalMode: RoomDatabase.JournalMode,
         queryExecutor: Executor,
         requireMigration: Boolean,
+        createTables: Boolean,
         migrationNotRequiredFrom: Set<Int>?
     ) : this(
         context = context,
@@ -179,6 +183,7 @@ constructor(
         multiInstanceInvalidationServiceIntent = null,
         allowDestructiveMigrationOnDowngrade = false,
         requireMigration = requireMigration,
+        createTables = createTables,
         migrationNotRequiredFrom = migrationNotRequiredFrom,
         copyFromAssetPath = null,
         copyFromFile = null,
@@ -230,6 +235,7 @@ constructor(
         transactionExecutor: Executor,
         multiInstanceInvalidation: Boolean,
         requireMigration: Boolean,
+        createTables: Boolean,
         allowDestructiveMigrationOnDowngrade: Boolean,
         migrationNotRequiredFrom: Set<Int>?
     ) : this(
@@ -248,6 +254,7 @@ constructor(
         ) else null,
         allowDestructiveMigrationOnDowngrade = allowDestructiveMigrationOnDowngrade,
         requireMigration = requireMigration,
+        createTables = createTables,
         migrationNotRequiredFrom = migrationNotRequiredFrom,
         copyFromAssetPath = null,
         copyFromFile = null,
@@ -301,6 +308,7 @@ constructor(
         transactionExecutor: Executor,
         multiInstanceInvalidation: Boolean,
         requireMigration: Boolean,
+        createTables: Boolean,
         allowDestructiveMigrationOnDowngrade: Boolean,
         migrationNotRequiredFrom: Set<Int>?,
         copyFromAssetPath: String?,
@@ -321,6 +329,7 @@ constructor(
         ) else null,
         allowDestructiveMigrationOnDowngrade = allowDestructiveMigrationOnDowngrade,
         requireMigration = requireMigration,
+        createTables = createTables,
         migrationNotRequiredFrom = migrationNotRequiredFrom,
         copyFromAssetPath = copyFromAssetPath,
         copyFromFile = copyFromFile,
@@ -376,6 +385,7 @@ constructor(
         transactionExecutor: Executor,
         multiInstanceInvalidation: Boolean,
         requireMigration: Boolean,
+        createTables: Boolean,
         allowDestructiveMigrationOnDowngrade: Boolean,
         migrationNotRequiredFrom: Set<Int>?,
         copyFromAssetPath: String?,
@@ -397,6 +407,7 @@ constructor(
         ) else null,
         allowDestructiveMigrationOnDowngrade = allowDestructiveMigrationOnDowngrade,
         requireMigration = requireMigration,
+        createTables = createTables,
         migrationNotRequiredFrom = migrationNotRequiredFrom,
         copyFromAssetPath = copyFromAssetPath,
         copyFromFile = copyFromFile,
@@ -454,6 +465,7 @@ constructor(
         transactionExecutor: Executor,
         multiInstanceInvalidation: Boolean,
         requireMigration: Boolean,
+        createTables: Boolean,
         allowDestructiveMigrationOnDowngrade: Boolean,
         migrationNotRequiredFrom: Set<Int>?,
         copyFromAssetPath: String?,
@@ -476,6 +488,7 @@ constructor(
         ) else null,
         allowDestructiveMigrationOnDowngrade = allowDestructiveMigrationOnDowngrade,
         requireMigration = requireMigration,
+        createTables = createTables,
         migrationNotRequiredFrom = migrationNotRequiredFrom,
         copyFromAssetPath = copyFromAssetPath,
         copyFromFile = copyFromFile,
@@ -534,6 +547,7 @@ constructor(
         transactionExecutor: Executor,
         multiInstanceInvalidation: Boolean,
         requireMigration: Boolean,
+        createTables: Boolean,
         allowDestructiveMigrationOnDowngrade: Boolean,
         migrationNotRequiredFrom: Set<Int>?,
         copyFromAssetPath: String?,
@@ -557,6 +571,7 @@ constructor(
         ) else null,
         allowDestructiveMigrationOnDowngrade = allowDestructiveMigrationOnDowngrade,
         requireMigration = requireMigration,
+        createTables = createTables,
         migrationNotRequiredFrom = migrationNotRequiredFrom,
         copyFromAssetPath = copyFromAssetPath,
         copyFromFile = copyFromFile,
@@ -616,6 +631,7 @@ constructor(
         transactionExecutor: Executor,
         multiInstanceInvalidation: Boolean,
         requireMigration: Boolean,
+        createTables: Boolean,
         allowDestructiveMigrationOnDowngrade: Boolean,
         migrationNotRequiredFrom: Set<Int>?,
         copyFromAssetPath: String?,
@@ -640,6 +656,7 @@ constructor(
         ) else null,
         allowDestructiveMigrationOnDowngrade = allowDestructiveMigrationOnDowngrade,
         requireMigration = requireMigration,
+        createTables = createTables,
         migrationNotRequiredFrom = migrationNotRequiredFrom,
         copyFromAssetPath = copyFromAssetPath,
         copyFromFile = copyFromFile,
