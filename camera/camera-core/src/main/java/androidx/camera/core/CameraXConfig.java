@@ -109,6 +109,11 @@ public final class CameraXConfig implements TargetConfig<CameraX> {
                     "camerax.core.appConfig.availableCamerasLimiter",
                     CameraSelector.class);
 
+    static final Option<Long> OPTION_CAMERA_OPEN_RETRY_MAX_TIMEOUT_IN_MILLIS_WHILE_OCCUPIED =
+            Option.create(
+                    "camerax.core.appConfig.cameraOpenRetryMaxTimeoutInMsWhileOccupied",
+                    long.class);
+
     // *********************************************************************************************
 
     private final OptionsBundle mConfig;
@@ -120,7 +125,6 @@ public final class CameraXConfig implements TargetConfig<CameraX> {
     /**
      * Returns the {@link CameraFactory} implementation for the application.
      *
-     * @hide
      */
     @RestrictTo(Scope.LIBRARY_GROUP)
     @Nullable
@@ -132,7 +136,6 @@ public final class CameraXConfig implements TargetConfig<CameraX> {
     /**
      * Returns the {@link CameraDeviceSurfaceManager} implementation for the application.
      *
-     * @hide
      */
     @RestrictTo(Scope.LIBRARY_GROUP)
     @Nullable
@@ -146,7 +149,6 @@ public final class CameraXConfig implements TargetConfig<CameraX> {
      *
      * <p>This factory should produce all default configurations for the application's use cases.
      *
-     * @hide
      */
     @RestrictTo(Scope.LIBRARY_GROUP)
     @Nullable
@@ -194,7 +196,17 @@ public final class CameraXConfig implements TargetConfig<CameraX> {
         return mConfig.retrieveOption(OPTION_AVAILABLE_CAMERAS_LIMITER, valueIfMissing);
     }
 
-    /** @hide */
+    /**
+     * Returns the camera open retry maximum timeout in milliseconds.
+     *
+     * @see Builder#setCameraOpenRetryMaxTimeoutInMsWhileOccupied(long)
+     */
+    @RestrictTo(Scope.LIBRARY_GROUP)
+    public long getCameraOpenRetryMaxTimeoutInMsWhileOccupied(long valueIfMissing) {
+        return mConfig.retrieveOption(OPTION_CAMERA_OPEN_RETRY_MAX_TIMEOUT_IN_MILLIS_WHILE_OCCUPIED,
+                valueIfMissing);
+    }
+
     @RestrictTo(Scope.LIBRARY_GROUP)
     @NonNull
     @Override
@@ -212,7 +224,6 @@ public final class CameraXConfig implements TargetConfig<CameraX> {
         /**
          * Creates a new Builder object.
          *
-         * @hide
          */
         @RestrictTo(Scope.LIBRARY_GROUP)
         public Builder() {
@@ -249,7 +260,6 @@ public final class CameraXConfig implements TargetConfig<CameraX> {
         /**
          * Sets the {@link CameraFactory} implementation for the application.
          *
-         * @hide
          */
         @RestrictTo(Scope.LIBRARY_GROUP)
         @NonNull
@@ -261,7 +271,6 @@ public final class CameraXConfig implements TargetConfig<CameraX> {
         /**
          * Sets the {@link CameraDeviceSurfaceManager} implementation for the application.
          *
-         * @hide
          */
         @RestrictTo(Scope.LIBRARY_GROUP)
         @NonNull
@@ -278,7 +287,6 @@ public final class CameraXConfig implements TargetConfig<CameraX> {
          * <p>This factory should produce all default configurations for the application's use
          * cases.
          *
-         * @hide
          */
         @RestrictTo(Scope.LIBRARY_GROUP)
         @NonNull
@@ -372,6 +380,20 @@ public final class CameraXConfig implements TargetConfig<CameraX> {
             return this;
         }
 
+        /**
+         * Sets the camera open retry maximum timeout in milliseconds.
+         *
+         * By default, the retry maximum timeout is 30 minutes when in active resume mode.
+         *
+         */
+        @RestrictTo(Scope.LIBRARY_GROUP)
+        @NonNull
+        public Builder setCameraOpenRetryMaxTimeoutInMsWhileOccupied(long valueIfMissing) {
+            getMutableConfig().insertOption(
+                    OPTION_CAMERA_OPEN_RETRY_MAX_TIMEOUT_IN_MILLIS_WHILE_OCCUPIED, valueIfMissing);
+            return this;
+        }
+
         @NonNull
         private MutableConfig getMutableConfig() {
             return mMutableConfig;
@@ -389,7 +411,6 @@ public final class CameraXConfig implements TargetConfig<CameraX> {
 
         // Implementations of TargetConfig.Builder default methods
 
-        /** @hide */
         @RestrictTo(Scope.LIBRARY_GROUP)
         @Override
         @NonNull
@@ -405,7 +426,6 @@ public final class CameraXConfig implements TargetConfig<CameraX> {
             return this;
         }
 
-        /** @hide */
         @RestrictTo(Scope.LIBRARY_GROUP)
         @Override
         @NonNull

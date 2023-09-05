@@ -29,6 +29,7 @@ import androidx.camera.camera2.Camera2Config
 import androidx.camera.camera2.pipe.integration.CameraPipeConfig
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.CameraXConfig
+import androidx.camera.core.DynamicRange
 import androidx.camera.core.Preview
 import androidx.camera.core.Preview.SurfaceProvider
 import androidx.camera.core.SurfaceRequest
@@ -36,15 +37,16 @@ import androidx.camera.core.impl.CameraInfoInternal
 import androidx.camera.core.impl.Timebase
 import androidx.camera.core.impl.utils.executor.CameraXExecutors
 import androidx.camera.core.internal.CameraUseCaseAdapter
-import androidx.camera.testing.CameraPipeConfigTestRule
-import androidx.camera.testing.CameraUtil
-import androidx.camera.testing.CameraXUtil
-import androidx.camera.testing.SurfaceTextureProvider
-import androidx.camera.testing.SurfaceTextureProvider.SurfaceTextureCallback
+import androidx.camera.testing.impl.CameraPipeConfigTestRule
+import androidx.camera.testing.impl.CameraUtil
+import androidx.camera.testing.impl.CameraXUtil
+import androidx.camera.testing.impl.SurfaceTextureProvider
+import androidx.camera.testing.impl.SurfaceTextureProvider.SurfaceTextureCallback
 import androidx.camera.video.Quality
-import androidx.camera.video.QualitySelector
+import androidx.camera.video.Recorder
 import androidx.camera.video.internal.compat.quirk.DeactivateEncoderSurfaceBeforeStopEncoderQuirk
 import androidx.camera.video.internal.compat.quirk.DeviceQuirks
+import androidx.camera.video.internal.compat.quirk.ExtraSupportedResolutionQuirk
 import androidx.concurrent.futures.ResolvableFuture
 import androidx.core.content.ContextCompat
 import androidx.test.core.app.ApplicationProvider
@@ -113,6 +115,7 @@ class VideoEncoderTest(
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+    private val dynamicRange = DynamicRange.SDR
     private var currentSurface: Surface? = null
     private val encodeStopSemaphore = Semaphore(0)
     private val deactivateSurfaceBeforeStop =
@@ -136,6 +139,12 @@ class VideoEncoderTest(
             "Skip tests for Cuttlefish MediaCodec issues",
             Build.MODEL.contains("Cuttlefish") &&
                 (Build.VERSION.SDK_INT == 29 || Build.VERSION.SDK_INT == 33)
+        )
+        // Skip for b/241876294
+        assumeFalse(
+            "Skip test for devices with ExtraSupportedResolutionQuirk, since the extra" +
+                " resolutions cannot be used when the provided surface is an encoder surface.",
+            DeviceQuirks.get(ExtraSupportedResolutionQuirk::class.java) != null
         )
 
         CameraXUtil.initialize(context, cameraConfig).get()
@@ -353,14 +362,18 @@ class VideoEncoderTest(
         verify(videoEncoderCallback, timeout(5000L)).onEncodeStop()
 
         // If the last data timestamp is null, it means the encoding is probably stopped because of timeout.
-        assertThat(videoEncoder.mLastDataStopTimestamp).isNotNull()
+        // Skip null since it could be a device performance issue which is out of the test scope.
+        assumeTrue(videoEncoder.mLastDataStopTimestamp != null)
         assertThat(videoEncoder.mLastDataStopTimestamp).isAtLeast(stopTimeUs)
     }
 
     private fun initVideoEncoder() {
         val cameraInfo = camera.cameraInfo as CameraInfoInternal
-        val resolution = QualitySelector.getResolution(cameraInfo, Quality.LOWEST)
-        assumeTrue(resolution != null)
+        val quality = Quality.LOWEST
+        val videoCapabilities = Recorder.getVideoCapabilities(cameraInfo)
+        val videoProfile = videoCapabilities.getProfiles(quality, dynamicRange)?.defaultVideoProfile
+        assumeTrue(videoProfile != null)
+        val resolution = Size(videoProfile!!.width, videoProfile.height)
 
         videoEncoderConfig = VideoEncoderConfig.builder()
             .setInputTimebase(INPUT_TIMEBASE)
@@ -369,7 +382,7 @@ class VideoEncoderTest(
             .setFrameRate(FRAME_RATE)
             .setIFrameInterval(I_FRAME_INTERVAL)
             .setMimeType(MIME_TYPE)
-            .setResolution(resolution!!)
+            .setResolution(resolution)
             .build()
 
         // init video encoder

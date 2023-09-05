@@ -25,6 +25,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import android.app.PendingIntent;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Build;
@@ -41,6 +42,8 @@ import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
 import org.robolectric.annotation.internal.DoNotInstrument;
+
+import java.util.Locale;
 
 /**
  * Tests for CustomTabsIntent.
@@ -157,7 +160,7 @@ public class CustomTabsIntentTest {
     }
 
     @Test
-    public void testActivityInitialFixedResizeBehavior() {
+    public void testActivityInitialFixedHeightResizeBehavior() {
         int heightFixedResizeBehavior = CustomTabsIntent.ACTIVITY_HEIGHT_FIXED;
         int initialActivityHeight = 200;
 
@@ -166,9 +169,10 @@ public class CustomTabsIntentTest {
                 .build()
                 .intent;
 
-        assertEquals("The value of EXTRA_ACTIVITY_FIXED_HEIGHT should be ACTIVITY_HEIGHT_FIXED.",
+        assertEquals("The value of EXTRA_ACTIVITY_HEIGHT_RESIZE_BEHAVIOR should be "
+                        + "ACTIVITY_HEIGHT_FIXED.",
                 heightFixedResizeBehavior,
-                intent.getIntExtra(CustomTabsIntent.EXTRA_ACTIVITY_RESIZE_BEHAVIOR,
+                intent.getIntExtra(CustomTabsIntent.EXTRA_ACTIVITY_HEIGHT_RESIZE_BEHAVIOR,
                         CustomTabsIntent.ACTIVITY_HEIGHT_DEFAULT));
         assertEquals("The height should be the same as the one that was set.",
                 initialActivityHeight,
@@ -182,7 +186,7 @@ public class CustomTabsIntentTest {
     }
 
     @Test
-    public void testActivityInitialAdjustableResizeBehavior() {
+    public void testActivityInitialAdjustableHeightResizeBehavior() {
         int heightAdjustableResizeBehavior = CustomTabsIntent.ACTIVITY_HEIGHT_ADJUSTABLE;
         int initialActivityHeight = 200;
 
@@ -191,10 +195,10 @@ public class CustomTabsIntentTest {
                 .build()
                 .intent;
 
-        assertEquals("The value of EXTRA_ACTIVITY_FIXED_HEIGHT should be "
+        assertEquals("The value of EXTRA_ACTIVITY_HEIGHT_RESIZE_BEHAVIOR should be "
                         + "ACTIVITY_HEIGHT_ADJUSTABLE.",
                 heightAdjustableResizeBehavior,
-                intent.getIntExtra(CustomTabsIntent.EXTRA_ACTIVITY_RESIZE_BEHAVIOR,
+                intent.getIntExtra(CustomTabsIntent.EXTRA_ACTIVITY_HEIGHT_RESIZE_BEHAVIOR,
                         CustomTabsIntent.ACTIVITY_HEIGHT_DEFAULT));
         assertEquals("The height should be the same as the one that was set.",
                 initialActivityHeight,
@@ -220,10 +224,10 @@ public class CustomTabsIntentTest {
         assertEquals("The height should be the same as the one that was set.",
                 initialActivityHeight,
                 intent.getIntExtra(CustomTabsIntent.EXTRA_INITIAL_ACTIVITY_HEIGHT_PX, 0));
-        assertEquals("The value of EXTRA_ACTIVITY_RESIZE_BEHAVIOR should be "
+        assertEquals("The value of EXTRA_ACTIVITY_HEIGHT_RESIZE_BEHAVIOR should be "
                         + "ACTIVITY_HEIGHT_DEFAULT.",
                 defaultResizeBehavior,
-                intent.getIntExtra(CustomTabsIntent.EXTRA_ACTIVITY_RESIZE_BEHAVIOR,
+                intent.getIntExtra(CustomTabsIntent.EXTRA_ACTIVITY_HEIGHT_RESIZE_BEHAVIOR,
                         CustomTabsIntent.ACTIVITY_HEIGHT_FIXED));
         assertEquals("The height returned by the getter should be the same.",
                 initialActivityHeight,
@@ -242,8 +246,8 @@ public class CustomTabsIntentTest {
 
         assertFalse("The EXTRA_INITIAL_ACTIVITY_HEIGHT_PX should not be set.",
                 intent.hasExtra(CustomTabsIntent.EXTRA_INITIAL_ACTIVITY_HEIGHT_PX));
-        assertFalse("The EXTRA_ACTIVITY_RESIZE_BEHAVIOR should not be set.",
-                intent.hasExtra(CustomTabsIntent.EXTRA_ACTIVITY_RESIZE_BEHAVIOR));
+        assertFalse("The EXTRA_ACTIVITY_HEIGHT_RESIZE_BEHAVIOR should not be set.",
+                intent.hasExtra(CustomTabsIntent.EXTRA_ACTIVITY_HEIGHT_RESIZE_BEHAVIOR));
         assertEquals("The getter should return the default value.",
                 defaultInitialActivityHeight,
                 CustomTabsIntent.getInitialActivityHeightPx(intent));
@@ -535,6 +539,99 @@ public class CustomTabsIntentTest {
 
         assertEquals(LocaleList.getAdjustedDefault().get(0).toLanguageTag(),
                 intent.getBundleExtra(Browser.EXTRA_HEADERS).getString(ACCEPT_LANGUAGE));
+    }
+
+    @Test
+    public void testBookmarksButton() {
+        Intent intent = new CustomTabsIntent.Builder().build().intent;
+        assertTrue(CustomTabsIntent.isBookmarksButtonEnabled(intent));
+
+        intent = new CustomTabsIntent.Builder().setBookmarksButtonEnabled(true).build().intent;
+        assertTrue(CustomTabsIntent.isBookmarksButtonEnabled(intent));
+
+        // Disabled only when explicitly called to disable it.
+        intent = new CustomTabsIntent.Builder().setBookmarksButtonEnabled(false).build().intent;
+        assertFalse(CustomTabsIntent.isBookmarksButtonEnabled(intent));
+    }
+
+    @Test
+    public void testDownloadButton() {
+        Intent intent = new CustomTabsIntent.Builder().build().intent;
+        assertTrue(CustomTabsIntent.isDownloadButtonEnabled(intent));
+
+        intent = new CustomTabsIntent.Builder().setDownloadButtonEnabled(true).build().intent;
+        assertTrue(CustomTabsIntent.isDownloadButtonEnabled(intent));
+
+        // Disabled only when explicitly called to disable it.
+        intent = new CustomTabsIntent.Builder().setDownloadButtonEnabled(false).build().intent;
+        assertFalse(CustomTabsIntent.isDownloadButtonEnabled(intent));
+    }
+
+    @Test
+    public void testSendToExternalDefaultHandler() {
+        Intent intent = new CustomTabsIntent.Builder().build().intent;
+        assertFalse(CustomTabsIntent.isSendToExternalDefaultHandlerEnabled(intent));
+
+        intent = new CustomTabsIntent.Builder()
+                .setSendToExternalDefaultHandlerEnabled(false).build().intent;
+        assertFalse(CustomTabsIntent.isSendToExternalDefaultHandlerEnabled(intent));
+
+        // The extra is set to true only when explicitly called to enable it.
+        intent = new CustomTabsIntent.Builder()
+                .setSendToExternalDefaultHandlerEnabled(true).build().intent;
+        assertTrue(CustomTabsIntent.isSendToExternalDefaultHandlerEnabled(intent));
+    }
+
+    @Config(minSdk = Build.VERSION_CODES.N)
+    @Test
+    public void testBackgroundInteraction() {
+        Intent intent = new CustomTabsIntent.Builder().build().intent;
+        assertTrue(CustomTabsIntent.isBackgroundInteractionEnabled(intent));
+
+        intent = new CustomTabsIntent.Builder()
+                .setBackgroundInteractionEnabled(true).build().intent;
+        assertTrue(CustomTabsIntent.isBackgroundInteractionEnabled(intent));
+
+        // The extra (EXTRA_DISABLE_BACKGROUND_INTERACTION) is set to true
+        // only when explicitly called to disable it.
+        intent = new CustomTabsIntent.Builder()
+                .setBackgroundInteractionEnabled(false).build().intent;
+        assertFalse(CustomTabsIntent.isBackgroundInteractionEnabled(intent));
+    }
+
+    @Test
+    public void testShowOnToolbar() {
+        Intent intent = new CustomTabsIntent.Builder().build().intent;
+        assertFalse(CustomTabsIntent.isShowOnToolbarEnabled(intent));
+
+        intent = new CustomTabsIntent.Builder().setShowOnToolbarEnabled(false).build().intent;
+        assertFalse(CustomTabsIntent.isShowOnToolbarEnabled(intent));
+
+        // The extra is set to true only when explicitly called to enable it.
+        intent = new CustomTabsIntent.Builder().setShowOnToolbarEnabled(true).build().intent;
+        assertTrue(CustomTabsIntent.isShowOnToolbarEnabled(intent));
+    }
+
+    @Config(minSdk = Build.VERSION_CODES.N)
+    @Test
+    public void testTranslateLocale() {
+        Intent intent = new CustomTabsIntent.Builder().build().intent;
+        assertNull(CustomTabsIntent.getTranslateLocale(intent));
+
+        intent = new CustomTabsIntent.Builder().setTranslateLocale(Locale.FRANCE).build().intent;
+        Locale locale = CustomTabsIntent.getTranslateLocale(intent);
+        assertEquals(locale.toLanguageTag(), Locale.FRANCE.toLanguageTag());
+    }
+
+    @Config(minSdk = Build.VERSION_CODES.N)
+    @Test
+    public void testSecondaryToolbarSwipeUpGesture() {
+        PendingIntent pendingIntent = TestUtil.makeMockPendingIntent();
+        Intent intent = new CustomTabsIntent.Builder()
+                .setSecondaryToolbarSwipeUpGesture(pendingIntent)
+                .build()
+                .intent;
+        assertEquals(pendingIntent, CustomTabsIntent.getSecondaryToolbarSwipeUpGesture(intent));
     }
 
     private void assertNullSessionInExtras(Intent intent) {

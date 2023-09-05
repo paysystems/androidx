@@ -16,12 +16,16 @@
 
 package androidx.compose.foundation
 
+import androidx.compose.animation.core.DecayAnimationSpec
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.rememberSplineBasedDecay
+import androidx.compose.foundation.gestures.DefaultFlingBehavior
 import androidx.compose.foundation.gestures.FlingBehavior
 import androidx.compose.foundation.gestures.ModifierLocalScrollableContainer
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.ScrollScope
+import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.gestures.ScrollableState
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -31,10 +35,15 @@ import androidx.compose.foundation.interaction.Interaction
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -45,9 +54,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.testutils.first
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.focus.FocusRequester
@@ -55,14 +66,17 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollDispatcher
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.input.pointer.util.VelocityTrackerAddPointsFix
 import androidx.compose.ui.materialize
 import androidx.compose.ui.modifier.ModifierLocalConsumer
 import androidx.compose.ui.modifier.ModifierLocalReadScope
@@ -78,8 +92,11 @@ import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeLeft
@@ -100,14 +117,17 @@ import androidx.test.filters.LargeTest
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import kotlin.math.abs
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.hamcrest.CoreMatchers.allOf
 import org.hamcrest.CoreMatchers.instanceOf
 import org.junit.After
+import org.junit.Assert
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -229,6 +249,87 @@ class ScrollableTest {
         }
         rule.runOnIdle {
             assertThat(total).isLessThan(0.01f)
+        }
+    }
+
+    /*
+     * Note: For keyboard scrolling to work (that is, scrolling based on the page up/down keys),
+     * at least one child within the scrollable must be focusable. (This matches the behavior in
+     * Views.)
+     */
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun scrollable_horizontalScroll_keyboardPageUpAndDown() {
+        var scrollAmount = 0f
+
+        val scrollableState = ScrollableState(
+            consumeScrollDelta = {
+                scrollAmount += it
+                it
+            }
+        )
+
+        rule.setContent {
+            Row(
+                Modifier
+                    .fillMaxHeight()
+                    .wrapContentWidth()
+                    .background(Color.Red)
+                    .scrollable(
+                        state = scrollableState,
+                        orientation = Orientation.Horizontal
+                    )
+                    .padding(10.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .testTag(scrollableBoxTag)
+                        .width(50.dp)
+                        .background(Color.Blue)
+                        // Required for keyboard scrolling (page up/down keys) to work.
+                        .focusable()
+                        .padding(10.dp)
+                )
+
+                Spacer(modifier = Modifier.size(10.dp))
+
+                for (i in 0 until 40) {
+                    val color = if (i % 2 == 0) {
+                        Color.Yellow
+                    } else {
+                        Color.Green
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .width(50.dp)
+                            .background(color)
+                            .padding(10.dp)
+                    )
+                    Spacer(modifier = Modifier.size(10.dp))
+                }
+            }
+        }
+
+        rule.onNodeWithTag(scrollableBoxTag).requestFocus()
+        rule.onNodeWithTag(scrollableBoxTag).performKeyInput {
+            pressKey(Key.PageDown)
+        }
+
+        rule.runOnIdle {
+            assertThat(scrollAmount).isLessThan(0f)
+        }
+
+        scrollAmount = 0f
+
+        rule.onNodeWithTag(scrollableBoxTag).performKeyInput {
+            pressKey(Key.PageUp)
+        }
+
+        rule.runOnIdle {
+            assertThat(scrollAmount).isGreaterThan(0f)
         }
     }
 
@@ -409,6 +510,86 @@ class ScrollableTest {
         }
         rule.runOnIdle {
             assertThat(total).isLessThan(0.01f)
+        }
+    }
+
+    /*
+     * Note: For keyboard scrolling to work (that is, scrolling based on the page up/down keys),
+     * at least one child within the scrollable must be focusable. (This matches the behavior in
+     * Views.)
+     */
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun scrollable_verticalScroll_keyboardPageUpAndDown() {
+        var scrollAmount = 0f
+
+        val scrollableState = ScrollableState(
+            consumeScrollDelta = {
+                scrollAmount += it
+                it
+            }
+        )
+
+        rule.setContent {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(Color.Red)
+                    .scrollable(
+                        state = scrollableState,
+                        orientation = Orientation.Vertical
+                    )
+                    .padding(10.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(scrollableBoxTag)
+                        .height(50.dp)
+                        .background(Color.Blue)
+                        // Required for keyboard scrolling (page up/down keys) to work.
+                        .focusable()
+                        .padding(10.dp)
+                )
+
+                Spacer(modifier = Modifier.size(10.dp))
+
+                for (i in 0 until 40) {
+                    val color = if (i % 2 == 0) {
+                        Color.Yellow
+                    } else {
+                        Color.Green
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                            .background(color)
+                            .padding(10.dp)
+                    )
+                    Spacer(modifier = Modifier.size(10.dp))
+                }
+            }
+        }
+
+        rule.onNodeWithTag(scrollableBoxTag).requestFocus()
+        rule.onNodeWithTag(scrollableBoxTag).performKeyInput {
+            pressKey(Key.PageDown)
+        }
+
+        rule.runOnIdle {
+            assertThat(scrollAmount).isLessThan(0f)
+        }
+
+        scrollAmount = 0f
+
+        rule.onNodeWithTag(scrollableBoxTag).performKeyInput {
+            pressKey(Key.PageUp)
+        }
+
+        rule.runOnIdle {
+            assertThat(scrollAmount).isGreaterThan(0f)
         }
     }
 
@@ -793,17 +974,19 @@ class ScrollableTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun scrollable_nestedScroll_disabledForMouseWheel() {
+    fun scrollable_nestedScroll_childPartialConsumptionForMouseWheel() {
         var innerDrag = 0f
         var outerDrag = 0f
         val outerState = ScrollableState(
             consumeScrollDelta = {
+                // Since the child has already consumed half, the parent will consume the rest.
                 outerDrag += it
                 it
             }
         )
         val innerState = ScrollableState(
             consumeScrollDelta = {
+                // Child consumes half, leaving the rest for the parent to consume.
                 innerDrag += it / 2
                 it / 2
             }
@@ -837,8 +1020,96 @@ class ScrollableTest {
         }
         rule.runOnIdle {
             assertThat(innerDrag).isGreaterThan(0f)
-            assertThat(outerDrag).isZero()
+            assertThat(outerDrag).isGreaterThan(0f)
+            // Since child (inner) consumes half of the scroll, the parent (outer) consumes the
+            // remainder (which is half as well), so they will be equal.
+            assertThat(innerDrag).isEqualTo(outerDrag)
             innerDrag
+        }
+    }
+
+    /*
+     * Note: For keyboard scrolling to work (that is, scrolling based on the page up/down keys),
+     * at least one child within the scrollable must be focusable. (This matches the behavior in
+     * Views.)
+     */
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun scrollable_nestedScroll_childPartialConsumptionForKeyboardPageUpAndDown() {
+        var innerDrag = 0f
+        var outerDrag = 0f
+        val outerState = ScrollableState(
+            consumeScrollDelta = {
+                // Since the child has already consumed half, the parent will consume the rest.
+                outerDrag += it
+                it
+            }
+        )
+        val innerState = ScrollableState(
+            consumeScrollDelta = {
+                // Child consumes half, leaving the rest for the parent to consume.
+                innerDrag += it / 2
+                it / 2
+            }
+        )
+
+        rule.setContent {
+            Box {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(300.dp)
+                        .scrollable(
+                            state = outerState,
+                            orientation = Orientation.Horizontal
+                        )
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(300.dp)
+                            .scrollable(
+                                state = innerState,
+                                orientation = Orientation.Horizontal
+                            )
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .testTag(scrollableBoxTag)
+                                // Required for keyboard scrolling (page up/down keys) to work.
+                                .focusable()
+                                .size(300.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        rule.onNodeWithTag(scrollableBoxTag).requestFocus()
+        rule.onNodeWithTag(scrollableBoxTag).performKeyInput {
+            pressKey(Key.PageDown)
+        }
+
+        rule.runOnIdle {
+            assertThat(outerDrag).isLessThan(0f)
+            assertThat(innerDrag).isLessThan(0f)
+            // Since child (inner) consumes half of the scroll, the parent (outer) consumes the
+            // remainder (which is half as well), so they will be equal.
+            assertThat(innerDrag).isEqualTo(outerDrag)
+        }
+
+        outerDrag = 0f
+        innerDrag = 0f
+
+        rule.onNodeWithTag(scrollableBoxTag).performKeyInput {
+            pressKey(Key.PageUp)
+        }
+
+        rule.runOnIdle {
+            assertThat(outerDrag).isGreaterThan(0f)
+            assertThat(innerDrag).isGreaterThan(0f)
+            // Since child (inner) consumes half of the scroll, the parent (outer) consumes the
+            // remainder (which is half as well), so they will be equal.
+            assertThat(innerDrag).isEqualTo(outerDrag)
         }
     }
 
@@ -1304,6 +1575,61 @@ class ScrollableTest {
             // but allow nested scroll to propagate up correctly
             assertThat(parentValue).isGreaterThan(0f)
         }
+    }
+
+    @Test
+    fun scrollable_nestedFlingCancellation_shouldPreventDeltasFromPropagating() {
+        var childDeltas = 0f
+        var touchSlop = 0f
+        val childController = ScrollableState {
+            childDeltas += it
+            it
+        }
+        val flingCancellationParent = object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                if (source == NestedScrollSource.Fling && available != Offset.Zero) {
+                    throw CancellationException()
+                }
+                return Offset.Zero
+            }
+        }
+
+        rule.setContent {
+            touchSlop = LocalViewConfiguration.current.touchSlop
+            Box(modifier = Modifier.nestedScroll(flingCancellationParent)) {
+                Box(
+                    modifier = Modifier
+                        .size(600.dp)
+                        .testTag("childScrollable")
+                        .scrollable(childController, Orientation.Horizontal)
+                )
+            }
+        }
+
+        // First drag, this won't trigger the cancellation flow.
+        rule.onNodeWithTag("childScrollable").performTouchInput {
+            down(centerLeft)
+            moveBy(Offset(100f, 0f))
+            up()
+        }
+
+        rule.runOnIdle {
+            assertThat(childDeltas).isEqualTo(100f - touchSlop)
+        }
+
+        childDeltas = 0f
+        var dragged = 0f
+        rule.onNodeWithTag("childScrollable").performTouchInput {
+            swipeWithVelocity(centerLeft, centerRight, 2000f)
+            dragged = centerRight.x - centerLeft.x
+        }
+
+        // child didn't receive more deltas after drag, because fling was cancelled by the parent
+        assertThat(childDeltas).isEqualTo(dragged - touchSlop)
     }
 
     @Test
@@ -2154,7 +2480,8 @@ class ScrollableTest {
             consumeScrollDelta = { it }
         )
         rule.setContentAndGetScope {
-            val modifier = Modifier.scrollable(controller, Orientation.Vertical) as InspectableValue
+            val modifier =
+                Modifier.scrollable(controller, Orientation.Vertical).first() as InspectableValue
             assertThat(modifier.nameFallback).isEqualTo("scrollable")
             assertThat(modifier.valueOverride).isNull()
             assertThat(modifier.inspectableElements.map { it.name }.asIterable()).containsExactly(
@@ -2165,6 +2492,7 @@ class ScrollableTest {
                 "reverseDirection",
                 "flingBehavior",
                 "interactionSource",
+                "scrollableBringIntoViewConfig",
             )
         }
     }
@@ -2395,6 +2723,167 @@ class ScrollableTest {
         }
     }
 
+    @Test
+    fun disableSystemAnimations_defaultFlingBehaviorShouldContinueToWork() {
+
+        val controller = ScrollableState { 0f }
+        var defaultFlingBehavior: DefaultFlingBehavior? = null
+        setScrollableContent {
+            defaultFlingBehavior = ScrollableDefaults.flingBehavior() as? DefaultFlingBehavior
+            Modifier.scrollable(
+                state = controller,
+                orientation = Orientation.Horizontal,
+                flingBehavior = defaultFlingBehavior
+            )
+        }
+
+        scope.launch {
+            controller.scroll {
+                defaultFlingBehavior?.let {
+                    with(it) { performFling(1000f) }
+                }
+            }
+        }
+
+        rule.runOnIdle {
+            assertThat(defaultFlingBehavior?.lastAnimationCycleCount).isGreaterThan(1)
+        }
+
+        // Simulate turning of animation
+        scope.launch {
+            controller.scroll {
+                withContext(TestScrollMotionDurationScale(0f)) {
+                    defaultFlingBehavior?.let {
+                        with(it) { performFling(1000f) }
+                    }
+                }
+            }
+        }
+
+        rule.runOnIdle {
+            assertThat(defaultFlingBehavior?.lastAnimationCycleCount).isGreaterThan(1)
+        }
+    }
+
+    @Test
+    fun defaultFlingBehavior_useScrollMotionDurationScale() {
+
+        val controller = ScrollableState { 0f }
+        var defaultFlingBehavior: DefaultFlingBehavior? = null
+        var switchMotionDurationScale by mutableStateOf(true)
+
+        rule.setContentAndGetScope {
+            val flingSpec: DecayAnimationSpec<Float> = rememberSplineBasedDecay()
+            if (switchMotionDurationScale) {
+                defaultFlingBehavior =
+                    DefaultFlingBehavior(flingSpec, TestScrollMotionDurationScale(1f))
+                Box(
+                    modifier = Modifier
+                        .testTag(scrollableBoxTag)
+                        .size(100.dp)
+                        .scrollable(
+                            state = controller,
+                            orientation = Orientation.Horizontal,
+                            flingBehavior = defaultFlingBehavior
+                        )
+                )
+            } else {
+                defaultFlingBehavior =
+                    DefaultFlingBehavior(flingSpec, TestScrollMotionDurationScale(0f))
+                Box(
+                    modifier = Modifier
+                        .testTag(scrollableBoxTag)
+                        .size(100.dp)
+                        .scrollable(
+                            state = controller,
+                            orientation = Orientation.Horizontal,
+                            flingBehavior = defaultFlingBehavior
+                        )
+                )
+            }
+        }
+
+        scope.launch {
+            controller.scroll {
+                defaultFlingBehavior?.let {
+                    with(it) { performFling(1000f) }
+                }
+            }
+        }
+
+        rule.runOnIdle {
+            assertThat(defaultFlingBehavior?.lastAnimationCycleCount).isGreaterThan(1)
+        }
+
+        switchMotionDurationScale = false
+        rule.waitForIdle()
+
+        scope.launch {
+            controller.scroll {
+                defaultFlingBehavior?.let {
+                    with(it) { performFling(1000f) }
+                }
+            }
+        }
+
+        rule.runOnIdle {
+            assertThat(defaultFlingBehavior?.lastAnimationCycleCount).isEqualTo(1)
+        }
+    }
+
+    @Test
+    fun scrollable_noMomentum_shouldChangeScrollStateAfterRelease() {
+        val scrollState = ScrollState(0)
+        val delta = 10f
+        var touchSlop = 0f
+        setScrollableContent {
+            touchSlop = LocalViewConfiguration.current.touchSlop
+            Modifier.scrollable(scrollState, Orientation.Vertical)
+        }
+        var previousScrollValue = 0
+        rule.onNodeWithTag(scrollableBoxTag).performTouchInput {
+            down(center)
+            // generate various move events
+            repeat(30) {
+                moveBy(Offset(0f, delta), delayMillis = 8L)
+                previousScrollValue += delta.toInt()
+            }
+            // stop for a moment
+            advanceEventTime(3000L)
+            up()
+        }
+
+        rule.runOnIdle {
+            Assert.assertEquals((previousScrollValue - touchSlop).toInt(), scrollState.value)
+        }
+    }
+
+    @Test
+    fun defaultScrollableState_scrollByWithNan_shouldFilterOutNan() {
+        val controller = ScrollableState {
+            assertThat(it).isNotNaN()
+            0f
+        }
+
+        val nanGenerator = object : FlingBehavior {
+            override suspend fun ScrollScope.performFling(initialVelocity: Float): Float {
+                return scrollBy(Float.NaN)
+            }
+        }
+
+        setScrollableContent {
+            Modifier.scrollable(
+                state = controller,
+                orientation = Orientation.Horizontal,
+                flingBehavior = nanGenerator
+            )
+        }
+
+        rule.onNodeWithTag(scrollableBoxTag).performTouchInput {
+            swipeLeft()
+        }
+    }
+
     private fun setScrollableContent(scrollableModifierFactory: @Composable () -> Modifier) {
         rule.setContentAndGetScope {
             Box {
@@ -2410,38 +2899,55 @@ class ScrollableTest {
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
-private val NoOpOverscrollEffect = object : OverscrollEffect {
-
-    override fun consumePreScroll(
-        scrollDelta: Offset,
-        source: NestedScrollSource
-    ): Offset = Offset.Zero
-
-    override fun consumePostScroll(
-        initialDragDelta: Offset,
-        overscrollDelta: Offset,
-        source: NestedScrollSource
-    ) {
-    }
-
-    override suspend fun consumePreFling(velocity: Velocity): Velocity = Velocity.Zero
-
-    override suspend fun consumePostFling(velocity: Velocity) {}
-
-    override var isEnabled: Boolean = false
-
-    override val isInProgress: Boolean
-        get() = false
-
-    override val effectModifier: Modifier get() = Modifier
-}
-
 // Very low tolerance on the difference
 internal val VelocityTrackerCalculationThreshold = 1
 
 @OptIn(ExperimentalComposeUiApi::class)
 internal suspend fun savePointerInputEvents(
+    tracker: VelocityTracker,
+    pointerInputScope: PointerInputScope
+) {
+    if (VelocityTrackerAddPointsFix) {
+        savePointerInputEventsWithFix(tracker, pointerInputScope)
+    } else {
+        savePointerInputEventsLegacy(tracker, pointerInputScope)
+    }
+}
+
+@OptIn(ExperimentalComposeUiApi::class)
+internal suspend fun savePointerInputEventsWithFix(
+    tracker: VelocityTracker,
+    pointerInputScope: PointerInputScope
+) {
+    with(pointerInputScope) {
+        coroutineScope {
+            awaitPointerEventScope {
+                while (true) {
+                    var event: PointerInputChange? = awaitFirstDown()
+                    while (event != null && !event.changedToUpIgnoreConsumed()) {
+                        val currentEvent = awaitPointerEvent().changes
+                            .firstOrNull()
+
+                        if (currentEvent != null && !currentEvent.changedToUpIgnoreConsumed()) {
+                            currentEvent.historical.fastForEach {
+                                tracker.addPosition(it.uptimeMillis, it.position)
+                            }
+                            tracker.addPosition(
+                                currentEvent.uptimeMillis,
+                                currentEvent.position
+                            )
+                        }
+
+                        event = currentEvent
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalComposeUiApi::class)
+internal suspend fun savePointerInputEventsLegacy(
     tracker: VelocityTracker,
     pointerInputScope: PointerInputScope
 ) {
@@ -2455,7 +2961,7 @@ internal suspend fun savePointerInputEvents(
                         val currentEvent = awaitPointerEvent().changes
                             .firstOrNull()
 
-                        if (currentEvent != null && !currentEvent.changedToUpIgnoreConsumed()) {
+                        if (currentEvent != null) {
                             currentEvent.historical.fastForEach {
                                 tracker.addPosition(it.uptimeMillis, it.position)
                             }
@@ -2476,8 +2982,8 @@ internal fun composeViewSwipeUp() {
     onView(allOf(instanceOf(AbstractComposeView::class.java)))
         .perform(
             espressoSwipe(
-                GeneralLocation.BOTTOM_CENTER,
-                GeneralLocation.CENTER
+                GeneralLocation.CENTER,
+                GeneralLocation.TOP_CENTER
             )
         )
 }
@@ -2521,3 +3027,5 @@ private fun espressoSwipe(
         Press.FINGER
     )
 }
+
+internal class TestScrollMotionDurationScale(override val scaleFactor: Float) : MotionDurationScale

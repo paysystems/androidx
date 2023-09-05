@@ -16,6 +16,8 @@
 
 package androidx.compose.animation.demos
 
+import androidx.compose.animation.core.samples.PathEasingSample
+import androidx.compose.animation.core.samples.SeekingAnimationSample
 import androidx.compose.animation.demos.fancy.AnimatedClockDemo
 import androidx.compose.animation.demos.fancy.AnimatedDotsDemo
 import androidx.compose.animation.demos.fancy.ChatScreen
@@ -38,8 +40,17 @@ import androidx.compose.animation.demos.layoutanimation.ShrineCartDemo
 import androidx.compose.animation.demos.lookahead.AnimateBoundsModifierDemo
 import androidx.compose.animation.demos.lookahead.CraneDemo
 import androidx.compose.animation.demos.lookahead.LookaheadLayoutWithAlignmentLinesDemo
+import androidx.compose.animation.demos.lookahead.LookaheadSamplesDemo
+import androidx.compose.animation.demos.lookahead.LookaheadWithAnimatedContentSize
+import androidx.compose.animation.demos.lookahead.LookaheadWithBoxWithConstraints
+import androidx.compose.animation.demos.lookahead.LookaheadWithDisappearingMovableContentDemo
 import androidx.compose.animation.demos.lookahead.LookaheadWithFlowRowDemo
+import androidx.compose.animation.demos.lookahead.LookaheadWithIntrinsicsDemo
+import androidx.compose.animation.demos.lookahead.LookaheadWithLazyColumn
 import androidx.compose.animation.demos.lookahead.LookaheadWithMovableContentDemo
+import androidx.compose.animation.demos.lookahead.LookaheadWithScaffold
+import androidx.compose.animation.demos.lookahead.LookaheadWithSubcompose
+import androidx.compose.animation.demos.lookahead.LookaheadWithTabRowDemo
 import androidx.compose.animation.demos.lookahead.ScreenSizeChangeDemo
 import androidx.compose.animation.demos.singlevalue.SingleValueAnimationDemo
 import androidx.compose.animation.demos.statetransition.CrossfadeDemo
@@ -71,6 +82,7 @@ val AnimationDemos = DemoCategory(
             listOf(
                 ComposableDemo("Double tap to like") { DoubleTapToLikeDemo() },
                 ComposableDemo("Gesture based animation") { GestureBasedAnimationDemo() },
+                ComposableDemo("Seeking animation") { SeekingAnimationSample() },
                 ComposableDemo("Infinite transition") { InfiniteTransitionDemo() },
                 ComposableDemo("Multi-dimensional prop") { MultiDimensionalAnimationDemo() },
                 ComposableDemo("Repeating rotation") { RepeatedRotationDemo() },
@@ -105,13 +117,36 @@ val AnimationDemos = DemoCategory(
                 },
                 ComposableDemo("Crane Nested Shared Element") { CraneDemo() },
                 ComposableDemo("Screen Size Change Demo") { ScreenSizeChangeDemo() },
-                ComposableDemo("Lookahead With Movable Content") {
-                    LookaheadWithMovableContentDemo()
+                ComposableDemo("LookaheadWithAnimatedContentSize") {
+                    LookaheadWithAnimatedContentSize()
+                },
+                ComposableDemo("Lookahead Samples Demo") {
+                    LookaheadSamplesDemo()
                 },
                 ComposableDemo("Lookahead With Alignment Lines") {
                     LookaheadLayoutWithAlignmentLinesDemo()
                 },
-                ComposableDemo("Flow Row Lookahead") { LookaheadWithFlowRowDemo() },
+                ComposableDemo("Lookahead With BoxWithConstraints") {
+                    LookaheadWithBoxWithConstraints()
+                },
+                ComposableDemo("Lookahead With Subcompose") { LookaheadWithSubcompose() },
+                ComposableDemo("Lookahead With LazyColumn") { LookaheadWithLazyColumn() },
+                ComposableDemo("Lookahead With Flow Row") { LookaheadWithFlowRowDemo() },
+                ComposableDemo("Lookahead With Intrinsics") {
+                    LookaheadWithIntrinsicsDemo()
+                },
+                ComposableDemo("Lookahead With Movable Content") {
+                    LookaheadWithMovableContentDemo()
+                },
+                ComposableDemo("Lookahead With Disappearing Movable Content") {
+                    LookaheadWithDisappearingMovableContentDemo()
+                },
+                ComposableDemo("Lookahead With Tab Row") {
+                    LookaheadWithTabRowDemo()
+                },
+                ComposableDemo("Lookahead With Scaffold") {
+                    LookaheadWithScaffold()
+                },
             )
         ),
         DemoCategory(
@@ -156,6 +191,7 @@ val AnimationDemos = DemoCategory(
                 ComposableDemo("Column Arrangements Demo") { ColumnConfigurationDemo() },
                 ComposableDemo("Row Arrangements Demo (Landscape)") { RowConfigurationDemo() },
                 ComposableDemo("Easing Functions Demo") { EasingInfoDemo() },
+                ComposableDemo("Path Easing Function Demo") { PathEasingSample() },
             )
         ),
 

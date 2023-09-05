@@ -22,16 +22,21 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.media.MediaRouter2;
 import android.os.Build;
+import android.provider.Settings;
 
+import androidx.annotation.DoNotInline;
 import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
 
 import java.util.List;
 
 /**
  * Provides an utility method to show the system's output switcher dialog.
  *
- * @see <a href="https://developer.android.com/guide/topics/media/media-routing">Media Routing</a>
+ * <p>See <a href="https://developer.android.com/guide/topics/media/media-routing">the Media
+ * Routing guide</a> for more information.
  */
 public final class SystemOutputSwitcherDialogController {
 
@@ -39,11 +44,11 @@ public final class SystemOutputSwitcherDialogController {
     private static final String PACKAGE_NAME_SYSTEM_UI =
             "com.android.systemui";
 
-    /** Output switcher dialog intent action in Android S. **/
+    /** Output switcher dialog intent action in Android S. */
     private static final String OUTPUT_SWITCHER_INTENT_ACTION_ANDROID_S =
             "com.android.systemui.action.LAUNCH_MEDIA_OUTPUT_DIALOG";
 
-    /** Output switcher dialog intent action in Android R. **/
+    /** Output switcher dialog intent action in Android R. */
     private static final String OUTPUT_SWITCHER_INTENT_ACTION_ANDROID_R =
             "com.android.settings.panel.action.MEDIA_OUTPUT";
 
@@ -62,23 +67,55 @@ public final class SystemOutputSwitcherDialogController {
     /**
      * Shows the system output switcher dialog.
      *
+     * <p>The appearance and precise behaviour of the system output switcher dialog
+     * may vary across different devices, OS versions, and form factors,
+     * but the basic functionality stays the same.
+     *
+     * <p>See
+     * <a href="https://developer.android.com/guide/topics/media/media-routing#output-switcher">
+     * Output Switcher documentation</a> for more details.
+     *
      * @param context Android context
      * @return {@code true} if the dialog was shown successfully and {@code false} otherwise
      */
     public static boolean showDialog(@NonNull Context context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            return showDialogForAndroidSAndAbove(context)
+        boolean result = false;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            result = showDialogForAndroidUAndAbove(context);
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            result = showDialogForAndroidSAndT(context)
                     // The intent action and related string constants are changed in S,
                     // however they are not public API yet. Try opening the output switcher with the
                     // old constants for devices that have prior version of the constants.
                     || showDialogForAndroidR(context);
         } else if (Build.VERSION.SDK_INT == Build.VERSION_CODES.R) {
-            return showDialogForAndroidR(context);
+            result = showDialogForAndroidR(context);
         }
+
+        if (result) {
+            return true;
+        }
+
+        if (isRunningOnWear(context) && showBluetoothSettingsFragment(context)) {
+            return true;
+        }
+
         return false;
     }
 
-    private static boolean showDialogForAndroidSAndAbove(@NonNull Context context) {
+    private static boolean showDialogForAndroidUAndAbove(@NonNull Context context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            MediaRouter2 mediaRouter2 = Api30Impl.getInstance(context);
+            if (Build.VERSION.SDK_INT >= 34) {
+                return Api34Impl.showSystemOutputSwitcher(mediaRouter2);
+            }
+        }
+
+        return false;
+    }
+
+    private static boolean showDialogForAndroidSAndT(@NonNull Context context) {
         Intent intent = new Intent()
                 .setAction(OUTPUT_SWITCHER_INTENT_ACTION_ANDROID_S)
                 .setPackage(PACKAGE_NAME_SYSTEM_UI)
@@ -129,5 +166,61 @@ public final class SystemOutputSwitcherDialogController {
             }
         }
         return false;
+    }
+
+    private static boolean showBluetoothSettingsFragment(@NonNull Context context) {
+        // Wear OS specific intent. This is a default behaviour
+        // for devices without the output switcher dialog.
+        // See https://developer.android.com/training/wearables/overlays/audio.
+        Intent intent = new Intent(Settings.ACTION_BLUETOOTH_SETTINGS)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                .putExtra("EXTRA_CONNECTION_ONLY", true)
+                .putExtra("android.bluetooth.devicepicker.extra.FILTER_TYPE", 1);
+
+        PackageManager packageManager = context.getPackageManager();
+        List<ResolveInfo> resolveInfos = packageManager.queryIntentActivities(intent,
+                0 /* flags */);
+        for (ResolveInfo resolveInfo : resolveInfos) {
+            ActivityInfo activityInfo = resolveInfo.activityInfo;
+            if (activityInfo == null || activityInfo.applicationInfo == null) {
+                continue;
+            }
+            ApplicationInfo appInfo = activityInfo.applicationInfo;
+            if (((ApplicationInfo.FLAG_SYSTEM | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)
+                    & appInfo.flags) != 0) {
+                context.startActivity(intent);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isRunningOnWear(@NonNull Context context) {
+        PackageManager packageManager = context.getPackageManager();
+        return packageManager.hasSystemFeature(PackageManager.FEATURE_WATCH);
+    }
+
+    @RequiresApi(30)
+    static class Api30Impl {
+        private Api30Impl() {
+            // This class is not instantiable.
+        }
+
+        @DoNotInline
+        static MediaRouter2 getInstance(Context context) {
+            return MediaRouter2.getInstance(context);
+        }
+    }
+
+    @RequiresApi(34)
+    static class Api34Impl {
+        private Api34Impl() {
+            // This class is not instantiable.
+        }
+
+        @DoNotInline
+        static boolean showSystemOutputSwitcher(MediaRouter2 mediaRouter2) {
+            return mediaRouter2.showSystemOutputSwitcher();
+        }
     }
 }

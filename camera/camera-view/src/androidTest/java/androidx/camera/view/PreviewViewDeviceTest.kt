@@ -17,12 +17,11 @@ package androidx.camera.view
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.PixelFormat
+import android.graphics.Matrix
 import android.graphics.Rect
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.util.Size
-import android.view.Display
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.Surface
@@ -44,18 +43,15 @@ import androidx.camera.core.Preview
 import androidx.camera.core.SurfaceRequest
 import androidx.camera.core.ViewPort
 import androidx.camera.core.impl.CameraInfoInternal
-import androidx.camera.core.impl.utils.executor.CameraXExecutors
-import androidx.camera.core.impl.utils.futures.FutureCallback
 import androidx.camera.core.impl.utils.futures.Futures
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.testing.CameraPipeConfigTestRule
-import androidx.camera.testing.CameraUtil
-import androidx.camera.testing.CameraUtil.PreTestCameraIdList
-import androidx.camera.testing.CoreAppTestUtil
-import androidx.camera.testing.SurfaceFormatUtil
-import androidx.camera.testing.fakes.FakeActivity
 import androidx.camera.testing.fakes.FakeCamera
 import androidx.camera.testing.fakes.FakeCameraInfoInternal
+import androidx.camera.testing.impl.CameraPipeConfigTestRule
+import androidx.camera.testing.impl.CameraUtil
+import androidx.camera.testing.impl.CameraUtil.PreTestCameraIdList
+import androidx.camera.testing.impl.CoreAppTestUtil
+import androidx.camera.testing.impl.fakes.FakeActivity
 import androidx.camera.view.PreviewView.ImplementationMode
 import androidx.camera.view.internal.compat.quirk.DeviceQuirks
 import androidx.camera.view.internal.compat.quirk.SurfaceViewNotCroppedByParentQuirk
@@ -144,8 +140,7 @@ class PreviewViewDeviceTest(
         val fakeController: CameraController = object : CameraController(context) {
             override fun attachPreviewSurface(
                 surfaceProvider: Preview.SurfaceProvider,
-                viewPort: ViewPort,
-                display: Display
+                viewPort: ViewPort
             ) {
                 if (viewPort.scaleType == ViewPort.FIT) {
                     fitTypeSemaphore.release()
@@ -199,6 +194,7 @@ class PreviewViewDeviceTest(
         Truth.assertThat(countDownLatch.await(TIMEOUT_SECONDS.toLong(), TimeUnit.SECONDS)).isTrue()
         instrumentation.runOnMainSync {
             Truth.assertThat(previewView.get().outputTransform).isNotNull()
+            Truth.assertThat(previewView.get().sensorToViewTransform).isNotNull()
         }
     }
 
@@ -217,6 +213,7 @@ class PreviewViewDeviceTest(
         Truth.assertThat(countDownLatch.await(TIMEOUT_SECONDS.toLong(), TimeUnit.SECONDS)).isTrue()
         instrumentation.runOnMainSync {
             Truth.assertThat(previewView.get().outputTransform).isNull()
+            Truth.assertThat(previewView.get().sensorToViewTransform).isNull()
         }
     }
 
@@ -503,16 +500,7 @@ class PreviewViewDeviceTest(
     fun usesSurfaceView_whenNonLegacyDevice_andAPILevelNewerThanN() {
         instrumentation.runOnMainSync {
             Assume.assumeTrue(Build.VERSION.SDK_INT > 24)
-            Assume.assumeTrue(
-                DeviceQuirks.get(
-                    SurfaceViewNotCroppedByParentQuirk::class.java
-                ) == null
-            )
-            Assume.assumeTrue(
-                DeviceQuirks.get(
-                    SurfaceViewStretchedQuirk::class.java
-                ) == null
-            )
+            Assume.assumeFalse(hasSurfaceViewQuirk())
             val cameraInfo = createCameraInfo(CameraInfo.IMPLEMENTATION_TYPE_CAMERA2)
             val previewView = PreviewView(context)
             setContentView(previewView)
@@ -541,30 +529,49 @@ class PreviewViewDeviceTest(
     }
 
     @Test
-    fun correctSurfacePixelFormat_whenRGBA8888IsRequired() {
-        val cameraInfo = createCameraInfo(CameraInfo.IMPLEMENTATION_TYPE_CAMERA2)
-        val surfaceRequest = createRgb8888SurfaceRequest(cameraInfo)
-        val future = surfaceRequest.deferrableSurface.surface
-        activityScenario!!.onActivity {
+    fun reuseImpl_whenImplModeIsSurfaceView_andSurfaceRequestCompatibleWithSurfaceView() {
+        instrumentation.runOnMainSync {
+            // Arrange.
+            Assume.assumeTrue(Build.VERSION.SDK_INT > 24)
+            Assume.assumeFalse(hasSurfaceViewQuirk())
+            val cameraInfo = createCameraInfo(CameraInfo.IMPLEMENTATION_TYPE_CAMERA2)
             val previewView = PreviewView(context)
             setContentView(previewView)
+
+            // Act.
             previewView.implementationMode = ImplementationMode.PERFORMANCE
             val surfaceProvider = previewView.surfaceProvider
-            surfaceProvider.onSurfaceRequested(surfaceRequest)
-        }
-        val surface = arrayOfNulls<Surface>(1)
-        val countDownLatch = CountDownLatch(1)
-        Futures.addCallback(future, object : FutureCallback<Surface?> {
-            override fun onSuccess(result: Surface?) {
-                surface[0] = result
-                countDownLatch.countDown()
-            }
+            surfaceProvider.onSurfaceRequested(createSurfaceRequest(cameraInfo))
+            val previousImplementation = previewView.mImplementation
+            assertThat(previousImplementation).isInstanceOf(SurfaceViewImplementation::class.java)
+            surfaceProvider.onSurfaceRequested(createSurfaceRequest(cameraInfo))
 
-            override fun onFailure(t: Throwable) {}
-        }, CameraXExecutors.directExecutor())
-        Truth.assertThat(countDownLatch.await(TIMEOUT_SECONDS.toLong(), TimeUnit.SECONDS)).isTrue()
-        Truth.assertThat(SurfaceFormatUtil.getSurfaceFormat(surface[0]))
-            .isEqualTo(PixelFormat.RGBA_8888)
+            // Assert.
+            val newImplementation = previewView.mImplementation
+            assertThat(newImplementation).isEqualTo(previousImplementation)
+        }
+    }
+
+    @Test
+    fun notReuseImpl_whenImplIsTextureView() {
+        instrumentation.runOnMainSync {
+            // Arrange.
+            val cameraInfo = createCameraInfo(CameraInfo.IMPLEMENTATION_TYPE_CAMERA2)
+            val previewView = PreviewView(context)
+            setContentView(previewView)
+
+            // Act.
+            previewView.implementationMode = ImplementationMode.COMPATIBLE
+            val surfaceProvider = previewView.surfaceProvider
+            surfaceProvider.onSurfaceRequested(createSurfaceRequest(cameraInfo))
+            val previousImplementation = previewView.mImplementation
+            assertThat(previousImplementation).isInstanceOf(TextureViewImplementation::class.java)
+            surfaceProvider.onSurfaceRequested(createSurfaceRequest(cameraInfo))
+
+            // Assert.
+            val newImplementation = previewView.mImplementation
+            assertThat(newImplementation).isNotEqualTo(previousImplementation)
+        }
     }
 
     @Test
@@ -1023,19 +1030,13 @@ class PreviewViewDeviceTest(
         activityScenario!!.onActivity { activity: FakeActivity -> activity.setContentView(view) }
     }
 
-    private fun createRgb8888SurfaceRequest(cameraInfo: CameraInfoInternal): SurfaceRequest {
-        return createSurfaceRequest(cameraInfo, true)
-    }
-
     private fun createSurfaceRequest(
         cameraInfo: CameraInfoInternal,
-        isRGBA8888Required: Boolean = false
     ): SurfaceRequest {
         val fakeCamera = FakeCamera( /*cameraControl=*/null, cameraInfo)
         val surfaceRequest = SurfaceRequest(
-            DEFAULT_SURFACE_SIZE, fakeCamera,
-            isRGBA8888Required
-        )
+            DEFAULT_SURFACE_SIZE, fakeCamera
+        ) {}
         surfaceRequestList.add(surfaceRequest)
         return surfaceRequest
     }
@@ -1062,10 +1063,23 @@ class PreviewViewDeviceTest(
     private fun updateCropRectAndWaitForIdle(cropRect: Rect) {
         for (surfaceRequest in surfaceRequestList) {
             surfaceRequest.updateTransformationInfo(
-                SurfaceRequest.TransformationInfo.of(cropRect, 0, Surface.ROTATION_0)
+                SurfaceRequest.TransformationInfo.of(
+                    cropRect,
+                    0,
+                    Surface.ROTATION_0,
+                    /*hasCameraTransform=*/true,
+                    /*sensorToBufferTransform=*/Matrix(),
+                    /*mirroring=*/false
+                )
             )
         }
         instrumentation.waitForIdleSync()
+    }
+
+    private fun hasSurfaceViewQuirk(): Boolean {
+        return DeviceQuirks.get(SurfaceViewStretchedQuirk::class.java) != null || DeviceQuirks.get(
+            SurfaceViewNotCroppedByParentQuirk::class.java
+        ) != null
     }
 
     /**

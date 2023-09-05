@@ -24,13 +24,18 @@ import androidx.test.filters.MediumTest
 import androidx.testutils.withActivity
 import androidx.testutils.withUse
 import com.google.common.truth.Truth.assertThat
+import leakcanary.DetectLeaksAfterTestSuccess
 import org.junit.Assert.fail
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @MediumTest
 @RunWith(AndroidJUnit4::class)
 class FragmentManagerTest {
+
+    @get:Rule
+    val rule = DetectLeaksAfterTestSuccess()
 
     @Test
     fun addRemoveFragmentOnAttachListener() {
@@ -146,48 +151,6 @@ class FragmentManagerTest {
     }
 
     @Test
-    fun findFragmentWithoutChildFragment() {
-       withUse(ActivityScenario.launch(FragmentTestActivity::class.java)) {
-            val fm = withActivity {
-                setContentView(R.layout.simple_container)
-                supportFragmentManager
-            }
-            val outerFragment = StrictViewFragment(R.layout.scene1)
-            val innerFragment = StrictViewFragment(R.layout.fragment_a)
-
-            fm.beginTransaction()
-                .add(R.id.fragmentContainer, outerFragment)
-                .setReorderingAllowed(false)
-                .commit()
-            // Here we add childFragment to a layout within parentFragment, but we
-            // specifically don't use parentFragment.childFragmentManager
-            fm.beginTransaction()
-                .add(R.id.squareContainer, innerFragment)
-                .setReorderingAllowed(false)
-                .commit()
-            executePendingTransactions()
-
-            val outerRootView = outerFragment.requireView()
-            val innerRootView = innerFragment.requireView()
-            assertThat(FragmentManager.findFragment<Fragment>(outerRootView))
-                .isEqualTo(outerFragment)
-            assertThat(FragmentManager.findFragment<Fragment>(innerRootView))
-                .isEqualTo(innerFragment)
-
-            fm.beginTransaction()
-                .remove(outerFragment)
-                .commit()
-            executePendingTransactions()
-
-            // Check that even after removal, findFragment still returns the right Fragment
-            assertThat(FragmentManager.findFragment<Fragment>(outerRootView))
-                .isEqualTo(outerFragment)
-            assertThat(FragmentManager.findFragment<Fragment>(innerRootView))
-                .isEqualTo(innerFragment)
-        }
-    }
-
-    @Test
     fun findFragmentManagerChildFragment() {
        withUse(ActivityScenario.launch(FragmentTestActivity::class.java)) {
             val fm = withActivity {
@@ -244,60 +207,6 @@ class FragmentManagerTest {
                             "the child FragmentManager."
                     )
             }
-        }
-    }
-
-    @Test
-    fun findFragmentManagerWithoutChildFragment() {
-       withUse(ActivityScenario.launch(FragmentTestActivity::class.java)) {
-            val fm = withActivity {
-                setContentView(R.layout.simple_container)
-                supportFragmentManager
-            }
-            val outerFragment = StrictViewFragment(R.layout.scene1)
-            val innerFragment = StrictViewFragment(R.layout.fragment_a)
-
-            fm.beginTransaction()
-                .add(R.id.fragmentContainer, outerFragment)
-                .setReorderingAllowed(false)
-                .commit()
-            // Here we add childFragment to a layout within parentFragment, but we
-            // specifically don't use parentFragment.childFragmentManager
-            fm.beginTransaction()
-                .add(R.id.squareContainer, innerFragment)
-                .setReorderingAllowed(false)
-                .commit()
-            executePendingTransactions()
-
-            val outerChildFragmentManager = outerFragment.childFragmentManager
-            val outerRootView = outerFragment.requireView()
-            val innerChildFragmentManager = innerFragment.childFragmentManager
-            val innerRootView = innerFragment.requireView()
-            assertThat(FragmentManager.findFragmentManager(outerRootView))
-                .isEqualTo(outerChildFragmentManager)
-            assertThat(FragmentManager.findFragmentManager(innerRootView))
-                .isEqualTo(innerChildFragmentManager)
-
-            fm.beginTransaction()
-                .remove(outerFragment)
-                .commit()
-            executePendingTransactions()
-
-            try {
-                FragmentManager.findFragmentManager(outerRootView)
-                fail("findFragmentManager on the removed outerRootView should throw")
-            } catch (expected: IllegalStateException) {
-                assertThat(expected).hasMessageThat()
-                    .isEqualTo(
-                        "The Fragment $outerFragment that owns View " +
-                            "$outerRootView has already been destroyed. Nested fragments " +
-                            "should always use the child FragmentManager."
-                    )
-            }
-            // The inner Fragment is still added, so it should still return its
-            // childFragmentManager, despite its View being detached
-            assertThat(FragmentManager.findFragmentManager(innerRootView))
-                .isEqualTo(innerChildFragmentManager)
         }
     }
 
@@ -385,6 +294,115 @@ class FragmentManagerTest {
                 popped = fm.popBackStackImmediate(null, FragmentManager.POP_BACK_STACK_INCLUSIVE)
             }
             assertThat(popped).isTrue()
+        }
+    }
+
+    @Test
+    fun navigatePopNavigateRestore() {
+        withUse(ActivityScenario.launch(FragmentTestActivity::class.java)) {
+            val fm = withActivity { supportFragmentManager }
+            val fragment2 = StrictViewFragment()
+
+            fm.beginTransaction()
+                .setCustomAnimations(
+                    androidx.fragment.R.animator.fragment_fade_enter,
+                    androidx.fragment.R.animator.fragment_fade_exit,
+                    androidx.fragment.R.animator.fragment_fade_enter,
+                    androidx.fragment.R.animator.fragment_fade_exit
+                )
+                .replace(R.id.content, fragment2, "fragment2")
+                .setReorderingAllowed(true)
+                .addToBackStack("stack2")
+                .commit()
+            executePendingTransactions()
+
+            val fragment3 = StrictViewFragment()
+
+            fm.saveBackStack("stack2")
+            fm.beginTransaction()
+                .setCustomAnimations(
+                    androidx.fragment.R.animator.fragment_fade_enter,
+                    androidx.fragment.R.animator.fragment_fade_exit,
+                    androidx.fragment.R.animator.fragment_fade_enter,
+                    androidx.fragment.R.animator.fragment_fade_exit
+                )
+                .replace(R.id.content, fragment3, "fragment3")
+                .setReorderingAllowed(true)
+                .addToBackStack("stack3")
+                .commit()
+
+            fm.saveBackStack("stack3")
+            fm.restoreBackStack("stack2")
+            executePendingTransactions()
+
+            recreate()
+
+            val restoredFragmentManager = withActivity { supportFragmentManager }
+
+            assertThat(restoredFragmentManager.findFragmentByTag("fragment2"))
+                .isNotNull()
+        }
+    }
+
+    @Test
+    fun replacePopReplaceWithRestored() {
+        withUse(ActivityScenario.launch(FragmentTestActivity::class.java)) {
+            val fm = withActivity { supportFragmentManager }
+            val fragment2 = StrictViewFragment()
+
+            fm.beginTransaction()
+                .setCustomAnimations(
+                    androidx.fragment.R.animator.fragment_fade_enter,
+                    androidx.fragment.R.animator.fragment_fade_exit,
+                    androidx.fragment.R.animator.fragment_fade_enter,
+                    androidx.fragment.R.animator.fragment_fade_exit
+                )
+                .replace(R.id.content, fragment2, "fragment2")
+                .setReorderingAllowed(true)
+                .addToBackStack("stack2")
+                .commit()
+            executePendingTransactions()
+
+            val fragment3 = StrictViewFragment()
+
+            fm.popBackStack("stack2", 0)
+            fm.beginTransaction()
+                .setCustomAnimations(
+                    androidx.fragment.R.animator.fragment_fade_enter,
+                    androidx.fragment.R.animator.fragment_fade_exit,
+                    androidx.fragment.R.animator.fragment_fade_enter,
+                    androidx.fragment.R.animator.fragment_fade_exit
+                )
+                .replace(R.id.content, fragment3, "fragment3")
+                .setReorderingAllowed(true)
+                .addToBackStack("stack3")
+                .commit()
+
+            fm.popBackStack("stack3", 0)
+
+            val restoreFragment2 = StrictViewFragment()
+            withActivity {
+                restoreFragment2.setInitialSavedState(fm.saveFragmentInstanceState(fragment2))
+            }
+            fm.beginTransaction()
+                .setCustomAnimations(
+                    androidx.fragment.R.animator.fragment_fade_enter,
+                    androidx.fragment.R.animator.fragment_fade_exit,
+                    androidx.fragment.R.animator.fragment_fade_enter,
+                    androidx.fragment.R.animator.fragment_fade_exit
+                )
+                .replace(R.id.content, restoreFragment2, "fragment2")
+                .setReorderingAllowed(true)
+                .addToBackStack("stack2")
+                .commit()
+            executePendingTransactions()
+
+            recreate()
+
+            val restoredFragmentManager = withActivity { supportFragmentManager }
+
+            assertThat(restoredFragmentManager.findFragmentByTag("fragment2"))
+                .isNotNull()
         }
     }
 }

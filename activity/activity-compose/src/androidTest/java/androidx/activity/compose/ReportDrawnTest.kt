@@ -211,6 +211,16 @@ class ReportDrawnTest {
     }
 
     @Test
+    fun reportAfterComposition() {
+        rule.setContent {
+            ReportDrawn()
+        }
+
+        rule.waitForIdle()
+        assertThat(rule.activity.reportFullyDrawnCalled).isTrue()
+    }
+
+    @Test
     fun removedCondition() {
         var condition1 by mutableStateOf(false)
         val condition2 by mutableStateOf(false)
@@ -254,5 +264,16 @@ class ReportDrawnTest {
             }
         }
         assertThat(localValue).isSameInstanceAs(fullyDrawnReporterOwner)
+    }
+
+    @Test
+    fun testDisposingBeforeReporting() {
+        rule.setContent {
+            // Reporting never finishes
+            ReportDrawnWhen { false }
+            // Report that finishes immediatelly
+            ReportDrawn()
+        }
+        // By going out of the scope, both reporters call onDismiss
     }
 }

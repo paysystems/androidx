@@ -16,15 +16,18 @@
 
 package androidx.credentials
 
+import android.os.Bundle
+
 /**
  * A federated credential fetched from a federated identity provider (FedCM).
  *
  * Note: the FedCM proposal is still under public discussion and its constructor will be exposed
  * after the proposal is final.
- *
- * @hide
  */
-class FederatedCredential private constructor() {
+internal class FederatedCredential private constructor() : Credential(
+    TYPE_FEDERATED_CREDENTIAL,
+    Bundle(),
+) {
     companion object {
         /** The type value for federated credential related operations. */
         const val TYPE_FEDERATED_CREDENTIAL: String = "type.federated_credential"

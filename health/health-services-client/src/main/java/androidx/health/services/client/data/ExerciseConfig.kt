@@ -39,9 +39,15 @@ import androidx.health.services.client.proto.DataProto
  * on-going exercise which can be used to pre-populate a new exercise.
  * @property swimmingPoolLengthMeters length (in meters) of the swimming pool, or 0 if not relevant to
  * this exercise
+ * @property exerciseTypeConfig [ExerciseTypeConfig] containing attributes which may be
+ * modified after the exercise has started
+ * @property batchingModeOverrides [BatchingMode] overrides for this exercise
+ * @property exerciseEventTypes [ExerciseEventType]s which should be tracked for this exercise
  */
 @Suppress("ParcelCreator")
-class ExerciseConfig(
+class ExerciseConfig
+@JvmOverloads
+constructor(
     val exerciseType: ExerciseType,
     val dataTypes: Set<DataType<*, *>>,
     val isAutoPauseAndResumeEnabled: Boolean,
@@ -49,6 +55,9 @@ class ExerciseConfig(
     val exerciseGoals: List<ExerciseGoal<*>> = listOf(),
     val exerciseParams: Bundle = Bundle(),
     @FloatRange(from = 0.0) val swimmingPoolLengthMeters: Float = SWIMMING_POOL_LENGTH_UNSPECIFIED,
+    val exerciseTypeConfig: ExerciseTypeConfig? = null,
+    val batchingModeOverrides: Set<BatchingMode> = emptySet(),
+    val exerciseEventTypes: Set<ExerciseEventType<*>> = emptySet(),
 ) {
 
     internal constructor(
@@ -62,10 +71,15 @@ class ExerciseConfig(
         proto.exerciseGoalsList.map { ExerciseGoal.fromProto(it) },
         BundlesUtil.fromProto(proto.exerciseParams),
         if (proto.hasSwimmingPoolLength()) {
-          proto.swimmingPoolLength
+            proto.swimmingPoolLength
         } else {
-          SWIMMING_POOL_LENGTH_UNSPECIFIED
-        }
+            SWIMMING_POOL_LENGTH_UNSPECIFIED
+        },
+        if (proto.hasExerciseTypeConfig()) {
+            ExerciseTypeConfig.fromProto(proto.exerciseTypeConfig)
+        } else null,
+        proto.batchingModeOverridesList.map { BatchingMode(it) }.toSet(),
+        proto.exerciseEventTypesList.map { ExerciseEventType.fromProto(it) }.toSet(),
     )
 
     init {
@@ -75,9 +89,10 @@ class ExerciseConfig(
         }
 
         if (exerciseType == ExerciseType.SWIMMING_POOL) {
-          require(swimmingPoolLengthMeters != 0.0f) {
-              "If exercise type is SWIMMING_POOL, then swimming pool length must also be specified"
-          }
+            require(swimmingPoolLengthMeters != 0.0f) {
+                "If exercise type is SWIMMING_POOL, " +
+                    "then swimming pool length must also be specified"
+            }
         }
     }
 
@@ -98,6 +113,9 @@ class ExerciseConfig(
         private var exerciseGoals: List<ExerciseGoal<*>> = emptyList()
         private var exerciseParams: Bundle = Bundle.EMPTY
         private var swimmingPoolLength: Float = SWIMMING_POOL_LENGTH_UNSPECIFIED
+        private var exerciseTypeConfig: ExerciseTypeConfig? = null
+        private var batchingModeOverrides: Set<BatchingMode> = emptySet()
+        private var exerciseEventTypes: Set<ExerciseEventType<*>> = emptySet()
 
         /**
          * Sets the requested [DataType]s that should be tracked during this exercise. If not
@@ -171,9 +189,40 @@ class ExerciseConfig(
 
         /** Sets the swimming pool length (in m). */
         @Suppress("MissingGetterMatchingBuilder")
-        public fun setSwimmingPoolLengthMeters(swimmingPoolLength: Float): Builder {
-          this.swimmingPoolLength = swimmingPoolLength
-          return this
+        fun setSwimmingPoolLengthMeters(swimmingPoolLength: Float): Builder {
+            this.swimmingPoolLength = swimmingPoolLength
+            return this
+        }
+
+        /**
+         * Sets the [ExerciseTypeConfig] which are configurable attributes for the ongoing exercise.
+         *
+         * @param exerciseTypeConfig [ExerciseTypeConfig] specifying active exercise type
+         * configurations
+         */
+        fun setExerciseTypeConfig(exerciseTypeConfig: ExerciseTypeConfig?): Builder {
+            this.exerciseTypeConfig = exerciseTypeConfig
+            return this
+        }
+
+        /**
+         * Sets the [BatchingMode] overrides for the ongoing exercise.
+         *
+         * @param batchingModeOverrides [BatchingMode] overrides
+         */
+        fun setBatchingModeOverrides(batchingModeOverrides: Set<BatchingMode>): Builder {
+            this.batchingModeOverrides = batchingModeOverrides
+            return this
+        }
+
+        /**
+         * Sets the [ExerciseEventType]s that should be tracked for this exercise.
+         *
+         * @param exerciseEventTypes the set of [ExerciseEventType]s to begin the exercise with
+         */
+        fun setExerciseEventTypes(exerciseEventTypes: Set<ExerciseEventType<*>>): Builder {
+            this.exerciseEventTypes = exerciseEventTypes
+            return this
         }
 
         /** Returns the built [ExerciseConfig]. */
@@ -185,7 +234,10 @@ class ExerciseConfig(
                 isGpsEnabled,
                 exerciseGoals,
                 exerciseParams,
-                swimmingPoolLength
+                swimmingPoolLength,
+                exerciseTypeConfig,
+                batchingModeOverrides,
+                exerciseEventTypes,
             )
         }
     }
@@ -197,10 +249,11 @@ class ExerciseConfig(
             "isAutoPauseAndResumeEnabled=$isAutoPauseAndResumeEnabled, " +
             "isGpsEnabled=$isGpsEnabled, " +
             "exerciseGoals=$exerciseGoals, " +
-            "swimmingPoolLengthMeters=$swimmingPoolLengthMeters)"
+            "swimmingPoolLengthMeters=$swimmingPoolLengthMeters, " +
+            "exerciseTypeConfig=$exerciseTypeConfig)"
 
-    internal fun toProto(): DataProto.ExerciseConfig =
-        DataProto.ExerciseConfig.newBuilder()
+    internal fun toProto(): DataProto.ExerciseConfig {
+        val builder = DataProto.ExerciseConfig.newBuilder()
             .setExerciseType(exerciseType.toProto())
             .addAllDataTypes(dataTypes.filter { !it.isAggregate }.map { it.proto })
             .addAllAggregateDataTypes(dataTypes.filter { it.isAggregate }.map { it.proto })
@@ -209,14 +262,20 @@ class ExerciseConfig(
             .addAllExerciseGoals(exerciseGoals.map { it.proto })
             .setExerciseParams(BundlesUtil.toProto(exerciseParams))
             .setSwimmingPoolLength(swimmingPoolLengthMeters)
-            .build()
+            .addAllBatchingModeOverrides(batchingModeOverrides.map { it.toProto() })
+            .addAllExerciseEventTypes(exerciseEventTypes.map { it.toProto() })
+        if (exerciseTypeConfig != null) {
+            builder.exerciseTypeConfig = exerciseTypeConfig.toProto()
+        }
+        return builder.build()
+    }
 
     companion object {
         /**
          * Returns a fresh new [Builder].
          *
          * @param exerciseType the [ExerciseType] representing this exercise
-          */
+         */
         @JvmStatic
         fun builder(exerciseType: ExerciseType): Builder = Builder(exerciseType)
 

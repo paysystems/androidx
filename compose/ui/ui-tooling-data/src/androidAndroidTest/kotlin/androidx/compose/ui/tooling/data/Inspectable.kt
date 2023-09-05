@@ -17,10 +17,10 @@
 package androidx.compose.ui.tooling.data
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.tooling.CompositionData
-import androidx.compose.runtime.InternalComposeApi
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.InternalComposeApi
 import androidx.compose.runtime.currentComposer
+import androidx.compose.runtime.tooling.CompositionData
 import androidx.compose.runtime.tooling.LocalInspectionTables
 import androidx.compose.ui.platform.LocalInspectionMode
 import java.util.Collections
@@ -49,8 +49,6 @@ private class CompositionDataRecordImpl : CompositionDataRecord {
  *
  * @param compositionDataRecord [CompositionDataRecord] to record the SlotTable used in the
  * composition of [content]
- *
- * @suppress
  */
 @Composable
 @OptIn(InternalComposeApi::class)

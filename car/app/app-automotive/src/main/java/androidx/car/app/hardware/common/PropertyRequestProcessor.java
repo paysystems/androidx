@@ -54,7 +54,6 @@ import javax.annotation.Nullable;
 /**
  * A class for interacting with the {@link CarPropertyManager} for getting any vehicle property.
  *
- * @hide
  */
 @RestrictTo(LIBRARY)
 final class PropertyRequestProcessor {
@@ -172,6 +171,7 @@ final class PropertyRequestProcessor {
         listener.onGetProperties(values, errors);
     }
 
+    @SuppressWarnings("deprecation")
     public void fetchCarPropertyProfiles(List<Integer> propertyIds,
             @NonNull OnGetCarPropertyProfilesListener listener) {
         ImmutableList.Builder<CarInternalError> errors = new ImmutableList.Builder<>();

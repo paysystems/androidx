@@ -125,6 +125,9 @@ public abstract class StartupApiFeature {
 
     private static @Nullable Bundle getMetaDataFromWebViewManifestOrNull(@NonNull Context context) {
         PackageInfo systemWebViewPackage = WebViewCompat.getCurrentWebViewPackage(context);
+        if (systemWebViewPackage == null) {
+            return null;
+        }
         ComponentName compName =
                 new ComponentName(systemWebViewPackage.packageName, METADATA_HOLDER_SERVICE_NAME);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -179,4 +182,17 @@ public abstract class StartupApiFeature {
         }
     }
 
+    /**
+     * Represents a feature that is not supported by framework.
+     */
+    public static class NoFramework extends StartupApiFeature {
+        NoFramework(@NonNull String publicFeatureValue, @NonNull String internalFeatureValue) {
+            super(publicFeatureValue, internalFeatureValue);
+        }
+
+        @Override
+        public final boolean isSupportedByFramework() {
+            return false;
+        }
+    }
 }

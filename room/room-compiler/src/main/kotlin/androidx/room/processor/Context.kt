@@ -21,6 +21,7 @@ import androidx.room.compiler.codegen.CodeLanguage
 import androidx.room.compiler.processing.XElement
 import androidx.room.compiler.processing.XProcessingEnv
 import androidx.room.compiler.processing.XType
+import androidx.room.ext.CommonTypeNames
 import androidx.room.log.RLog
 import androidx.room.parser.expansion.ProjectionExpander
 import androidx.room.parser.optimization.RemoveUnusedColumnQueryRewriter
@@ -130,24 +131,48 @@ class Context private constructor(
 
     class CommonTypes(val processingEnv: XProcessingEnv) {
         val VOID: XType by lazy {
-            processingEnv.requireType("java.lang.Void")
+            processingEnv.requireType(CommonTypeNames.VOID)
         }
         val STRING: XType by lazy {
-            processingEnv.requireType("java.lang.String")
+            processingEnv.requireType(CommonTypeNames.STRING)
         }
         val READONLY_COLLECTION: XType by lazy {
-            if (processingEnv.backend == XProcessingEnv.Backend.KSP) {
-                processingEnv.requireType("kotlin.collections.Collection")
-            } else {
-                processingEnv.requireType("java.util.Collection")
-            }
+            processingEnv.requireType(CommonTypeNames.COLLECTION)
+        }
+        val LIST: XType by lazy {
+            processingEnv.requireType(CommonTypeNames.LIST)
+        }
+        val SET: XType by lazy {
+            processingEnv.requireType(CommonTypeNames.SET)
+        }
+    }
+
+    val schemaInFolderPath by lazy {
+        val internalInputFolder =
+            processingEnv.options[ProcessorOptions.INTERNAL_SCHEMA_INPUT_FOLDER.argName]
+        val legacySchemaFolder =
+            processingEnv.options[ProcessorOptions.OPTION_SCHEMA_FOLDER.argName]
+        if (!internalInputFolder.isNullOrBlank()) {
+            internalInputFolder
+        } else if (!legacySchemaFolder.isNullOrBlank()) {
+            legacySchemaFolder
+        } else {
+            null
         }
     }
 
     val schemaOutFolderPath by lazy {
-        val arg = processingEnv.options[ProcessorOptions.OPTION_SCHEMA_FOLDER.argName]
-        if (arg?.isNotEmpty() == true) {
-            arg
+        val internalOutputFolder =
+            processingEnv.options[ProcessorOptions.INTERNAL_SCHEMA_OUTPUT_FOLDER.argName]
+        val legacySchemaFolder =
+            processingEnv.options[ProcessorOptions.OPTION_SCHEMA_FOLDER.argName]
+        if (!internalOutputFolder.isNullOrBlank() && !legacySchemaFolder.isNullOrBlank()) {
+            logger.e(ProcessorErrors.INVALID_GRADLE_PLUGIN_AND_SCHEMA_LOCATION_OPTION)
+        }
+        if (!internalOutputFolder.isNullOrBlank()) {
+            internalOutputFolder
+        } else if (!legacySchemaFolder.isNullOrBlank()) {
+            legacySchemaFolder
         } else {
             null
         }
@@ -168,9 +193,33 @@ class Context private constructor(
         return Pair(result, collector)
     }
 
-    fun fork(element: XElement, forceSuppressedWarnings: Set<Warning> = emptySet()): Context {
+    /**
+     * Forks the processor context adding suppressed warnings a type converters found in the
+     * given [element].
+     *
+     * @param element the element from which to create the fork.
+     * @param forceSuppressedWarnings the warning that will be silenced regardless if they are
+     * present or not in the [element].
+     * @param forceBuiltInConverters the built-in converter states that will be set regardless of
+     * the states found in the [element].
+     */
+    fun fork(
+        element: XElement,
+        forceSuppressedWarnings: Set<Warning> = emptySet(),
+        forceBuiltInConverters: BuiltInConverterFlags? = null
+    ): Context {
         val suppressedWarnings = SuppressWarningProcessor.getSuppressedWarnings(element)
-        val processConvertersResult = CustomConverterProcessor.findConverters(this, element)
+        val processConvertersResult =
+            CustomConverterProcessor.findConverters(this, element).let { result ->
+                if (forceBuiltInConverters != null) {
+                    result.copy(
+                        builtInConverterFlags =
+                            result.builtInConverterFlags.withNext(forceBuiltInConverters)
+                    )
+                } else {
+                    result
+                }
+            }
         val subBuiltInConverterFlags = typeConverters.builtInConverterFlags.withNext(
             processConvertersResult.builtInConverterFlags
         )
@@ -229,14 +278,17 @@ class Context private constructor(
     }
 
     enum class ProcessorOptions(val argName: String) {
-        OPTION_SCHEMA_FOLDER("room.schemaLocation")
+        OPTION_SCHEMA_FOLDER("room.schemaLocation"),
+        INTERNAL_SCHEMA_INPUT_FOLDER("room.internal.schemaInput"),
+        INTERNAL_SCHEMA_OUTPUT_FOLDER("room.internal.schemaOutput"),
     }
 
     enum class BooleanProcessorOptions(val argName: String, private val defaultValue: Boolean) {
         INCREMENTAL("room.incremental", defaultValue = true),
         EXPAND_PROJECTION("room.expandProjection", defaultValue = false),
         USE_NULL_AWARE_CONVERTER("room.useNullAwareTypeAnalysis", defaultValue = false),
-        GENERATE_KOTLIN("room.generateKotlin", defaultValue = false);
+        GENERATE_KOTLIN("room.generateKotlin", defaultValue = false),
+        EXPORT_SCHEMA_RESOURCE("room.exportSchemaResource", defaultValue = false);
 
         /**
          * Returns the value of this option passed through the [XProcessingEnv]. If the value
@@ -246,8 +298,16 @@ class Context private constructor(
             return getInputValue(processingEnv) ?: defaultValue
         }
 
+        fun getValue(options: Map<String, String>): Boolean {
+            return getInputValue(options) ?: defaultValue
+        }
+
         fun getInputValue(processingEnv: XProcessingEnv): Boolean? {
-            return processingEnv.options[argName]?.takeIf {
+            return getInputValue(processingEnv.options)
+        }
+
+        private fun getInputValue(options: Map<String, String>): Boolean? {
+            return options[argName]?.takeIf {
                 it.isNotBlank()
             }?.toBoolean()
         }

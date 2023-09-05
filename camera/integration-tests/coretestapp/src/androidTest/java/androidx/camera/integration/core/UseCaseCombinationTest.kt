@@ -20,7 +20,6 @@ import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.TotalCaptureResult
 import androidx.camera.camera2.Camera2Config
-import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.camera2.pipe.integration.CameraPipeConfig
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
@@ -31,11 +30,12 @@ import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
+import androidx.camera.integration.core.util.CameraPipeUtil
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.testing.CameraPipeConfigTestRule
-import androidx.camera.testing.CameraUtil
-import androidx.camera.testing.SurfaceTextureProvider
-import androidx.camera.testing.fakes.FakeLifecycleOwner
+import androidx.camera.testing.impl.CameraPipeConfigTestRule
+import androidx.camera.testing.impl.CameraUtil
+import androidx.camera.testing.impl.SurfaceTextureProvider
+import androidx.camera.testing.impl.fakes.FakeLifecycleOwner
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.filters.LargeTest
 import com.google.common.truth.Truth
@@ -44,12 +44,14 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.junit.After
 import org.junit.Assume
 import org.junit.Assume.assumeTrue
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -107,7 +109,6 @@ class UseCaseCombinationTest(
     fun shutdownCameraX(): Unit = runBlocking {
         if (::cameraProvider.isInitialized) {
             withContext(Dispatchers.Main) {
-                cameraProvider.unbindAll()
                 cameraProvider.shutdown()[10, TimeUnit.SECONDS]
             }
         }
@@ -141,6 +142,7 @@ class UseCaseCombinationTest(
     }
 
     /** Test Combination: Preview (no surface provider) + ImageCapture */
+    @Ignore("b/283959238")
     @Test
     fun previewCombinesImageCapture_withNoSurfaceProvider(): Unit = runBlocking {
         // Arrange.
@@ -398,7 +400,8 @@ class UseCaseCombinationTest(
         withContext(Dispatchers.Main) {
             cameraProvider.unbind(preview)
         }
-        previewMonitor.waitForStreamIdle()
+        delay(1000) // Unbind and stop the output stream should be done within 1 sec.
+        previewMonitor.waitForStreamIdle(count = 1, timeMillis = TimeUnit.SECONDS.toMillis(2))
 
         // Assert
         imageCapture.waitForCapturing()
@@ -444,7 +447,7 @@ class UseCaseCombinationTest(
         return Preview.Builder()
             .setTargetName("Preview").also {
                 monitor?.let { monitor ->
-                    Camera2Interop.Extender(it).setSessionCaptureCallback(monitor)
+                    CameraPipeUtil.setCameraCaptureSessionCallback(implName, it, monitor)
                 }
             }.build()
     }

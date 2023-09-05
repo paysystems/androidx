@@ -18,7 +18,8 @@ package androidx.camera.core;
 
 import static androidx.camera.core.ImageProcessingUtil.convertJpegBytesToImage;
 import static androidx.camera.core.ImageProcessingUtil.rotateYUV;
-import static androidx.camera.testing.ImageProxyUtil.createYUV420ImagePlanes;
+import static androidx.camera.core.ImageProcessingUtil.writeJpegBytesToSurface;
+import static androidx.camera.testing.impl.ImageProxyUtil.createYUV420ImagePlanes;
 
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
@@ -33,8 +34,9 @@ import android.media.ImageWriter;
 
 import androidx.annotation.IntRange;
 import androidx.annotation.NonNull;
-import androidx.camera.testing.fakes.FakeImageInfo;
-import androidx.camera.testing.fakes.FakeImageProxy;
+import androidx.camera.core.impl.utils.Exif;
+import androidx.camera.testing.impl.fakes.FakeImageInfo;
+import androidx.camera.testing.impl.fakes.FakeImageProxy;
 import androidx.core.math.MathUtils;
 import androidx.core.util.Preconditions;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -47,6 +49,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 
@@ -66,6 +69,8 @@ public class ImageProcessingUtilTest {
     private static final int PIXEL_STRIDE_UV_UNSUPPORTED = 3;
     private static final int MAX_IMAGES = 4;
     private static final int JPEG_ENCODE_ERROR_TOLERANCE = 3;
+
+    private static final int PADDING_BYTES = 16;
 
     private ByteBuffer mRgbConvertedBuffer;
     private ByteBuffer mYRotatedBuffer;
@@ -129,6 +134,7 @@ public class ImageProcessingUtilTest {
     public void tearDown() {
         mRGBImageReaderProxy.safeClose();
         mRotatedRGBImageReaderProxy.safeClose();
+        mJpegImageReaderProxy.safeClose();
     }
 
     @Test
@@ -149,6 +155,64 @@ public class ImageProcessingUtilTest {
         assertThat(bitmap.getWidth()).isEqualTo(WIDTH);
         assertThat(bitmap.getHeight()).isEqualTo(HEIGHT);
         assertBitmapColor(bitmap, Color.RED, JPEG_ENCODE_ERROR_TOLERANCE);
+        imageProxy.close();
+    }
+
+    @Test
+    public void writeJpegToSurface_returnsTheSameImage() {
+        // Arrange: create a JPEG image with solid color.
+        byte[] inputBytes = createJpegBytesWithSolidColor(Color.RED);
+
+        // Act: acquire image and get the bytes.
+        writeJpegBytesToSurface(mJpegImageReaderProxy.getSurface(), inputBytes);
+
+        final ImageProxy imageProxy = mJpegImageReaderProxy.acquireLatestImage();
+        assertThat(imageProxy).isNotNull();
+        ByteBuffer byteBuffer = imageProxy.getPlanes()[0].getBuffer();
+        byteBuffer.rewind();
+        byte[] outputBytes = new byte[byteBuffer.capacity()];
+        byteBuffer.get(outputBytes);
+
+        // Assert: the color and the dimension of the restored image.
+        Bitmap bitmap = BitmapFactory.decodeByteArray(outputBytes, 0, outputBytes.length);
+        assertThat(bitmap.getWidth()).isEqualTo(WIDTH);
+        assertThat(bitmap.getHeight()).isEqualTo(HEIGHT);
+        assertBitmapColor(bitmap, Color.RED, JPEG_ENCODE_ERROR_TOLERANCE);
+        imageProxy.close();
+    }
+
+    @Test
+    public void convertYuvToJpegBytesIntoSurface_sizeAndRotationAreCorrect() throws IOException {
+        final int expectedRotation = 270;
+        // Arrange: create a YUV_420_888 image
+        mYUVImageProxy.setPlanes(createYUV420ImagePlanes(
+                WIDTH,
+                HEIGHT,
+                PIXEL_STRIDE_Y,
+                PIXEL_STRIDE_UV,
+                /*flipUV=*/false,
+                /*incrementValue=*/false));
+
+        // Act: convert it into JPEG and write into the surface.
+        ImageProcessingUtil.convertYuvToJpegBytesIntoSurface(mYUVImageProxy,
+                100, expectedRotation, mJpegImageReaderProxy.getSurface());
+
+        final ImageProxy imageProxy = mJpegImageReaderProxy.acquireLatestImage();
+        assertThat(imageProxy).isNotNull();
+        ByteBuffer byteBuffer = imageProxy.getPlanes()[0].getBuffer();
+        byteBuffer.rewind();
+        byte[] outputBytes = new byte[byteBuffer.capacity()];
+        byteBuffer.get(outputBytes);
+
+        // Assert: the format is JPEG and can decode,  the size is correct, the rotation in Exif
+        // is correct.
+        assertThat(imageProxy.getFormat()).isEqualTo(ImageFormat.JPEG);
+        Bitmap bitmap = BitmapFactory.decodeByteArray(outputBytes, 0, outputBytes.length);
+        assertThat(bitmap.getWidth()).isEqualTo(WIDTH);
+        assertThat(bitmap.getHeight()).isEqualTo(HEIGHT);
+        Exif exif = Exif.createFromImageProxy(imageProxy);
+        assertThat(exif.getRotation()).isEqualTo(expectedRotation);
+        imageProxy.close();
     }
 
     /**
@@ -187,6 +251,7 @@ public class ImageProcessingUtilTest {
         // Assert.
         assertThat(rgbImageProxy.getFormat()).isEqualTo(PixelFormat.RGBA_8888);
         assertThat(rgbImageProxy.getPlanes().length).isEqualTo(1);
+        rgbImageProxy.close();
     }
 
     @Test
@@ -211,6 +276,7 @@ public class ImageProcessingUtilTest {
         // Assert.
         assertThat(rgbImageProxy.getFormat()).isEqualTo(PixelFormat.RGBA_8888);
         assertThat(rgbImageProxy.getPlanes().length).isEqualTo(1);
+        rgbImageProxy.close();
     }
 
     @Test
@@ -235,6 +301,7 @@ public class ImageProcessingUtilTest {
         // Assert.
         assertThat(rgbImageProxy.getFormat()).isEqualTo(PixelFormat.RGBA_8888);
         assertThat(rgbImageProxy.getPlanes().length).isEqualTo(1);
+        rgbImageProxy.close();
     }
 
     @Test
@@ -316,6 +383,7 @@ public class ImageProcessingUtilTest {
         assertThat(rgbImageProxy.getPlanes().length).isEqualTo(1);
         assertThat(rgbImageProxy.getWidth()).isEqualTo(HEIGHT);
         assertThat(rgbImageProxy.getHeight()).isEqualTo(WIDTH);
+        rgbImageProxy.close();
     }
 
     @SdkSuppress(minSdkVersion = 23)
@@ -348,6 +416,7 @@ public class ImageProcessingUtilTest {
         assertThat(yuvImageProxy.getPlanes().length).isEqualTo(3);
         assertThat(yuvImageProxy.getWidth()).isEqualTo(HEIGHT);
         assertThat(yuvImageProxy.getHeight()).isEqualTo(WIDTH);
+        yuvImageProxy.close();
     }
 
     @Test
@@ -384,6 +453,31 @@ public class ImageProcessingUtilTest {
                 YUV_RED_STUDIO_SWING_BT601[2]);
         assertSolidYUVColorConvertedToRGBMatchesReferenceRGB(YUV_RED_STUDIO_SWING_BT601,
                 referenceColorRgb);
+    }
+
+    @Test
+    public void canCopyBetweenBitmapAndByteBufferWithDifferentStrides() {
+
+        // Create bitmap with a solid color
+        Bitmap bitmap1 = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.ARGB_8888);
+        bitmap1.eraseColor(Color.YELLOW);
+
+        int bufferStride = bitmap1.getRowBytes() + PADDING_BYTES;
+
+        // Same size bitmap with a different color
+        Bitmap bitmap2 = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.ARGB_8888);
+        bitmap2.eraseColor(Color.BLUE);
+
+        ByteBuffer bytebuffer = ByteBuffer.allocateDirect(bufferStride * bitmap1.getHeight());
+
+        // Copy bitmap1 into bytebuffer
+        ImageProcessingUtil.copyBitmapToByteBuffer(bitmap1, bytebuffer, bufferStride);
+
+        // Copy bytebuffer into bitmap2
+        ImageProcessingUtil.copyByteBufferToBitmap(bitmap2, bytebuffer, bufferStride);
+
+        // Assert second bitmap now has the same color as first bitmap
+        assertBitmapColor(bitmap2, Color.YELLOW, 0);
     }
 
     private void assertSolidYUVColorConvertedToRGBMatchesReferenceRGB(int[] yuvColor,

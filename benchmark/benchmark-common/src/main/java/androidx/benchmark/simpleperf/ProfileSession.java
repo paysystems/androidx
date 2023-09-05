@@ -65,7 +65,6 @@ import java.util.stream.Collectors;
  * NOTE: copied from
  * https://cs.android.com/android/platform/superproject/+/master:system/extras/simpleperf/app_api/
  *
- * @hide
  */
 @SuppressWarnings({"IOStreamConstructor", "CatchMayIgnoreException",
         "IfStatementMissingBreakInLoop", "ResultOfMethodCallIgnored", "StringConcatenationInLoop",
@@ -154,7 +153,7 @@ public class ProfileSession {
         mSimpleperfPath = findSimpleperf();
         checkIfPerfEnabled();
         createSimpleperfDataDir();
-        createSimpleperfProcess(mSimpleperfPath, args);
+        startRecordingProcess(args);
         mState = State.STARTED;
     }
 
@@ -327,7 +326,7 @@ public class ProfileSession {
 
     /**
      * Convert a .data simpleperf file to the .trace proto format.
-     *
+     * <p>
      * Paths may be relative to the simpleperf data dir.
      *
      * @param inputPath Path of the .data file within the simpleperf output directory
@@ -338,6 +337,7 @@ public class ProfileSession {
             @NonNull String outputPath
     ) {
         ArrayList<String> args = new ArrayList<>();
+        args.add(mSimpleperfPath);
         args.add("report-sample");
         args.add("--protobuf");
         args.add("--show-callchain");
@@ -346,14 +346,23 @@ public class ProfileSession {
         args.add("-o");
         args.add(outputPath);
 
-        createSimpleperfProcess(mSimpleperfPath, args);
+        createProcess(args);
         waitForSimpleperfProcess();
     }
 
-    private void createSimpleperfProcess(String simpleperfPath, List<String> recordArgs) {
+    private void createProcess(List<String> args) {
+        ProcessBuilder pb = new ProcessBuilder(args).directory(new File(mSimpleperfDataDir));
+        try {
+            mSimpleperfProcess = pb.start();
+        } catch (IOException e) {
+            throw new Error("failed to create simpleperf process: " + e.getMessage());
+        }
+    }
+
+    private void startRecordingProcess(List<String> recordArgs) {
         // 1. Prepare simpleperf arguments.
         ArrayList<String> args = new ArrayList<>();
-        args.add(simpleperfPath);
+        args.add(mSimpleperfPath);
         args.add("record");
         args.add("--log-to-android-buffer");
         args.add("--log");
@@ -365,12 +374,7 @@ public class ProfileSession {
         args.addAll(recordArgs);
 
         // 2. Create the simpleperf process.
-        ProcessBuilder pb = new ProcessBuilder(args).directory(new File(mSimpleperfDataDir));
-        try {
-            mSimpleperfProcess = pb.start();
-        } catch (IOException e) {
-            throw new Error("failed to create simpleperf process: " + e.getMessage());
-        }
+        createProcess(args);
 
         // 3. Wait until simpleperf starts recording.
         String startFlag = readReply();

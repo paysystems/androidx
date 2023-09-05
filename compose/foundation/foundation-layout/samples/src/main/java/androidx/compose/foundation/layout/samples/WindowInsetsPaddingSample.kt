@@ -24,20 +24,20 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.MutableWindowInsets
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.captionBarPadding
-import androidx.compose.foundation.layout.consumedWindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.mandatorySystemGesturesPadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.onConsumedWindowInsetsChanged
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeContent
 import androidx.compose.foundation.layout.safeContentPadding
@@ -50,7 +50,7 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.systemGesturesPadding
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.waterfallPadding
-import androidx.compose.foundation.layout.withConsumedWindowInsets
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -325,7 +325,6 @@ fun insetsPaddingSample() {
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Sampled
 fun consumedInsetsPaddingSample() {
     class SampleActivity : ComponentActivity() {
@@ -338,7 +337,7 @@ fun consumedInsetsPaddingSample() {
                     Box(
                         Modifier
                             .padding(paddingValues)
-                            .consumedWindowInsets(paddingValues)
+                            .consumeWindowInsets(paddingValues)
                     ) {
                         // app content
                     }
@@ -399,7 +398,6 @@ fun paddingValuesSample() {
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Sampled
 fun consumedInsetsSample() {
     class SampleActivity : ComponentActivity() {
@@ -408,7 +406,7 @@ fun consumedInsetsSample() {
             super.onCreate(savedInstanceState)
             setContent {
                 Box(Modifier.padding(WindowInsets.navigationBars.asPaddingValues())) {
-                    Box(Modifier.consumedWindowInsets(WindowInsets.navigationBars)) {
+                    Box(Modifier.consumeWindowInsets(WindowInsets.navigationBars)) {
                         // app content
                     }
                 }
@@ -430,7 +428,7 @@ fun withConsumedInsetsSample() {
                 Box(
                     Modifier
                         .navigationBarsPadding()
-                        .withConsumedWindowInsets { consumedWindowInsets ->
+                        .onConsumedWindowInsetsChanged { consumedWindowInsets ->
                             remainingInsets.insets = safeContent.exclude(consumedWindowInsets)
                         }) {
                     // padding can be used without recomposition when insets change.

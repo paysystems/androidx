@@ -24,20 +24,19 @@ import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
 
-import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresPermission;
 import androidx.annotation.RestrictTo;
 import androidx.car.app.CarContext;
 import androidx.car.app.annotations.CarProtocol;
+import androidx.car.app.annotations.KeepFields;
 
 /**
  * A {@link CarAudioRecord} for automotive OS.
  *
- * @hide
  */
 @RestrictTo(LIBRARY_GROUP)
-@Keep
+@KeepFields
 @CarProtocol
 public class AutomotiveCarAudioRecord extends CarAudioRecord {
     /**

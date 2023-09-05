@@ -32,7 +32,7 @@ import com.squareup.kotlinpoet.javapoet.toKClassName
  * [XMemberContainer] implementation for KSFiles.
  */
 internal class KspFileMemberContainer(
-    private val env: KspProcessingEnv,
+    internal val env: KspProcessingEnv,
     private val ksFile: KSFile
 ) : KspMemberContainer,
     XAnnotated by KspAnnotated.create(
@@ -44,6 +44,14 @@ internal class KspFileMemberContainer(
         get() = null
     override val declaration: KSDeclaration?
         get() = null
+
+    @Deprecated(
+        "Use asClassName().toJavaPoet() to be clear the name is for JavaPoet.",
+        replaceWith = ReplaceWith(
+            "asClassName().toJavaPoet()",
+            "androidx.room.compiler.codegen.toJavaPoet"
+        )
+    )
     override val className: ClassName by lazy {
         xClassName.java
     }
