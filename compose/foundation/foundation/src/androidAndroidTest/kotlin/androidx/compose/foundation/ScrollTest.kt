@@ -60,7 +60,7 @@ import androidx.compose.ui.layout.Measurable
 import androidx.compose.ui.layout.MeasurePolicy
 import androidx.compose.ui.layout.MeasureResult
 import androidx.compose.ui.layout.MeasureScope
-import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.OnRemeasuredModifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.InspectableValue
 import androidx.compose.ui.platform.LocalDensity
@@ -105,6 +105,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -462,6 +463,7 @@ class ScrollTest(private val config: Config) {
                         content()
                     }
                 }
+
                 Horizontal -> {
                     CompositionLocalProvider(LocalLayoutDirection provides config.layoutDirection) {
                         Row(Modifier.horizontalScroll(actualState)) {
@@ -590,6 +592,7 @@ class ScrollTest(private val config: Config) {
                                 )
                             }
                         }
+
                         Horizontal -> {
                             CompositionLocalProvider(
                                 LocalLayoutDirection provides config.layoutDirection
@@ -673,6 +676,7 @@ class ScrollTest(private val config: Config) {
                             content()
                         }
                     }
+
                     Horizontal -> {
                         CompositionLocalProvider(
                             LocalLayoutDirection provides config.layoutDirection
@@ -969,6 +973,166 @@ class ScrollTest(private val config: Config) {
         assertThat(sizeParam).isEqualTo(Constraints.Infinity)
     }
 
+    @Test
+    fun canNotScrollForwardOrBackward() {
+        val scrollState = ScrollState(initial = 0)
+
+        composeScroller(scrollState)
+
+        rule.runOnIdle {
+            assertTrue(scrollState.maxValue == 0)
+            assertFalse(scrollState.canScrollForward)
+            assertFalse(scrollState.canScrollBackward)
+        }
+    }
+
+    @SdkSuppress(minSdkVersion = 26)
+    @Test
+    fun canScrollForward() {
+        val scrollState = ScrollState(initial = 0)
+        val size = 30
+
+        composeScroller(scrollState, mainAxisSize = size)
+
+        validateScroller(mainAxis = size)
+
+        rule.runOnIdle {
+            assertTrue(scrollState.value == 0)
+            assertTrue(scrollState.maxValue > 0)
+            assertTrue(scrollState.canScrollForward)
+            assertFalse(scrollState.canScrollBackward)
+        }
+    }
+
+    @SdkSuppress(minSdkVersion = 26)
+    @Test
+    fun canScrollBackward() {
+        val scrollState = ScrollState(initial = 0)
+        val scrollDistance = 10
+        val size = 30
+
+        composeScroller(scrollState, mainAxisSize = size)
+
+        validateScroller(mainAxis = size)
+
+        rule.waitForIdle()
+        assertEquals(scrollDistance, scrollState.maxValue)
+        scope.launch {
+            scrollState.scrollTo(scrollDistance)
+        }
+
+        rule.runOnIdle {
+            assertTrue(scrollState.value == scrollDistance)
+            assertTrue(scrollState.maxValue == scrollDistance)
+            assertFalse(scrollState.canScrollForward)
+            assertTrue(scrollState.canScrollBackward)
+        }
+    }
+
+    @SdkSuppress(minSdkVersion = 26)
+    @Test
+    fun canScrollForwardAndBackward() {
+        val scrollState = ScrollState(initial = 0)
+        val scrollDistance = 5
+        val size = 30
+
+        composeScroller(scrollState, mainAxisSize = size)
+
+        validateScroller(mainAxis = size)
+
+        rule.waitForIdle()
+        assertEquals(scrollDistance, scrollState.maxValue / 2)
+        scope.launch {
+            scrollState.scrollTo(scrollDistance)
+        }
+
+        rule.runOnIdle {
+            assertTrue(scrollState.value == scrollDistance)
+            assertTrue(scrollState.maxValue == scrollDistance * 2)
+            assertTrue(scrollState.canScrollForward)
+            assertTrue(scrollState.canScrollBackward)
+        }
+    }
+
+    @Test
+    fun viewPortSize_shouldRepresentScrollableLayoutSize_contentFits() {
+        val state = ScrollState(0)
+        val scrollerSize = colors.size * defaultCellSize
+        composeScroller(scrollState = state, mainAxisSize = scrollerSize)
+        assertThat(state.viewportSize).isEqualTo(scrollerSize)
+    }
+
+    @Test
+    fun viewPortSize_shouldRepresentScrollableLayoutSize_contentDoesNotFit() {
+        val state = ScrollState(0)
+        val scrollerSize = 30
+        composeScroller(scrollState = state, mainAxisSize = scrollerSize)
+        assertThat(state.viewportSize).isEqualTo(scrollerSize)
+    }
+
+    @Test
+    fun onMaxValueUpdate_shouldNotGenerateExtraMeasurements() {
+        var measurements = 0
+        lateinit var scrollState: ScrollState
+
+        val sizeModifiers = if (config.orientation == Horizontal) {
+            Modifier
+                .fillMaxWidth()
+                .height(100.dp)
+        } else {
+            Modifier
+                .width(100.dp)
+                .fillMaxHeight()
+        }
+
+        val wrapperModifiers = Modifier
+            .testTag(scrollerTag)
+            .then(sizeModifiers)
+            .then(CountMeasureModifier { measurements++ })
+
+        val content: @Composable () -> Unit = {
+            repeat(25) {
+                Box(modifier = Modifier.size(100.dp)
+                    .padding(2.dp)
+                    .background(Color.Red))
+            }
+        }
+
+        rule.setContent {
+            scrollState = rememberScrollState()
+
+            CompositionLocalProvider(LocalLayoutDirection provides config.layoutDirection) {
+                if (config.orientation == Horizontal) {
+                    Row(
+                        Modifier
+                            .horizontalScroll(scrollState)
+                            .then(wrapperModifiers),
+                        content = { content() }
+                    )
+                } else {
+                    Column(
+                        Modifier
+                            .verticalScroll(scrollState)
+                            .then(wrapperModifiers),
+                        content = { content() }
+                    )
+                }
+            }
+        }
+
+        val previousMeasurement = measurements
+
+        rule.onNodeWithTag(scrollerTag)
+            .performTouchInput {
+                configAwareSwipe()
+            }
+
+        rule.runOnIdle {
+            assertThat(scrollState.value).isNotEqualTo(0) // check we scrolled
+            assertThat(measurements).isEqualTo(previousMeasurement) // no extra measurements
+        }
+    }
+
     private fun Modifier.intrinsicMainAxisSize(size: IntrinsicSize): Modifier =
         if (config.orientation == Horizontal) {
             width(size)
@@ -1019,6 +1183,7 @@ class ScrollTest(private val config: Config) {
                 height = mainAxisSize,
                 rowHeight = cellSize
             )
+
             Horizontal -> composeHorizontalScroller(
                 scrollState = scrollState,
                 isReversed = isReversed,
@@ -1116,6 +1281,7 @@ class ScrollTest(private val config: Config) {
                 height = mainAxis,
                 rowHeight = cellSize
             )
+
             Horizontal -> validateHorizontalScroller(
                 offset = offset,
                 width = mainAxis,
@@ -1276,5 +1442,11 @@ class ScrollTest(private val config: Config) {
             Offset(-inflate, -inflate),
             Size(size.width + inflate * 2, size.height + inflate * 2)
         )
+    }
+
+    private class CountMeasureModifier(val onRemeasure: () -> Unit) : OnRemeasuredModifier {
+        override fun onRemeasured(size: IntSize) {
+            onRemeasure.invoke()
+        }
     }
 }

@@ -18,14 +18,22 @@ package androidx.camera.camera2.pipe.integration.interop
 
 import android.hardware.camera2.CameraCharacteristics
 import androidx.annotation.RequiresApi
+import androidx.annotation.RestrictTo
+import androidx.camera.camera2.pipe.integration.adapter.CameraInfoAdapter
+import androidx.camera.camera2.pipe.integration.compat.workaround.getSafely
+import androidx.camera.camera2.pipe.integration.impl.CameraProperties
 import androidx.camera.core.CameraInfo
+import androidx.camera.core.impl.CameraInfoInternal
+import androidx.core.util.Preconditions
 
 /**
  * An interface for retrieving Camera2-related camera information.
  */
 @ExperimentalCamera2Interop
 @RequiresApi(21) // TODO(b/200306659): Remove and replace with annotation on package-info.java
-class Camera2CameraInfo private constructor() {
+class Camera2CameraInfo private constructor(
+    private val cameraProperties: CameraProperties,
+) {
 
     /**
      * Gets a camera characteristic value.
@@ -39,9 +47,9 @@ class Camera2CameraInfo private constructor() {
      * @return the value of the characteristic.
     </T> */
     fun <T> getCameraCharacteristic(
-        @Suppress("UNUSED_PARAMETER") key: CameraCharacteristics.Key<T>
+        key: CameraCharacteristics.Key<T>
     ): T? {
-        TODO()
+        return cameraProperties.metadata.getSafely(key)
     }
 
     /**
@@ -63,13 +71,8 @@ class Camera2CameraInfo private constructor() {
      * [androidx.camera.camera2.Camera2Config]).
      */
 
-    fun getCameraId(): String {
-        TODO()
-    }
+    fun getCameraId(): String = cameraProperties.cameraId.value
 
-    /**
-     * @hide
-     */
     companion object {
 
         /**
@@ -83,7 +86,19 @@ class Camera2CameraInfo private constructor() {
          */
         @JvmStatic
         fun from(@Suppress("UNUSED_PARAMETER") cameraInfo: CameraInfo): Camera2CameraInfo {
-            TODO()
+            var cameraInfoImpl = (cameraInfo as CameraInfoInternal).implementation
+            Preconditions.checkArgument(
+                cameraInfoImpl is CameraInfoAdapter,
+                "CameraInfo doesn't contain Camera2 implementation."
+            )
+            return (cameraInfoImpl as CameraInfoAdapter).camera2CameraInfo
         }
+
+        /**
+         * This is the workaround to prevent constructor from being added to public API.
+         */
+        @RestrictTo(RestrictTo.Scope.LIBRARY)
+        @JvmStatic
+        fun create(cameraProperties: CameraProperties) = Camera2CameraInfo(cameraProperties)
     }
 }

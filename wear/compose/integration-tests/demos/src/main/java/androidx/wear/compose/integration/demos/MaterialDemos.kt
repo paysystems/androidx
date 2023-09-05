@@ -27,16 +27,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.wear.compose.integration.demos.common.Centralize
+import androidx.wear.compose.integration.demos.common.ComposableDemo
+import androidx.wear.compose.integration.demos.common.DemoCategory
 import androidx.wear.compose.material.samples.AlertDialogSample
 import androidx.wear.compose.material.samples.AlertWithButtons
 import androidx.wear.compose.material.samples.AlertWithChips
+import androidx.wear.compose.material.samples.AnimateOptionChangePicker
 import androidx.wear.compose.material.samples.AppCardWithIcon
+import androidx.wear.compose.material.samples.AutoCenteringPickerGroup
 import androidx.wear.compose.material.samples.ButtonWithIcon
 import androidx.wear.compose.material.samples.ButtonWithText
 import androidx.wear.compose.material.samples.ChipWithIconAndLabel
-import androidx.wear.compose.material.samples.ChipWithIconAndLabelsAndOverlaidPlaceholder
 import androidx.wear.compose.material.samples.ChipWithIconAndLabelAndPlaceholders
 import androidx.wear.compose.material.samples.ChipWithIconAndLabels
+import androidx.wear.compose.material.samples.ChipWithIconAndLabelsAndOverlaidPlaceholder
 import androidx.wear.compose.material.samples.CircularProgressIndicatorFullscreenWithGap
 import androidx.wear.compose.material.samples.CircularProgressIndicatorWithAnimation
 import androidx.wear.compose.material.samples.CompactButtonWithIcon
@@ -59,6 +64,7 @@ import androidx.wear.compose.material.samples.OutlinedButtonWithIcon
 import androidx.wear.compose.material.samples.OutlinedChipWithIconAndLabel
 import androidx.wear.compose.material.samples.OutlinedCompactButtonWithIcon
 import androidx.wear.compose.material.samples.OutlinedCompactChipWithIconAndLabel
+import androidx.wear.compose.material.samples.PickerGroup24Hours
 import androidx.wear.compose.material.samples.ScalingLazyColumnEdgeAnchoredAndAnimatedScrollTo
 import androidx.wear.compose.material.samples.SimplePicker
 import androidx.wear.compose.material.samples.SimpleScaffoldWithScrollIndicator
@@ -69,7 +75,10 @@ import androidx.wear.compose.material.samples.SimpleSwipeToDismissBox
 import androidx.wear.compose.material.samples.SplitToggleChipWithCheckbox
 import androidx.wear.compose.material.samples.StatefulSwipeToDismissBox
 import androidx.wear.compose.material.samples.StepperSample
+import androidx.wear.compose.material.samples.StepperWithCustomSemanticsSample
 import androidx.wear.compose.material.samples.StepperWithIntegerSample
+import androidx.wear.compose.material.samples.StepperWithoutRangeSemanticsSample
+import androidx.wear.compose.material.samples.TextPlaceholder
 import androidx.wear.compose.material.samples.TimeTextAnimation
 import androidx.wear.compose.material.samples.TimeTextWithFullDateAndTimeFormat
 import androidx.wear.compose.material.samples.TimeTextWithStatus
@@ -80,42 +89,6 @@ import androidx.wear.compose.material.samples.ToggleChipWithRadioButton
 import androidx.wear.compose.material.samples.ToggleChipWithSwitch
 import java.time.LocalDate
 import java.time.LocalTime
-
-// Declare the swipe to dismiss demos so that we can use this variable as the background composable
-// for the SwipeToDismissDemo itself.
-internal val SwipeToDismissDemos =
-    DemoCategory(
-        "Swipe to Dismiss",
-        listOf(
-            DemoCategory(
-                "Samples",
-                listOf(
-                    ComposableDemo("Simple") { params ->
-                        SimpleSwipeToDismissBox(params.navigateBack)
-                    },
-                    ComposableDemo("Stateful") { StatefulSwipeToDismissBox() },
-                    ComposableDemo("Edge swipe") { params ->
-                        EdgeSwipeForSwipeToDismiss(params.navigateBack)
-                    },
-                )
-            ),
-            DemoCategory(
-                "Demos",
-                listOf(
-                    ComposableDemo("Demo") { params ->
-                        val state = remember { mutableStateOf(SwipeDismissDemoState.List) }
-                        SwipeToDismissDemo(navigateBack = params.navigateBack, demoState = state)
-                    },
-                    ComposableDemo("Stateful Demo") { params ->
-                        SwipeToDismissBoxWithState(params.navigateBack)
-                    },
-                    ComposableDemo("EdgeSwipeToDismiss modifier") { params ->
-                        EdgeSwipeDemo(params.swipeToDismissBoxState)
-                    },
-                )
-            )
-        )
-    )
 
 @SuppressLint("ClassVerificationFailure")
 val WearMaterialDemos = DemoCategory(
@@ -137,6 +110,9 @@ val WearMaterialDemos = DemoCategory(
                 },
                 ComposableDemo("SLC Cards offset>0") {
                     ScrollAwayScalingLazyColumnCardDemoMismatch()
+                },
+                ComposableDemo("Out of range") {
+                    ScrollAwayScalingLazyColumnCardDemoOutOfRange()
                 },
                 ComposableDemo("SLC Chips") {
                     ScrollAwayScalingLazyColumnChipDemo()
@@ -178,11 +154,35 @@ val WearMaterialDemos = DemoCategory(
                                 params.navigateBack()
                             },
                             date = datePickerDate
-
+                        )
+                    },
+                    ComposableDemo("From Date Picker") { params ->
+                        var datePickerDate by remember { mutableStateOf(LocalDate.now()) }
+                        DatePicker(
+                            onDateConfirm = {
+                                datePickerDate = it
+                                params.navigateBack()
+                            },
+                            date = datePickerDate,
+                            fromDate = datePickerDate
+                        )
+                    },
+                    ComposableDemo("To Date Picker") { params ->
+                        var datePickerDate by remember { mutableStateOf(LocalDate.now()) }
+                        DatePicker(
+                            onDateConfirm = {
+                                datePickerDate = it
+                                params.navigateBack()
+                            },
+                            date = datePickerDate,
+                            toDate = datePickerDate
                         )
                     },
                     ComposableDemo("Simple Picker") { SimplePicker() },
                     ComposableDemo("No gradient") { PickerWithoutGradient() },
+                    ComposableDemo("Animate picker change") { AnimateOptionChangePicker() },
+                    ComposableDemo("Sample Picker Group") { PickerGroup24Hours() },
+                    ComposableDemo("Autocentering Picker Group") { AutoCenteringPickerGroup() }
                 )
             } else {
                 listOf(
@@ -237,6 +237,12 @@ val WearMaterialDemos = DemoCategory(
                         ComposableDemo("Integer Stepper") {
                             Centralize { StepperWithIntegerSample() }
                         },
+                        ComposableDemo("Stepper without RangeSemantics") {
+                            Centralize { StepperWithoutRangeSemanticsSample() }
+                        },
+                        ComposableDemo("Stepper with customSemantics") {
+                            Centralize { StepperWithCustomSemanticsSample() }
+                        }
                     )
                 ),
                 DemoCategory(
@@ -420,6 +426,11 @@ val WearMaterialDemos = DemoCategory(
                                 ChipWithIconAndLabelsAndOverlaidPlaceholder()
                             }
                         },
+                        ComposableDemo("Simple Text Placeholder") {
+                            Centralize(Modifier.padding(horizontal = 10.dp)) {
+                                TextPlaceholder()
+                            }
+                        },
                      )
                 ),
                 DemoCategory(
@@ -548,7 +559,14 @@ val WearMaterialDemos = DemoCategory(
                 )
             )
         ),
-        SwipeToDismissDemos,
+        DemoCategory(
+            title = "Swipe To Dismiss",
+            listOf(
+                ComposableDemo("Simple") { SimpleSwipeToDismissBox(it.navigateBack) },
+                ComposableDemo("Stateful") { StatefulSwipeToDismissBox() },
+                ComposableDemo("Edge swipe") { EdgeSwipeForSwipeToDismiss(it.navigateBack) },
+            )
+        ),
         DemoCategory(
             "List (Scaling Lazy Column)",
             listOf(

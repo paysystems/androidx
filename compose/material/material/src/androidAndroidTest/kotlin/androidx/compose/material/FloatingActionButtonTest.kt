@@ -17,23 +17,34 @@
 package androidx.compose.material
 
 import android.os.Build
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.testutils.assertShape
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertWidthIsAtLeast
@@ -43,6 +54,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
@@ -71,6 +83,7 @@ class FloatingActionButtonTest {
         }
 
         rule.onNodeWithTag("myButton")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
             .assertIsEnabled()
     }
 
@@ -143,14 +156,18 @@ class FloatingActionButtonTest {
         rule.setMaterialContent {
             Column {
                 Spacer(
-                    Modifier.requiredSize(10.dp).weight(1f).onGloballyPositioned {
-                        item1Bounds = it.boundsInRoot()
-                    }
+                    Modifier
+                        .requiredSize(10.dp)
+                        .weight(1f)
+                        .onGloballyPositioned {
+                            item1Bounds = it.boundsInRoot()
+                        }
                 )
 
                 FloatingActionButton(
                     onClick = {},
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f)
                         .onGloballyPositioned {
                             buttonBounds = it.boundsInRoot()
                         }
@@ -158,7 +175,10 @@ class FloatingActionButtonTest {
                     Text("Button")
                 }
 
-                Spacer(Modifier.requiredSize(10.dp).weight(1f))
+                Spacer(
+                    Modifier
+                        .requiredSize(10.dp)
+                        .weight(1f))
             }
         }
 
@@ -252,7 +272,8 @@ class FloatingActionButtonTest {
                     }
                 ) {
                     Box(
-                        Modifier.size(2.dp)
+                        Modifier
+                            .size(2.dp)
                             .onGloballyPositioned { contentCoordinates = it }
                     )
                 }
@@ -281,7 +302,8 @@ class FloatingActionButtonTest {
                 ExtendedFloatingActionButton(
                     text = {
                         Box(
-                            Modifier.size(2.dp)
+                            Modifier
+                                .size(2.dp)
                                 .onGloballyPositioned { contentCoordinates = it }
                         )
                     },
@@ -314,13 +336,15 @@ class FloatingActionButtonTest {
                 ExtendedFloatingActionButton(
                     text = {
                         Box(
-                            Modifier.size(2.dp)
+                            Modifier
+                                .size(2.dp)
                                 .onGloballyPositioned { textCoordinates = it }
                         )
                     },
                     icon = {
                         Box(
-                            Modifier.size(10.dp)
+                            Modifier
+                                .size(10.dp)
                                 .onGloballyPositioned { iconCoordinates = it }
                         )
                     },
@@ -348,6 +372,114 @@ class FloatingActionButtonTest {
                     textBounds.center.x - textBounds.width / 2 - halfPadding
                 )
             }
+        }
+    }
+
+    @Test
+    fun floatingActionButtonElevation_newInteraction() {
+        val interactionSource = MutableInteractionSource()
+        val defaultElevation = 1.dp
+        val pressedElevation = 2.dp
+        val hoveredElevation = 3.dp
+        val focusedElevation = 4.dp
+        lateinit var elevation: State<Dp>
+
+        rule.setMaterialContent {
+            val fabElevation = FloatingActionButtonDefaults.elevation(
+                defaultElevation = defaultElevation,
+                pressedElevation = pressedElevation,
+                hoveredElevation = hoveredElevation,
+                focusedElevation = focusedElevation
+            )
+
+            elevation = fabElevation.elevation(interactionSource)
+        }
+
+        rule.runOnIdle {
+            assertThat(elevation.value).isEqualTo(defaultElevation)
+        }
+
+        rule.runOnIdle {
+            interactionSource.tryEmit(PressInteraction.Press(Offset.Zero))
+        }
+
+        rule.runOnIdle {
+            assertThat(elevation.value).isEqualTo(pressedElevation)
+        }
+    }
+
+    @Test
+    fun floatingActionButtonElevation_newValue() {
+        val interactionSource = MutableInteractionSource()
+        var defaultElevation by mutableStateOf(1.dp)
+        val pressedElevation = 2.dp
+        val hoveredElevation = 3.dp
+        val focusedElevation = 4.dp
+        lateinit var elevation: State<Dp>
+
+        rule.setMaterialContent {
+             val fabElevation = FloatingActionButtonDefaults.elevation(
+                defaultElevation = defaultElevation,
+                pressedElevation = pressedElevation,
+                hoveredElevation = hoveredElevation,
+                focusedElevation = focusedElevation
+            )
+
+            elevation = fabElevation.elevation(interactionSource)
+        }
+
+        rule.runOnIdle {
+            assertThat(elevation.value).isEqualTo(defaultElevation)
+        }
+
+        rule.runOnIdle {
+            defaultElevation = 5.dp
+        }
+
+        rule.runOnIdle {
+            assertThat(elevation.value).isEqualTo(5.dp)
+        }
+    }
+
+    @Test
+    fun floatingActionButtonElevation_newValueDuringInteraction() {
+        val interactionSource = MutableInteractionSource()
+        val defaultElevation = 1.dp
+        var pressedElevation by mutableStateOf(2.dp)
+        val hoveredElevation = 3.dp
+        val focusedElevation = 4.dp
+        lateinit var elevation: State<Dp>
+
+        rule.setMaterialContent {
+            val fabElevation = FloatingActionButtonDefaults.elevation(
+                defaultElevation = defaultElevation,
+                pressedElevation = pressedElevation,
+                hoveredElevation = hoveredElevation,
+                focusedElevation = focusedElevation
+            )
+
+            elevation = fabElevation.elevation(interactionSource)
+        }
+
+        rule.runOnIdle {
+            assertThat(elevation.value).isEqualTo(defaultElevation)
+        }
+
+        rule.runOnIdle {
+            interactionSource.tryEmit(PressInteraction.Press(Offset.Zero))
+        }
+
+        rule.runOnIdle {
+            assertThat(elevation.value).isEqualTo(pressedElevation)
+        }
+
+        rule.runOnIdle {
+            pressedElevation = 5.dp
+        }
+
+        // We are still pressed, so we should now show the updated value for the pressed state
+        rule.runOnIdle {
+            assertThat(elevation.value).isEqualTo(5.dp)
         }
     }
 }

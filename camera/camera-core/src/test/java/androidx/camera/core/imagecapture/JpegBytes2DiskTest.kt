@@ -16,7 +16,6 @@
 
 package androidx.camera.core.imagecapture
 
-import android.graphics.BitmapFactory
 import android.graphics.ImageFormat
 import android.graphics.Matrix
 import android.graphics.Rect
@@ -25,6 +24,7 @@ import android.os.Build
 import android.util.Size
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCapture.OutputFileOptions
+import androidx.camera.core.imagecapture.JpegBytes2Disk.moveFileToTarget
 import androidx.camera.core.imagecapture.Utils.ALTITUDE
 import androidx.camera.core.imagecapture.Utils.CAMERA_CAPTURE_RESULT
 import androidx.camera.core.imagecapture.Utils.EXIF_DESCRIPTION
@@ -35,12 +35,11 @@ import androidx.camera.core.imagecapture.Utils.WIDTH
 import androidx.camera.core.impl.utils.Exif
 import androidx.camera.core.impl.utils.Exif.createFromFileString
 import androidx.camera.core.processing.Packet
-import androidx.camera.testing.ExifUtil.createExif
-import androidx.camera.testing.TestImageUtil.createBitmap
-import androidx.camera.testing.TestImageUtil.createJpegBytes
-import androidx.camera.testing.TestImageUtil.getAverageDiff
+import androidx.camera.testing.impl.ExifUtil.createExif
+import androidx.camera.testing.impl.TestImageUtil.createJpegBytes
 import com.google.common.truth.Truth.assertThat
-import java.io.FileOutputStream
+import java.io.File
+import java.util.UUID
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -60,39 +59,18 @@ class JpegBytes2DiskTest {
     private val operation = JpegBytes2Disk()
 
     @Test
-    fun saveToOutputStream_verifySavedImageIsIdentical() {
-        // Arrange.
-        val jpegBytes = createJpegBytes(WIDTH, HEIGHT)
-        val inputPacket = Packet.of(
-            jpegBytes,
-            createExif(jpegBytes),
-            ImageFormat.JPEG,
-            Size(WIDTH, HEIGHT),
-            Rect(0, 0, WIDTH, HEIGHT),
-            ROTATION_DEGREES,
-            Matrix(),
-            CAMERA_CAPTURE_RESULT
-        )
-        // Act: save to a OutputStream.
-        FileOutputStream(TEMP_FILE).use {
-            val input = JpegBytes2Disk.In.of(inputPacket, OutputFileOptions.Builder(it).build())
-            operation.apply(input)
-        }
-        // Assert.
-        val restoredBitmap = BitmapFactory.decodeFile(TEMP_FILE.path)
-        assertThat(getAverageDiff(restoredBitmap, createBitmap(WIDTH, HEIGHT))).isEqualTo(0)
-    }
-
-    @Test
-    fun saveToFile_verifySavedImageIsIdentical() {
-        // Act.
-        val path = saveFileAndGetPath()
-        // Assert: image is identical.
-        val restoredBitmap = BitmapFactory.decodeFile(path)
-        assertThat(getAverageDiff(restoredBitmap, createBitmap(WIDTH, HEIGHT))).isEqualTo(0)
-        // Assert: exif rotation matches the packet rotation.
-        val restoredExif = createFromFileString(path)
-        assertThat(restoredExif.rotation).isEqualTo(ROTATION_DEGREES)
+    fun copyToDestination_tempFileDeleted() {
+        // Arrange: create a file with a string.
+        val fileContent = "fileContent"
+        TEMP_FILE.writeText(fileContent, Charsets.UTF_8)
+        val destination = File.createTempFile(
+            "unit_test_" + UUID.randomUUID().toString(), ".temp"
+        ).also { it.deleteOnExit() }
+        // Act: move the file to the destination.
+        moveFileToTarget(TEMP_FILE, OutputFileOptions.Builder(destination).build())
+        // Assert: the temp file is deleted and the destination file has the same content.
+        assertThat(File(TEMP_FILE.absolutePath).exists()).isFalse()
+        assertThat(File(destination.absolutePath).readText(Charsets.UTF_8)).isEqualTo(fileContent)
     }
 
     @Test

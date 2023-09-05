@@ -25,7 +25,6 @@ import kotlin.reflect.KClass
 /**
  * Converts public API object into internal proto for ipc.
  *
- * @suppress
  */
 fun KClass<out Record>.toDataTypeName(): String =
     RECORDS_CLASS_NAME_MAP[this] ?: throw UnsupportedOperationException("Not supported yet: $this")
@@ -36,5 +35,4 @@ fun KClass<out Record>.toDataType(): DataType =
 fun String.toDataTypeKClass(): KClass<out Record> =
     RECORDS_TYPE_NAME_MAP[this] ?: throw UnsupportedOperationException("Not supported yet: $this")
 
-fun DataType.toDataTypeKClass(): KClass<out Record> =
-    name.toDataTypeKClass()
+fun DataType.toDataTypeKClass(): KClass<out Record> = name.toDataTypeKClass()

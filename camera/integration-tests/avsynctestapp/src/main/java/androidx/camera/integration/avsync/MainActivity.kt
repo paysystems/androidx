@@ -16,9 +16,13 @@
 
 package androidx.camera.integration.avsync
 
+import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.annotation.DoNotInline
+import androidx.annotation.RequiresApi
 import androidx.compose.material.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.core.util.Preconditions
@@ -29,16 +33,34 @@ private const val DEFAULT_BEEP_FREQUENCY = 1500
 private const val DEFAULT_BEEP_ENABLED = true
 private const val MIN_SCREEN_BRIGHTNESS = 0F
 private const val MAX_SCREEN_BRIGHTNESS = 1F
-private const val DEFAULT_SCREEN_BRIGHTNESS = 0.5F
+private const val DEFAULT_SCREEN_BRIGHTNESS = 0.8F
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        handleScreenLock()
         setScreenBrightness()
         setContent {
             App(getBeepFrequency(), getBeepEnabled())
+        }
+    }
+
+    private fun handleScreenLock() {
+        if (Build.VERSION.SDK_INT >= 27) {
+            Api27Impl.setShowWhenLocked(this, true)
+            Api27Impl.setTurnScreenOn(this, true)
+            window.addFlags(
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            window.addFlags(
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                    or WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                    or WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            )
         }
     }
 
@@ -66,6 +88,17 @@ class MainActivity : ComponentActivity() {
         val layoutParam = window.attributes
         layoutParam.screenBrightness = brightness
         window.attributes = layoutParam
+    }
+
+    @RequiresApi(27)
+    private object Api27Impl {
+        @DoNotInline
+        fun setShowWhenLocked(activity: ComponentActivity, showWhenLocked: Boolean) =
+            activity.setShowWhenLocked(showWhenLocked)
+
+        @DoNotInline
+        fun setTurnScreenOn(activity: ComponentActivity, turnScreenOn: Boolean) =
+            activity.setTurnScreenOn(turnScreenOn)
     }
 }
 

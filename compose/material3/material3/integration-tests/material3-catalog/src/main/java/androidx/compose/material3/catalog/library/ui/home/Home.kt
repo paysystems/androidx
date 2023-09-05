@@ -16,11 +16,10 @@
 
 package androidx.compose.material3.catalog.library.ui.home
 
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
-import androidx.compose.foundation.layout.consumedWindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -35,22 +34,25 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun Home(
     components: List<Component>,
     theme: Theme,
     onThemeChange: (theme: Theme) -> Unit,
-    onComponentClick: (component: Component) -> Unit
+    onComponentClick: (component: Component) -> Unit,
+    favorite: Boolean = false,
+    onFavoriteClick: () -> Unit,
 ) {
     val ltr = LocalLayoutDirection.current
     CatalogScaffold(
         topBarTitle = stringResource(id = R.string.compose_material_3),
         theme = theme,
-        onThemeChange = onThemeChange
+        onThemeChange = onThemeChange,
+        favorite = favorite,
+        onFavoriteClick = onFavoriteClick
     ) { paddingValues ->
         LazyVerticalGrid(
-            modifier = Modifier.consumedWindowInsets(paddingValues),
+            modifier = Modifier.consumeWindowInsets(paddingValues),
             columns = GridCells.Adaptive(HomeCellMinSize),
             content = {
                 items(components) { component ->

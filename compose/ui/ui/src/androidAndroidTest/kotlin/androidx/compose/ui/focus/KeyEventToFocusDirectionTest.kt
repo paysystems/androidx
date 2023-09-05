@@ -16,8 +16,13 @@
 
 package androidx.compose.ui.focus
 
+import android.view.KeyEvent as AndroidKeyEvent
+import android.view.KeyEvent.ACTION_DOWN as KeyDown
+import android.view.KeyEvent.META_SHIFT_ON as Shift
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.focus.FocusDirection.Companion.Down
+import androidx.compose.ui.focus.FocusDirection.Companion.Enter
+import androidx.compose.ui.focus.FocusDirection.Companion.Exit
 import androidx.compose.ui.focus.FocusDirection.Companion.Left
 import androidx.compose.ui.focus.FocusDirection.Companion.Next
 import androidx.compose.ui.focus.FocusDirection.Companion.Previous
@@ -36,11 +41,6 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import android.view.KeyEvent as AndroidKeyEvent
-import android.view.KeyEvent.ACTION_DOWN as KeyDown
-import android.view.KeyEvent.META_SHIFT_ON as Shift
-import androidx.compose.ui.focus.FocusDirection.Companion.Enter
-import androidx.compose.ui.focus.FocusDirection.Companion.Exit
 
 @SmallTest
 @RunWith(AndroidJUnit4::class)
@@ -98,6 +98,30 @@ class KeyEventToFocusDirectionTest {
     fun down() {
         // Arrange.
         val keyEvent = KeyEvent(AndroidKeyEvent(KeyDown, Key.DirectionDown.nativeKeyCode))
+
+        // Act.
+        val focusDirection = owner.getFocusDirection(keyEvent)
+
+        // Assert.
+        assertThat(focusDirection).isEqualTo(Down)
+    }
+
+    @Test
+    fun page_up() {
+        // Arrange.
+        val keyEvent = KeyEvent(AndroidKeyEvent(KeyDown, Key.PageUp.nativeKeyCode))
+
+        // Act.
+        val focusDirection = owner.getFocusDirection(keyEvent)
+
+        // Assert.
+        assertThat(focusDirection).isEqualTo(Up)
+    }
+
+    @Test
+    fun page_down() {
+        // Arrange.
+        val keyEvent = KeyEvent(AndroidKeyEvent(KeyDown, Key.PageDown.nativeKeyCode))
 
         // Act.
         val focusDirection = owner.getFocusDirection(keyEvent)

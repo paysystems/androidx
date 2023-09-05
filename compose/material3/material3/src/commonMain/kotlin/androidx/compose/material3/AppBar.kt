@@ -27,7 +27,6 @@ import androidx.compose.animation.core.animateDecay
 import androidx.compose.animation.core.animateTo
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.rememberSplineBasedDecay
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -37,7 +36,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -57,7 +55,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.listSaver
@@ -68,6 +66,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -82,6 +81,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.fastFirst
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -110,7 +110,7 @@ import kotlin.math.roundToInt
  * [IconButton]s. The default layout here is a [Row], so icons inside will be placed horizontally.
  * @param windowInsets a window insets that app bar will respect.
  * @param colors [TopAppBarColors] that will be used to resolve the colors used for this top app
- * bar in different states. See [TopAppBarDefaults.smallTopAppBarColors].
+ * bar in different states. See [TopAppBarDefaults.topAppBarColors].
  * @param scrollBehavior a [TopAppBarScrollBehavior] which holds various offset values that will be
  * applied by this top app bar to set up its height and colors. A scroll behavior is designed to
  * work in conjunction with a scrolled content to change the top app bar appearance as the content
@@ -124,7 +124,7 @@ fun TopAppBar(
     navigationIcon: @Composable () -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
     windowInsets: WindowInsets = TopAppBarDefaults.windowInsets,
-    colors: TopAppBarColors = TopAppBarDefaults.smallTopAppBarColors(),
+    colors: TopAppBarColors = TopAppBarDefaults.topAppBarColors(),
     scrollBehavior: TopAppBarScrollBehavior? = null
 ) {
     SingleRowTopAppBar(
@@ -164,7 +164,7 @@ fun TopAppBar(
  * [IconButton]s. The default layout here is a [Row], so icons inside will be placed horizontally.
  * @param windowInsets a window insets that app bar will respect.
  * @param colors [TopAppBarColors] that will be used to resolve the colors used for this top app
- * bar in different states. See [TopAppBarDefaults.smallTopAppBarColors].
+ * bar in different states. See [TopAppBarDefaults.topAppBarColors].
  * @param scrollBehavior a [TopAppBarScrollBehavior] which holds various offset values that will be
  * applied by this top app bar to set up its height and colors. A scroll behavior is designed to
  * work in conjunction with a scrolled content to change the top app bar appearance as the content
@@ -187,7 +187,7 @@ fun SmallTopAppBar(
     navigationIcon: @Composable () -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
     windowInsets: WindowInsets = TopAppBarDefaults.windowInsets,
-    colors: TopAppBarColors = TopAppBarDefaults.smallTopAppBarColors(),
+    colors: TopAppBarColors = TopAppBarDefaults.topAppBarColors(),
     scrollBehavior: TopAppBarScrollBehavior? = null
 ) = TopAppBar(title, modifier, navigationIcon, actions, windowInsets, colors, scrollBehavior)
 
@@ -409,9 +409,13 @@ fun BottomAppBar(
     windowInsets = windowInsets,
     contentPadding = contentPadding
 ) {
-    actions()
+    Row(
+        modifier = Modifier.weight(1f),
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.CenterVertically,
+        content = actions,
+    )
     if (floatingActionButton != null) {
-        Spacer(Modifier.weight(1f, true))
         Box(
             Modifier
                 .fillMaxHeight()
@@ -466,7 +470,7 @@ fun BottomAppBar(
         contentColor = contentColor,
         tonalElevation = tonalElevation,
         // TODO(b/209583788): Consider adding a shape parameter if updated design guidance allows
-        shape = BottomAppBarTokens.ContainerShape.toShape(),
+        shape = BottomAppBarTokens.ContainerShape.value,
         modifier = modifier
     ) {
         Row(
@@ -532,7 +536,7 @@ interface TopAppBarScrollBehavior {
 object TopAppBarDefaults {
 
     /**
-     * Creates a [TopAppBarColors] for small top app bars. The default implementation animates
+     * Creates a [TopAppBarColors] for small [TopAppBar]. The default implementation animates
      * between the provided colors according to the Material Design specification.
      *
      * @param containerColor the container color
@@ -543,17 +547,56 @@ object TopAppBarDefaults {
      * @return the resulting [TopAppBarColors] used for the top app bar
      */
     @Composable
-    fun smallTopAppBarColors(
-        containerColor: Color = TopAppBarSmallTokens.ContainerColor.toColor(),
+    fun topAppBarColors(
+        containerColor: Color = TopAppBarSmallTokens.ContainerColor.value,
         scrolledContainerColor: Color = MaterialTheme.colorScheme.applyTonalElevation(
             backgroundColor = containerColor,
             elevation = TopAppBarSmallTokens.OnScrollContainerElevation
         ),
-        navigationIconContentColor: Color = TopAppBarSmallTokens.LeadingIconColor.toColor(),
-        titleContentColor: Color = TopAppBarSmallTokens.HeadlineColor.toColor(),
-        actionIconContentColor: Color = TopAppBarSmallTokens.TrailingIconColor.toColor(),
+        navigationIconContentColor: Color = TopAppBarSmallTokens.LeadingIconColor.value,
+        titleContentColor: Color = TopAppBarSmallTokens.HeadlineColor.value,
+        actionIconContentColor: Color = TopAppBarSmallTokens.TrailingIconColor.value,
     ): TopAppBarColors =
         TopAppBarColors(
+            containerColor,
+            scrolledContainerColor,
+            navigationIconContentColor,
+            titleContentColor,
+            actionIconContentColor
+        )
+
+    /**
+     * Creates a [TopAppBarColors] for small [TopAppBar]s. The default implementation animates
+     * between the provided colors according to the Material Design specification.
+     *
+     * @param containerColor the container color
+     * @param scrolledContainerColor the container color when content is scrolled behind it
+     * @param navigationIconContentColor the content color used for the navigation icon
+     * @param titleContentColor the content color used for the title
+     * @param actionIconContentColor the content color used for actions
+     * @return the resulting [TopAppBarColors] used for the top app bar
+     * @deprecated use [topAppBarColors] instead
+     */
+    @Deprecated(
+        message = "Use topAppBarColors instead.",
+        replaceWith = ReplaceWith(
+            "topAppBarColors(containerColor, scrolledContainerColor, " +
+                "navigationIconContentColor, titleContentColor, actionIconContentColor)"
+        ),
+        level = DeprecationLevel.WARNING
+    )
+    @Composable
+    fun smallTopAppBarColors(
+        containerColor: Color = TopAppBarSmallTokens.ContainerColor.value,
+        scrolledContainerColor: Color = MaterialTheme.colorScheme.applyTonalElevation(
+            backgroundColor = containerColor,
+            elevation = TopAppBarSmallTokens.OnScrollContainerElevation
+        ),
+        navigationIconContentColor: Color = TopAppBarSmallTokens.LeadingIconColor.value,
+        titleContentColor: Color = TopAppBarSmallTokens.HeadlineColor.value,
+        actionIconContentColor: Color = TopAppBarSmallTokens.TrailingIconColor.value,
+    ): TopAppBarColors =
+        topAppBarColors(
             containerColor,
             scrolledContainerColor,
             navigationIconContentColor,
@@ -570,7 +613,7 @@ object TopAppBarDefaults {
             .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top)
 
     /**
-     * Creates a [TopAppBarColors] for center aligned top app bars. The default implementation
+     * Creates a [TopAppBarColors] for [CenterAlignedTopAppBar]s. The default implementation
      * animates between the provided colors according to the Material Design specification.
      *
      * @param containerColor the container color
@@ -582,14 +625,14 @@ object TopAppBarDefaults {
      */
     @Composable
     fun centerAlignedTopAppBarColors(
-        containerColor: Color = TopAppBarSmallCenteredTokens.ContainerColor.toColor(),
+        containerColor: Color = TopAppBarSmallCenteredTokens.ContainerColor.value,
         scrolledContainerColor: Color = MaterialTheme.colorScheme.applyTonalElevation(
             backgroundColor = containerColor,
             elevation = TopAppBarSmallTokens.OnScrollContainerElevation
         ),
-        navigationIconContentColor: Color = TopAppBarSmallCenteredTokens.LeadingIconColor.toColor(),
-        titleContentColor: Color = TopAppBarSmallCenteredTokens.HeadlineColor.toColor(),
-        actionIconContentColor: Color = TopAppBarSmallCenteredTokens.TrailingIconColor.toColor(),
+        navigationIconContentColor: Color = TopAppBarSmallCenteredTokens.LeadingIconColor.value,
+        titleContentColor: Color = TopAppBarSmallCenteredTokens.HeadlineColor.value,
+        actionIconContentColor: Color = TopAppBarSmallCenteredTokens.TrailingIconColor.value,
     ): TopAppBarColors =
         TopAppBarColors(
             containerColor,
@@ -600,7 +643,7 @@ object TopAppBarDefaults {
         )
 
     /**
-     * Creates a [TopAppBarColors] for medium top app bars. The default implementation interpolates
+     * Creates a [TopAppBarColors] for [MediumTopAppBar]s. The default implementation interpolates
      * between the provided colors as the top app bar scrolls according to the Material Design
      * specification.
      *
@@ -613,14 +656,14 @@ object TopAppBarDefaults {
      */
     @Composable
     fun mediumTopAppBarColors(
-        containerColor: Color = TopAppBarMediumTokens.ContainerColor.toColor(),
+        containerColor: Color = TopAppBarMediumTokens.ContainerColor.value,
         scrolledContainerColor: Color = MaterialTheme.colorScheme.applyTonalElevation(
             backgroundColor = containerColor,
             elevation = TopAppBarSmallTokens.OnScrollContainerElevation
         ),
-        navigationIconContentColor: Color = TopAppBarMediumTokens.LeadingIconColor.toColor(),
-        titleContentColor: Color = TopAppBarMediumTokens.HeadlineColor.toColor(),
-        actionIconContentColor: Color = TopAppBarMediumTokens.TrailingIconColor.toColor(),
+        navigationIconContentColor: Color = TopAppBarMediumTokens.LeadingIconColor.value,
+        titleContentColor: Color = TopAppBarMediumTokens.HeadlineColor.value,
+        actionIconContentColor: Color = TopAppBarMediumTokens.TrailingIconColor.value,
     ): TopAppBarColors =
         TopAppBarColors(
             containerColor,
@@ -631,7 +674,7 @@ object TopAppBarDefaults {
         )
 
     /**
-     * Creates a [TopAppBarColors] for large top app bars. The default implementation interpolates
+     * Creates a [TopAppBarColors] for [LargeTopAppBar]s. The default implementation interpolates
      * between the provided colors as the top app bar scrolls according to the Material Design
      * specification.
      *
@@ -644,14 +687,14 @@ object TopAppBarDefaults {
      */
     @Composable
     fun largeTopAppBarColors(
-        containerColor: Color = TopAppBarLargeTokens.ContainerColor.toColor(),
+        containerColor: Color = TopAppBarLargeTokens.ContainerColor.value,
         scrolledContainerColor: Color = MaterialTheme.colorScheme.applyTonalElevation(
             backgroundColor = containerColor,
             elevation = TopAppBarSmallTokens.OnScrollContainerElevation
         ),
-        navigationIconContentColor: Color = TopAppBarLargeTokens.LeadingIconColor.toColor(),
-        titleContentColor: Color = TopAppBarLargeTokens.HeadlineColor.toColor(),
-        actionIconContentColor: Color = TopAppBarLargeTokens.TrailingIconColor.toColor(),
+        navigationIconContentColor: Color = TopAppBarLargeTokens.LeadingIconColor.value,
+        titleContentColor: Color = TopAppBarLargeTokens.HeadlineColor.value,
+        actionIconContentColor: Color = TopAppBarLargeTokens.TrailingIconColor.value,
     ): TopAppBarColors =
         TopAppBarColors(
             containerColor,
@@ -791,7 +834,7 @@ class TopAppBarState(
      *
      * Use this limit to coerce the [heightOffset] value when it's updated.
      */
-    var heightOffsetLimit by mutableStateOf(initialHeightOffsetLimit)
+    var heightOffsetLimit by mutableFloatStateOf(initialHeightOffsetLimit)
 
     /**
      * The top app bar's current height offset in pixels. This height offset is applied to the fixed
@@ -800,9 +843,9 @@ class TopAppBarState(
      * Updates to the [heightOffset] value are coerced between zero and [heightOffsetLimit].
      */
     var heightOffset: Float
-        get() = _heightOffset.value
+        get() = _heightOffset.floatValue
         set(newOffset) {
-            _heightOffset.value = newOffset.coerceIn(
+            _heightOffset.floatValue = newOffset.coerceIn(
                 minimumValue = heightOffsetLimit,
                 maximumValue = 0f
             )
@@ -818,7 +861,7 @@ class TopAppBarState(
      * consumes scroll events. A common implementation would update the value to be the sum of all
      * [NestedScrollConnection.onPostScroll] `consumed.y` values.
      */
-    var contentOffset by mutableStateOf(initialContentOffset)
+    var contentOffset by mutableFloatStateOf(initialContentOffset)
 
     /**
      * A value that represents the collapsed height percentage of the app bar.
@@ -866,22 +909,31 @@ class TopAppBarState(
         )
     }
 
-    private var _heightOffset = mutableStateOf(initialHeightOffset)
+    private var _heightOffset = mutableFloatStateOf(initialHeightOffset)
 }
 
 /**
  * Represents the colors used by a top app bar in different states.
  * This implementation animates the container color according to the top app bar scroll state. It
  * does not animate the leading, headline, or trailing colors.
+ *
+ * @constructor create an instance with arbitrary colors, see [TopAppBarColors] for a
+ * factory method using the default material3 spec
+ * @param containerColor the color used for the background of this BottomAppBar. Use
+ * [Color.Transparent] to have no color.
+ * @param scrolledContainerColor the container color when content is scrolled behind it
+ * @param navigationIconContentColor the content color used for the navigation icon
+ * @param titleContentColor the content color used for the title
+ * @param actionIconContentColor the content color used for actions
  */
 @ExperimentalMaterial3Api
 @Stable
-class TopAppBarColors internal constructor(
-    private val containerColor: Color,
-    private val scrolledContainerColor: Color,
-    internal val navigationIconContentColor: Color,
-    internal val titleContentColor: Color,
-    internal val actionIconContentColor: Color,
+class TopAppBarColors constructor(
+    val containerColor: Color,
+    val scrolledContainerColor: Color,
+    val navigationIconContentColor: Color,
+    val titleContentColor: Color,
+    val actionIconContentColor: Color,
 ) {
 
     /**
@@ -930,10 +982,10 @@ class TopAppBarColors internal constructor(
 /** Contains default values used for the bottom app bar implementations. */
 object BottomAppBarDefaults {
 
-    /** Default color used for [BottomAppBar] container **/
-    val containerColor: Color @Composable get() = BottomAppBarTokens.ContainerColor.toColor()
+    /** Default color used for [BottomAppBar] container */
+    val containerColor: Color @Composable get() = BottomAppBarTokens.ContainerColor.value
 
-    /** Default elevation used for [BottomAppBar] **/
+    /** Default elevation used for [BottomAppBar] */
     val ContainerElevation: Dp = BottomAppBarTokens.ContainerElevation
 
     /**
@@ -959,7 +1011,7 @@ object BottomAppBarDefaults {
     /** The color of a [BottomAppBar]'s [FloatingActionButton] */
     val bottomAppBarFabColor: Color
         @Composable get() =
-            FabSecondaryTokens.ContainerColor.toColor()
+            FabSecondaryTokens.ContainerColor.value
 }
 
 // Padding minus IconButton's min touch target expansion
@@ -1162,11 +1214,10 @@ private fun TwoRowsTopAppBar(
         Modifier
     }
 
-    Surface(modifier = modifier.then(appBarDragModifier)) {
+    Surface(modifier = modifier.then(appBarDragModifier), color = appBarContainerColor) {
         Column {
             TopAppBarLayout(
                 modifier = Modifier
-                    .background(color = appBarContainerColor)
                     .windowInsetsPadding(windowInsets)
                     // clip after padding so we don't show the title over the inset area
                     .clipToBounds(),
@@ -1187,7 +1238,11 @@ private fun TwoRowsTopAppBar(
                 actions = actionsRow,
             )
             TopAppBarLayout(
-                modifier = Modifier.clipToBounds(),
+                modifier = Modifier
+                    // only apply the horizontal sides of the window insets padding, since the top
+                    // padding will always be applied by the layout above
+                    .windowInsetsPadding(windowInsets.only(WindowInsetsSides.Horizontal))
+                    .clipToBounds(),
                 heightPx = maxHeightPx - pinnedHeightPx + (scrollBehavior?.state?.heightOffset
                     ?: 0f),
                 navigationIconContentColor =
@@ -1269,10 +1324,11 @@ private fun TopAppBarLayout(
                     .layoutId("title")
                     .padding(horizontal = TopAppBarHorizontalPadding)
                     .then(if (hideTitleSemantics) Modifier.clearAndSetSemantics { } else Modifier)
+                    .graphicsLayer(alpha = titleAlpha)
             ) {
                 ProvideTextStyle(value = titleTextStyle) {
                     CompositionLocalProvider(
-                        LocalContentColor provides titleContentColor.copy(alpha = titleAlpha),
+                        LocalContentColor provides titleContentColor,
                         content = title
                     )
                 }
@@ -1291,10 +1347,10 @@ private fun TopAppBarLayout(
         modifier = modifier
     ) { measurables, constraints ->
         val navigationIconPlaceable =
-            measurables.first { it.layoutId == "navigationIcon" }
+            measurables.fastFirst { it.layoutId == "navigationIcon" }
                 .measure(constraints.copy(minWidth = 0))
         val actionIconsPlaceable =
-            measurables.first { it.layoutId == "actionIcons" }
+            measurables.fastFirst { it.layoutId == "actionIcons" }
                 .measure(constraints.copy(minWidth = 0))
 
         val maxTitleWidth = if (constraints.maxWidth == Constraints.Infinity) {
@@ -1304,7 +1360,7 @@ private fun TopAppBarLayout(
                 .coerceAtLeast(0)
         }
         val titlePlaceable =
-            measurables.first { it.layoutId == "title" }
+            measurables.fastFirst { it.layoutId == "title" }
                 .measure(constraints.copy(minWidth = 0, maxWidth = maxTitleWidth))
 
         // Locate the title's baseline.
@@ -1315,7 +1371,7 @@ private fun TopAppBarLayout(
                 0
             }
 
-        val layoutHeight = heightPx.roundToInt()
+        val layoutHeight = if (heightPx.isNaN()) 0 else heightPx.roundToInt()
 
         layout(constraints.maxWidth, layoutHeight) {
             // Navigation icon
@@ -1327,7 +1383,24 @@ private fun TopAppBarLayout(
             // Title
             titlePlaceable.placeRelative(
                 x = when (titleHorizontalArrangement) {
-                    Arrangement.Center -> (constraints.maxWidth - titlePlaceable.width) / 2
+                    Arrangement.Center -> {
+                        var baseX = (constraints.maxWidth - titlePlaceable.width) / 2
+                        if (baseX < navigationIconPlaceable.width) {
+                            // May happen if the navigation is wider than the actions and the
+                            // title is long. In this case, prioritize showing more of the title by
+                            // offsetting it to the right.
+                            baseX += (navigationIconPlaceable.width - baseX)
+                        } else if (baseX + titlePlaceable.width >
+                            constraints.maxWidth - actionIconsPlaceable.width
+                        ) {
+                            // May happen if the actions are wider than the navigation and the title
+                            // is long. In this case, offset to the left.
+                            baseX += ((constraints.maxWidth - actionIconsPlaceable.width) -
+                                (baseX + titlePlaceable.width))
+                        }
+                        baseX
+                    }
+
                     Arrangement.End ->
                         constraints.maxWidth - titlePlaceable.width - actionIconsPlaceable.width
                     // Arrangement.Start.

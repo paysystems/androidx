@@ -21,6 +21,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -68,7 +69,9 @@ import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.test.filters.LargeTest
@@ -601,6 +604,43 @@ class LazyListTest(orientation: Orientation) : BaseLazyListTestWithOrientation(o
     }
 
     @Test
+    fun itemFillingParentSizeParentRecomposed_noRemeasureOnReuse() {
+        var counter = 0
+        val modifier = Modifier.layout { measurable, constraints ->
+            counter++
+            val placeable = measurable.measure(constraints)
+            layout(placeable.width, placeable.height) {
+                placeable.place(IntOffset.Zero)
+            }
+        }
+
+        lateinit var state: TvLazyListState
+        rule.setContentWithTestViewConfiguration {
+            state = rememberTvLazyListState()
+            LazyColumnOrRow(state = state) {
+                items(2) {
+                    Spacer(
+                        Modifier
+                            .fillParentMaxSize()
+                            .run {
+                                then(if (it == 0) modifier else Modifier)
+                            }
+                    )
+                }
+            }
+        }
+
+        rule.runOnIdle {
+            runBlocking {
+                state.scrollToItem(1)
+                state.scrollToItem(0)
+            }
+        }
+
+        assertThat(counter).isEqualTo(1)
+    }
+
+    @Test
     fun whenNotAnymoreAvailableItemWasDisplayed() {
         var items by mutableStateOf((1..30).toList())
         rule.setContentWithTestViewConfiguration {
@@ -673,9 +713,9 @@ class LazyListTest(orientation: Orientation) : BaseLazyListTestWithOrientation(o
 
         // and has no children
         rule.onNodeWithTag("1")
-            .assertDoesNotExist()
+            .assertIsNotPlaced()
         rule.onNodeWithTag("2")
-            .assertDoesNotExist()
+            .assertIsNotPlaced()
     }
 
     @Test
@@ -1488,15 +1528,24 @@ class LazyListTest(orientation: Orientation) : BaseLazyListTestWithOrientation(o
                 userScrollEnabled = false,
             ) {
                 items(5) {
-                    Spacer(Modifier.size(itemSize).testTag("$it"))
+                    Box(
+                        modifier = Modifier
+                            .size(itemSize)
+                            .border(2.dp, Color.Blue)
+                            .testTag("$it")
+                            .focusable()
+                    ) {
+                        BasicText("$it")
+                    }
                 }
             }
         }
 
-        rule.keyPress(1)
+        rule.onNodeWithTag("2").requestFocus()
+        rule.keyPress(2)
 
-        rule.onNodeWithTag("1")
-            .assertStartPositionInRootIsEqualTo(itemSize)
+        rule.onNodeWithTag("1").assertIsDisplayed()
+        rule.onNodeWithTag("3").assertIsNotDisplayed()
     }
 
     @Test
@@ -1756,6 +1805,67 @@ class LazyListTest(orientation: Orientation) : BaseLazyListTestWithOrientation(o
         rule.onNodeWithTag("item")
             .assertMainAxisSizeIsEqualTo(with(rule.density) { (100 * 0.95f).roundToInt().toDp() })
             .assertCrossAxisSizeIsEqualTo(0.dp)
+    }
+
+    @Test
+    fun fillingFullSize_nextItemIsNotComposed() {
+        val state = TvLazyListState()
+        state.prefetchingEnabled = false
+        val itemSizePx = 5f
+        val itemSize = with(rule.density) { itemSizePx.toDp() }
+        rule.setContentWithTestViewConfiguration {
+            LazyColumnOrRow(
+                Modifier
+                    .testTag(LazyListTag)
+                    .mainAxisSize(itemSize),
+                state = state
+            ) {
+                items(3) { index ->
+                    Box(fillParentMaxMainAxis().crossAxisSize(1.dp).testTag("$index"))
+                }
+            }
+        }
+
+        repeat(3) { index ->
+            rule.onNodeWithTag("$index")
+                .assertIsDisplayed()
+            rule.onNodeWithTag("${index + 1}")
+                .assertDoesNotExist()
+            rule.runOnIdle {
+                runBlocking {
+                    state.scrollBy(itemSizePx)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun fillingFullSize_crossAxisSizeOfVisibleItemIsUsed() {
+        val state = TvLazyListState()
+        val itemSizePx = 5f
+        val itemSize = with(rule.density) { itemSizePx.toDp() }
+        rule.setContentWithTestViewConfiguration {
+            LazyColumnOrRow(
+                Modifier
+                    .testTag(LazyListTag)
+                    .mainAxisSize(itemSize),
+                state = state
+            ) {
+                items(5) { index ->
+                    Box(fillParentMaxMainAxis().crossAxisSize(index.dp))
+                }
+            }
+        }
+
+        repeat(5) { index ->
+            rule.onNodeWithTag(LazyListTag)
+                .assertCrossAxisSizeIsEqualTo(index.dp)
+            rule.runOnIdle {
+                runBlocking {
+                    state.scrollBy(itemSizePx)
+                }
+            }
+        }
     }
 
     // ********************* END OF TESTS *********************

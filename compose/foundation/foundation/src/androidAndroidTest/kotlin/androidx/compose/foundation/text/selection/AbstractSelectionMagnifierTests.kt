@@ -16,12 +16,13 @@
 
 package androidx.compose.foundation.text.selection
 
-import androidx.compose.foundation.MagnifierPositionInRoot
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.Handle
+import androidx.compose.foundation.text.selection.gestures.util.longPress
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -30,7 +31,6 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.test.SemanticsMatcher.Companion.keyIsDefined
 import androidx.compose.ui.test.TouchInjectionScope
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
@@ -43,7 +43,15 @@ import androidx.compose.ui.text.style.ResolvedTextDirection
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.util.lerp
+import androidx.test.filters.RequiresDevice
+import com.google.common.truth.Fact
+import com.google.common.truth.FailureMetadata
+import com.google.common.truth.Subject
+import com.google.common.truth.Subject.Factory
+import com.google.common.truth.Truth
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import kotlin.math.sign
 import org.junit.Rule
 import org.junit.Test
@@ -59,14 +67,15 @@ internal abstract class AbstractSelectionMagnifierTests {
     val rule = createComposeRule()
 
     protected val defaultMagnifierSize = IntSize.Zero
-    private val tag = "tag"
+    protected val tag = "tag"
 
     @Composable
     abstract fun TestContent(
         text: String,
         modifier: Modifier,
         style: TextStyle,
-        onTextLayout: (TextLayoutResult) -> Unit
+        onTextLayout: (TextLayoutResult) -> Unit,
+        maxLines: Int
     )
 
     @Test
@@ -87,6 +96,122 @@ internal abstract class AbstractSelectionMagnifierTests {
         assertThat(center).isEqualTo(Offset.Unspecified)
     }
 
+    // Regression - magnifier should be constrained to end of line in BiDi,
+    // not the last offset which could be in middle of the line.
+    @Test
+    fun magnifier_centeredToEndOfLine_whenBidiEndOffsetInMiddleOfLine() {
+        val ltrWord = "hello"
+        val rtlWord = "בבבבב"
+
+        lateinit var textLayout: TextLayoutResult
+        rule.setContent {
+            Content(
+                text = """
+                    $rtlWord $ltrWord
+                    $ltrWord $rtlWord
+                    $rtlWord $ltrWord
+                """.trimIndent().trim(),
+                modifier = Modifier
+                    // Center the text to give the magnifier lots of room to move.
+                    .fillMaxSize()
+                    .wrapContentHeight()
+                    .testTag(tag),
+                onTextLayout = { textLayout = it }
+            )
+        }
+
+        val placedPosition = rule.onNodeWithTag(tag).fetchSemanticsNode().positionInRoot
+
+        fun getCenterForLine(line: Int): Float {
+            val top = textLayout.getLineTop(line)
+            val bottom = textLayout.getLineBottom(line)
+            return (bottom - top) / 2 + top
+        }
+
+        val farRightX = rule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot.right - 1f
+
+        rule.onNodeWithTag(tag).performTouchInput {
+            longPress(Offset(farRightX, getCenterForLine(0)))
+        }
+        rule.waitForIdle()
+        assertWithMessage("Magnifier should not be shown")
+            .that(getMagnifierCenterOffset(rule).isUnspecified)
+            .isTrue()
+
+        val secondLineCenterY = getCenterForLine(1)
+        val secondOffset = Offset(farRightX, secondLineCenterY)
+        rule.onNodeWithTag(tag).performTouchInput {
+            moveTo(secondOffset)
+        }
+        rule.waitForIdle()
+        assertWithMessage("Magnifier should not be shown")
+            .that(getMagnifierCenterOffset(rule).isUnspecified)
+            .isTrue()
+
+        val lineRightX = textLayout.getLineRight(1)
+        val thirdOffset = Offset(lineRightX + 1f, secondLineCenterY)
+        rule.onNodeWithTag(tag).performTouchInput {
+            moveTo(thirdOffset)
+        }
+        rule.waitForIdle()
+        val actual = getMagnifierCenterOffset(rule, requireSpecified = true) - placedPosition
+        assertThatOffset(actual).equalsWithTolerance(Offset(lineRightX, secondLineCenterY))
+    }
+
+    // regression - When dragging to the final empty line, the magnifier appeared on the second
+    // to last line instead of on the final line. It should appear on the final line.
+    @Test
+    fun magnifier_centeredOnCorrectLine_whenLinesAreEmpty() {
+        lateinit var textLayout: TextLayoutResult
+        rule.setContent {
+            Content(
+                "a\n\n",
+                Modifier
+                    // Center the text to give the magnifier lots of room to move.
+                    .fillMaxSize()
+                    .wrapContentSize()
+                    .testTag(tag),
+                onTextLayout = { textLayout = it }
+            )
+        }
+
+        rule.waitForIdle()
+        val placedOffset = rule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot.topLeft
+        fun assertMagnifierAt(expected: Offset) {
+            rule.waitForIdle()
+            val actual = getMagnifierCenterOffset(rule, requireSpecified = true) - placedOffset
+            assertThatOffset(actual).equalsWithTolerance(expected)
+        }
+
+        // start selection at first character
+        val firstPressOffset = textLayout.getBoundingBox(0).centerLeft + Offset(1f, 0f)
+        rule.onNodeWithTag(tag).performTouchInput {
+            longPress(firstPressOffset)
+        }
+        assertMagnifierAt(firstPressOffset)
+
+        fun getOffsetAtLine(line: Int): Offset = Offset(
+            x = firstPressOffset.x,
+            y = lerp(
+                start = textLayout.getLineTop(lineIndex = line),
+                stop = textLayout.getLineBottom(lineIndex = line),
+                fraction = 0.5f
+            )
+        )
+
+        val secondOffset = getOffsetAtLine(1)
+        rule.onNodeWithTag(tag).performTouchInput {
+            moveTo(secondOffset)
+        }
+        assertMagnifierAt(Offset(0f, secondOffset.y))
+
+        val thirdOffset = getOffsetAtLine(2)
+        rule.onNodeWithTag(tag).performTouchInput {
+            moveTo(thirdOffset)
+        }
+        assertMagnifierAt(Offset(0f, thirdOffset.y))
+    }
+
     @Test
     fun magnifier_hidden_whenTextIsEmpty() {
         rule.setContent {
@@ -98,7 +223,7 @@ internal abstract class AbstractSelectionMagnifierTests {
         rule.onNodeWithTag(tag).performTouchInput { longClick() }
 
         // No magnifier yet.
-        assertNoMagnifierExists()
+        assertNoMagnifierExists(rule)
     }
 
     @Test
@@ -110,7 +235,7 @@ internal abstract class AbstractSelectionMagnifierTests {
         // TODO(b/209698586) Select programmatically once that's fixed.
         rule.onNodeWithTag(tag).performTouchInput { longClick() }
         // No magnifier yet.
-        assertNoMagnifierExists()
+        assertNoMagnifierExists(rule)
     }
 
     @Test
@@ -139,46 +264,55 @@ internal abstract class AbstractSelectionMagnifierTests {
         )
     }
 
+    @RequiresDevice // b/264702195
     @Test
     fun magnifier_appears_whileStartHandleTouched() {
         checkMagnifierAppears_whileHandleTouched(Handle.SelectionStart)
     }
 
+    @RequiresDevice // b/264702195
     @Test
     fun magnifier_appears_whileEndHandleTouched() {
         checkMagnifierAppears_whileHandleTouched(Handle.SelectionEnd)
     }
 
+    @RequiresDevice // b/264702195
     @Test
     fun magnifier_followsStartHandleHorizontally_whenDragged() {
         checkMagnifierFollowsHandleHorizontally(Handle.SelectionStart)
     }
 
+    @RequiresDevice // b/264702195
     @Test
     fun magnifier_followsEndHandleHorizontally_whenDragged() {
         checkMagnifierFollowsHandleHorizontally(Handle.SelectionEnd)
     }
 
+    @RequiresDevice // b/264702195
     @Test
     fun magnifier_staysAtLineStart_whenDraggedPastStart() {
         checkMagnifierConstrainedToLineHorizontalBounds(Handle.SelectionStart)
     }
 
+    @RequiresDevice // b/264702195
     @Test
     fun magnifier_staysAtLineEnd_whenDraggedPastEnd() {
         checkMagnifierConstrainedToLineHorizontalBounds(Handle.SelectionEnd)
     }
 
+    @RequiresDevice // b/264702195
     @Test
     fun magnifier_hidden_whenDraggedFarPastStartOfLine() {
         checkMagnifierHiddenWhenDraggedTooFar(Handle.SelectionStart)
     }
 
+    @RequiresDevice // b/264702195
     @Test
     fun magnifier_hidden_whenDraggedFarPastEndOfLine() {
         checkMagnifierHiddenWhenDraggedTooFar(Handle.SelectionEnd)
     }
 
+    @RequiresDevice // b/264702195
     @Test
     fun magnifier_followsStartHandleHorizontally_whenDragged_rtl() {
         checkMagnifierFollowsHandleHorizontally(
@@ -187,6 +321,7 @@ internal abstract class AbstractSelectionMagnifierTests {
         )
     }
 
+    @RequiresDevice // b/264702195
     @Test
     fun magnifier_followsEndHandleHorizontally_whenDragged_rtl() {
         checkMagnifierFollowsHandleHorizontally(
@@ -195,6 +330,7 @@ internal abstract class AbstractSelectionMagnifierTests {
         )
     }
 
+    @RequiresDevice // b/264702195
     @Test
     fun magnifier_staysAtLineStart_whenDraggedPastStart_rtl() {
         checkMagnifierConstrainedToLineHorizontalBounds(
@@ -203,6 +339,7 @@ internal abstract class AbstractSelectionMagnifierTests {
         )
     }
 
+    @RequiresDevice // b/264702195
     @Test
     fun magnifier_staysAtLineEnd_whenDraggedPastEnd_rtl() {
         checkMagnifierConstrainedToLineHorizontalBounds(
@@ -211,6 +348,7 @@ internal abstract class AbstractSelectionMagnifierTests {
         )
     }
 
+    @RequiresDevice // b/264702195
     @Test
     fun magnifier_hidden_whenDraggedFarPastStartOfLine_rtl() {
         checkMagnifierHiddenWhenDraggedTooFar(
@@ -219,6 +357,7 @@ internal abstract class AbstractSelectionMagnifierTests {
         )
     }
 
+    @RequiresDevice // b/264702195
     @Test
     fun magnifier_hidden_whenDraggedFarPastEndOfLine_rtl() {
         checkMagnifierHiddenWhenDraggedTooFar(
@@ -227,21 +366,25 @@ internal abstract class AbstractSelectionMagnifierTests {
         )
     }
 
+    @RequiresDevice // b/264702195
     @Test
     fun magnifier_doesNotFollowStartHandleVertically_whenDraggedWithinLine() {
         checkMagnifierDoesNotFollowHandleVerticallyWithinLine(Handle.SelectionStart)
     }
 
+    @RequiresDevice // b/264702195
     @Test
     fun magnifier_doesNotFollowEndHandleVertically_whenDraggedWithinLine() {
         checkMagnifierDoesNotFollowHandleVerticallyWithinLine(Handle.SelectionEnd)
     }
 
+    @RequiresDevice // b/264702195
     @Test
     fun magnifier_followsStartHandle_whenDraggedToNextLine() {
         checkMagnifierFollowsHandleVerticallyBetweenLines(Handle.SelectionStart)
     }
 
+    @RequiresDevice // b/264702195
     @Test
     fun magnifier_followsEndHandle_whenDraggedToNextLine() {
         checkMagnifierFollowsHandleVerticallyBetweenLines(Handle.SelectionEnd)
@@ -253,8 +396,9 @@ internal abstract class AbstractSelectionMagnifierTests {
         text: String,
         modifier: Modifier,
         style: TextStyle = TextStyle.Default,
-        onTextLayout: (TextLayoutResult) -> Unit = {}
-    ) = TestContent(text, modifier, style, onTextLayout)
+        onTextLayout: (TextLayoutResult) -> Unit = {},
+        maxLines: Int = Int.MAX_VALUE
+    ) = TestContent(text, modifier, style, onTextLayout, maxLines)
 
     protected fun checkMagnifierAppears_whileHandleTouched(handle: Handle) {
         rule.setContent {
@@ -267,13 +411,39 @@ internal abstract class AbstractSelectionMagnifierTests {
         rule.onNode(isSelectionHandle(handle))
             .performTouchInput { down(center) }
 
-        assertThat(getMagnifierCenterOffset()).isNotEqualTo(Offset.Zero)
+        assertMagnifierExists(rule)
 
         // Stop touching the handle to hide the magnifier.
         rule.onNode(isSelectionHandle(handle))
             .performTouchInput { up() }
 
-        assertNoMagnifierExists()
+        assertNoMagnifierExists(rule)
+    }
+
+    protected fun checkMagnifierAppears_whenCursorHandleDragged() {
+        rule.setContent {
+            Content("aaaa aaaa aaaa", Modifier.testTag(tag))
+        }
+
+        showHandle(Handle.Cursor)
+
+        // Touch the handle
+        rule.onNode(isSelectionHandle(Handle.Cursor))
+            .performTouchInput { down(center) }
+
+        assertNoMagnifierExists(rule)
+
+        // move the handle to show the magnifier
+        rule.onNode(isSelectionHandle(Handle.Cursor))
+            .performTouchInput { movePastSlopBy(Offset(x = 1f, y = 0f)) }
+
+        assertMagnifierExists(rule)
+
+        // Stop touching the handle to hide the magnifier.
+        rule.onNode(isSelectionHandle(Handle.Cursor))
+            .performTouchInput { up() }
+
+        assertNoMagnifierExists(rule)
     }
 
     protected fun checkMagnifierShowsDuringInitialLongPressDrag(
@@ -305,8 +475,7 @@ internal abstract class AbstractSelectionMagnifierTests {
             }
 
         // Magnifier should show after long-press starts.
-        val magnifierInitialPosition = getMagnifierCenterOffset()
-        assertThat(magnifierInitialPosition).isNotEqualTo(Offset.Zero)
+        val magnifierInitialPosition = getMagnifierCenterOffset(rule, requireSpecified = true)
 
         // Drag horizontally - the magnifier should follow.
         rule.onNodeWithTag(tag)
@@ -316,7 +485,7 @@ internal abstract class AbstractSelectionMagnifierTests {
                 moveBy(dragDistance * dragDirection)
             }
 
-        assertThat(getMagnifierCenterOffset())
+        assertThat(getMagnifierCenterOffset(rule))
             .isEqualTo(magnifierInitialPosition + (dragDistance * dragDirection))
     }
 
@@ -342,16 +511,18 @@ internal abstract class AbstractSelectionMagnifierTests {
 
         showHandle(handle)
 
-        // Touch the handle to show the magnifier.
-        rule.onNode(isSelectionHandle(handle))
-            .performTouchInput { down(center) }
-        val magnifierInitialPosition = getMagnifierCenterOffset()
+        // Touch and move the handle to show the magnifier.
+        rule.onNode(isSelectionHandle(handle)).performTouchInput {
+            down(center)
+            movePastSlopBy(dragDistance)
+        }
+        val magnifierInitialPosition = getMagnifierCenterOffset(rule, requireSpecified = true)
 
         // Drag the handle horizontally - the magnifier should follow.
         rule.onNode(isSelectionHandle(handle))
-            .performTouchInput { movePastSlopBy(dragDistance) }
+            .performTouchInput { moveBy(dragDistance) }
 
-        assertThat(getMagnifierCenterOffset())
+        assertThat(getMagnifierCenterOffset(rule))
             .isEqualTo(magnifierInitialPosition + dragDistance)
     }
 
@@ -362,6 +533,7 @@ internal abstract class AbstractSelectionMagnifierTests {
     ) {
         val dragDistance = Offset(1f, 0f)
         val dragDirection = if (checkStart xor (layoutDirection == LayoutDirection.Rtl)) -1f else 1f
+        val moveOffset = dragDistance * dragDirection
         val fillerWord = if (layoutDirection == LayoutDirection.Ltr) "aaaa" else "באמת"
         // When testing the cursor, we use an empty line so it doesn't have room to move in either
         // direction. For other handles, the line needs to have some text to select.
@@ -381,17 +553,21 @@ internal abstract class AbstractSelectionMagnifierTests {
 
         showHandle(handle)
 
-        // Touch the handle to show the magnifier.
-        rule.onNode(isSelectionHandle(handle))
-            .performTouchInput { down(center) }
-        val magnifierInitialPosition = getMagnifierCenterOffset()
+        // Touch and move the handle to show the magnifier.
+        rule.onNode(isSelectionHandle(handle)).performTouchInput {
+            down(center)
+            movePastSlopBy(moveOffset)
+        }
+
+        val magnifierInitialPosition = getMagnifierCenterOffset(rule, requireSpecified = true)
 
         // Drag just a little past the end of the line.
-        rule.onNode(isSelectionHandle(handle))
-            .performTouchInput { movePastSlopBy(dragDistance * dragDirection) }
+        rule.onNode(isSelectionHandle(handle)).performTouchInput {
+            moveBy(moveOffset)
+        }
 
         // The magnifier shouldn't have moved.
-        assertThat(getMagnifierCenterOffset()).isEqualTo(magnifierInitialPosition)
+        assertThat(getMagnifierCenterOffset(rule)).isEqualTo(magnifierInitialPosition)
     }
 
     protected fun checkMagnifierHiddenWhenDraggedTooFar(
@@ -431,7 +607,7 @@ internal abstract class AbstractSelectionMagnifierTests {
             }
 
         // The magnifier should be gone.
-        assertNoMagnifierExists()
+        assertNoMagnifierExists(rule)
     }
 
     protected fun checkMagnifierFollowsHandleVerticallyBetweenLines(handle: Handle) {
@@ -454,17 +630,46 @@ internal abstract class AbstractSelectionMagnifierTests {
         // Touch the handle to show the magnifier.
         rule.onNode(isSelectionHandle(handle))
             .performTouchInput { down(center) }
-        val magnifierInitialPosition = getMagnifierCenterOffset()
+        val magnifierInitialPosition = getMagnifierCenterOffset(rule, requireSpecified = true)
 
         // Drag the handle down - the magnifier should follow.
         rule.onNode(isSelectionHandle(handle))
             .performTouchInput { movePastSlopBy(dragDistance) }
 
-        val (x, y) = getMagnifierCenterOffset()
+        val (x, y) = getMagnifierCenterOffset(rule)
         assertThat(x).isEqualTo(magnifierInitialPosition.x)
         assertThat(y)
             .isWithin(1f)
             .of(magnifierInitialPosition.y + lineHeight)
+    }
+
+    protected fun checkMagnifierAsHandleGoesOutOfBoundsUsingMaxLines(handle: Handle) {
+        var lineHeight = 0f
+        rule.setContent {
+            Content(
+                "aaaa aaaa aaaa\naaaa aaaa aaaa",
+                Modifier
+                    // Center the text to give the magnifier lots of room to move.
+                    .fillMaxSize()
+                    .wrapContentSize()
+                    .testTag(tag),
+                onTextLayout = { lineHeight = it.getLineBottom(0) - it.getLineTop(0) },
+                maxLines = 1
+            )
+        }
+
+        showHandle(handle)
+
+        // Touch the handle to show the magnifier.
+        rule.onNode(isSelectionHandle(handle))
+            .performTouchInput { down(center) }
+
+        // Drag the handle down - the magnifier should follow.
+        val dragDistance = Offset(0f, lineHeight)
+        rule.onNode(isSelectionHandle(handle))
+            .performTouchInput { movePastSlopBy(dragDistance) }
+
+        assertNoMagnifierExists(rule)
     }
 
     protected fun checkMagnifierDoesNotFollowHandleVerticallyWithinLine(handle: Handle) {
@@ -485,7 +690,8 @@ internal abstract class AbstractSelectionMagnifierTests {
         // Touch the handle to show the magnifier.
         rule.onNode(isSelectionHandle(handle))
             .performTouchInput { down(center) }
-        val magnifierInitialPosition = getMagnifierCenterOffset()
+
+        val magnifierInitialPosition = getMagnifierCenterOffset(rule, requireSpecified = true)
 
         // Drag the handle up - the magnifier should not follow.
         // Note that dragging it down *should* cause it to move to the line below, so only drag up.
@@ -494,7 +700,7 @@ internal abstract class AbstractSelectionMagnifierTests {
                 movePastSlopBy(-dragDistance)
             }
 
-        assertThat(getMagnifierCenterOffset())
+        assertThat(getMagnifierCenterOffset(rule))
             .isEqualTo(magnifierInitialPosition)
     }
 
@@ -517,33 +723,38 @@ internal abstract class AbstractSelectionMagnifierTests {
      */
     // TODO(b/210545925) This is here because we can't disable the touch slop in a popup. When
     //  that's fixed we can just disable slop and delete this function.
-    private fun TouchInjectionScope.movePastSlopBy(delta: Offset) {
+    protected fun TouchInjectionScope.movePastSlopBy(delta: Offset) {
         val slop = Offset(
             x = viewConfiguration.touchSlop * delta.x.sign,
             y = viewConfiguration.touchSlop * delta.y.sign
         )
         moveBy(delta + slop)
     }
+}
 
-    private fun getMagnifierCenterOffset(): Offset =
-        rule.onNode(keyIsDefined(MagnifierPositionInRoot))
-            .fetchSemanticsNode()
-            .config[MagnifierPositionInRoot]
-            .let(rule::runOnIdle)
+internal fun assertThatOffset(actual: Offset): OffsetSubject =
+    Truth.assertAbout(OffsetSubject.INSTANCE).that(actual)
 
-    /**
-     * Asserts that there is no magnifier being displayed. This may be because no
-     * `Modifier.magnifier` modifiers are currently set on any nodes, or because all the magnifiers
-     * that exist have an unspecified position.
-     */
-    private fun assertNoMagnifierExists() {
-        // The magnifier semantics will be present whenever the modifier is, even if the modifier
-        // isn't actually showing a magnifier because the position is unspecified. So instead of
-        // just checking that no semantics property exists, we need to check that the value of each
-        // property won't show a magnifier.
-        val magnifierNodes = rule.onAllNodes(keyIsDefined(MagnifierPositionInRoot))
-            .fetchSemanticsNodes(atLeastOneRootRequired = false)
-            .map { it.config[MagnifierPositionInRoot].invoke() }
-        assertThat(magnifierNodes.all { it.isUnspecified }).isTrue()
+internal class OffsetSubject(
+    failureMetadata: FailureMetadata?,
+    private val subject: Offset,
+) : Subject(failureMetadata, subject) {
+
+    companion object {
+        val INSTANCE: Factory<OffsetSubject, Offset> =
+            Factory { failureMetadata, subject -> OffsetSubject(failureMetadata, subject) }
+    }
+
+    fun equalsWithTolerance(expected: Offset, tolerance: Float = 0.001f) {
+        try {
+            assertThat(subject.x).isWithin(tolerance).of(expected.x)
+            assertThat(subject.y).isWithin(tolerance).of(expected.y)
+        } catch (e: AssertionError) {
+            failWithActual(
+                Fact.simpleFact("Unequal Offsets"),
+                Fact.fact("expected", expected.toString()),
+                Fact.fact("with tolerance", tolerance),
+            )
+        }
     }
 }

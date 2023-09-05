@@ -26,21 +26,20 @@ import androidx.compose.ui.platform.TextToolbar
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.ResolvedTextDirection
 import com.google.common.truth.Truth.assertThat
-import com.nhaarman.mockitokotlin2.any
-import com.nhaarman.mockitokotlin2.argThat
-import com.nhaarman.mockitokotlin2.doReturn
-import com.nhaarman.mockitokotlin2.eq
-import com.nhaarman.mockitokotlin2.isNull
-import com.nhaarman.mockitokotlin2.mock
-import com.nhaarman.mockitokotlin2.never
-import com.nhaarman.mockitokotlin2.spy
-import com.nhaarman.mockitokotlin2.times
-import com.nhaarman.mockitokotlin2.verify
-import com.nhaarman.mockitokotlin2.whenever
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
+import org.mockito.kotlin.any
+import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.eq
+import org.mockito.kotlin.isNull
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
+import org.mockito.kotlin.spy
+import org.mockito.kotlin.times
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
 
 @RunWith(JUnit4::class)
 class SelectionManagerTest {
@@ -48,6 +47,7 @@ class SelectionManagerTest {
     private val selectable = FakeSelectable()
     private val selectableId = 1L
     private val selectionManager = SelectionManager(selectionRegistrar)
+    private var onSelectionChangeCalledTimes = 0
 
     private val containerLayoutCoordinates = mock<LayoutCoordinates> {
         on { isAttached } doReturn true
@@ -72,9 +72,6 @@ class SelectionManagerTest {
     private val lastSelectable = mock<Selectable> {
         whenever(it.selectableId).thenReturn(lastSelectableId)
     }
-
-    private val startCoordinates = Offset(3f, 30f)
-    private val endCoordinates = Offset(3f, 600f)
 
     private val fakeSelection =
         Selection(
@@ -109,230 +106,120 @@ class SelectionManagerTest {
         selectionManager.clipboardManager = clipboardManager
         selectionManager.textToolbar = textToolbar
         selectionManager.selection = fakeSelection
+        selectionManager.onSelectionChange = { onSelectionChangeCalledTimes++ }
     }
 
     @Test
-    fun updateSelection_sorting() {
+    fun updateSelection_onInitial_returnsTrue() {
+        val startHandlePosition = Offset(x = 5f, y = 5f)
+        val endHandlePosition = Offset(x = 25f, y = 5f)
+        selectable.apply {
+            textToReturn = AnnotatedString("hello")
+            rawStartHandleOffset = 0
+            rawEndHandleOffset = 5
+        }
+
+        val actual = selectionManager.updateSelection(
+            startHandlePosition = startHandlePosition,
+            endHandlePosition = endHandlePosition,
+            previousHandlePosition = endHandlePosition - Offset(x = 5f, y = 0f),
+            isStartHandle = false,
+            adjustment = SelectionAdjustment.None,
+        )
+
+        assertThat(actual).isTrue()
+        assertThat(onSelectionChangeCalledTimes).isEqualTo(1)
+    }
+
+    @Test
+    fun updateSelection_onNoChange_returnsFalse() {
+        val startHandlePosition = Offset(x = 5f, y = 5f)
+        val endHandlePosition = Offset(x = 25f, y = 5f)
+        selectable.apply {
+            textToReturn = AnnotatedString("hello")
+            rawStartHandleOffset = 0
+            rawEndHandleOffset = 5
+            rawPreviousHandleOffset = 5
+        }
+
+        // run once to set context for the "previous" selection update
         selectionManager.updateSelection(
-            startHandlePosition = startCoordinates,
-            endHandlePosition = endCoordinates,
-            previousHandlePosition = null,
+            startHandlePosition = startHandlePosition,
+            endHandlePosition = endHandlePosition,
+            previousHandlePosition = endHandlePosition,
             isStartHandle = false,
-            adjustment = SelectionAdjustment.None
+            adjustment = SelectionAdjustment.None,
         )
 
-        verify(selectionRegistrar, times(1)).sort(containerLayoutCoordinates)
+        // run again since we are testing the "no changes" case
+        val actual = selectionManager.updateSelection(
+            startHandlePosition = startHandlePosition,
+            endHandlePosition = endHandlePosition,
+            previousHandlePosition = endHandlePosition,
+            isStartHandle = false,
+            adjustment = SelectionAdjustment.None,
+        )
+
+        assertThat(actual).isFalse()
+        assertThat(onSelectionChangeCalledTimes).isEqualTo(1)
     }
 
     @Test
-    fun updateSelection_single_selectable_calls_getSelection_once() {
-        val newSelection = fakeSelection.copy(
-            start = fakeSelection.start.copy(
-                offset = fakeSelection.start.offset + 1
-            )
-        )
+    fun updateSelection_onChange_returnsTrue() {
+        val startHandlePosition = Offset(x = 5f, y = 5f)
+        val endHandlePosition = Offset(x = 25f, y = 5f)
+        selectable.apply {
+            textToReturn = AnnotatedString("hello")
+            rawStartHandleOffset = 0
+            rawEndHandleOffset = 5
+            rawPreviousHandleOffset = 5
+        }
 
-        selectable.selectionToReturn = newSelection
-
+        // run once to set context for the "previous" selection update
         selectionManager.updateSelection(
-            startHandlePosition = startCoordinates,
-            endHandlePosition = endCoordinates,
-            previousHandlePosition = null,
+            startHandlePosition = startHandlePosition,
+            endHandlePosition = endHandlePosition,
+            previousHandlePosition = endHandlePosition,
             isStartHandle = false,
-            adjustment = SelectionAdjustment.None
+            adjustment = SelectionAdjustment.None,
         )
 
-        assertThat(selectable.getSelectionCalledTimes).isEqualTo(1)
-        assertThat(selectable.lastStartHandlePosition).isEqualTo(startCoordinates)
-        assertThat(selectable.lastEndHandlePosition).isEqualTo(endCoordinates)
-        assertThat(selectable.lastContainerLayoutCoordinates)
-            .isEqualTo(selectionManager.requireContainerCoordinates())
-        assertThat(selectable.lastAdjustment).isEqualTo(SelectionAdjustment.None)
-        assertThat(selectable.lastPreviousSelection).isEqualTo(fakeSelection)
+        // run again with a change in end handle
+        selectable.rawEndHandleOffset = 4
+        val actual = selectionManager.updateSelection(
+            startHandlePosition = startHandlePosition,
+            endHandlePosition = endHandlePosition,
+            previousHandlePosition = endHandlePosition - Offset(x = 5f, y = 0f),
+            isStartHandle = false,
+            adjustment = SelectionAdjustment.None,
+        )
 
-        verify(
-            hapticFeedback,
-            times(1)
-        ).performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        assertThat(actual).isTrue()
+        assertThat(onSelectionChangeCalledTimes).isEqualTo(2)
     }
 
     @Test
-    fun updateSelection_multiple_selectables_calls_getSelection_multiple_times() {
-        val anotherSelectableId = 100L
-        val selectableAnother = mock<Selectable>()
-        whenever(selectableAnother.selectableId).thenReturn(anotherSelectableId)
-        whenever(
-            selectableAnother.updateSelection(
-                anyOffset(), anyOffset(), anyOffset(), any(), any(), any(), any()
-            )
-        ).thenReturn(Pair(null, false))
-        selectionRegistrar.subscribe(selectableAnother)
-        selectionRegistrar.subselections = mapOf(
-            anotherSelectableId to fakeSelection,
-            selectableId to fakeSelection
-        )
-
-        selectionManager.updateSelection(
-            startHandlePosition = startCoordinates,
-            endHandlePosition = endCoordinates,
-            previousHandlePosition = null,
-            isStartHandle = false,
-            adjustment = SelectionAdjustment.None
-        )
-
-        assertThat(selectable.getSelectionCalledTimes).isEqualTo(1)
-        assertThat(selectable.lastStartHandlePosition).isEqualTo(startCoordinates)
-        assertThat(selectable.lastEndHandlePosition).isEqualTo(endCoordinates)
-        assertThat(selectable.lastContainerLayoutCoordinates)
-            .isEqualTo(selectionManager.requireContainerCoordinates())
-        assertThat(selectable.lastAdjustment).isEqualTo(SelectionAdjustment.None)
-        assertThat(selectable.lastPreviousSelection).isEqualTo(fakeSelection)
-
-        verify(selectableAnother, times(1))
-            .updateSelection(
-                startHandlePosition = startCoordinates,
-                endHandlePosition = endCoordinates,
-                previousHandlePosition = null,
-                isStartHandle = false,
-                containerLayoutCoordinates = selectionManager.requireContainerCoordinates(),
-                adjustment = SelectionAdjustment.None,
-                previousSelection = fakeSelection
-            )
-        verify(
-            hapticFeedback,
-            times(1)
-        ).performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    fun shouldPerformHaptics_notInTouchMode_returnsFalse() {
+        selectionManager.isInTouchMode = false
+        selectable.textToReturn = AnnotatedString("hello")
+        val actual = selectionManager.shouldPerformHaptics()
+        assertThat(actual).isFalse()
     }
 
     @Test
-    fun updateSelection_selection_does_not_change_hapticFeedBack_Not_triggered() {
-        val selection: Selection = fakeSelection
-        selectable.selectionToReturn = selection
-
-        selectionManager.updateSelection(
-            startHandlePosition = startCoordinates,
-            endHandlePosition = endCoordinates,
-            previousHandlePosition = null,
-            isStartHandle = false,
-            adjustment = SelectionAdjustment.None
-        )
-
-        verify(
-            hapticFeedback,
-            times(0)
-        ).performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    fun shouldPerformHaptics_allEmptyTextSelectables_returnsFalse() {
+        selectionManager.isInTouchMode = true
+        selectable.textToReturn = AnnotatedString("")
+        val actual = selectionManager.shouldPerformHaptics()
+        assertThat(actual).isFalse()
     }
 
     @Test
-    fun updateSelection_selectable_drag_startHandle() {
-        selectionRegistrar.subscribe(endSelectable)
-        whenever(
-            endSelectable.updateSelection(
-                anyOffset(), anyOffset(), anyOffset(), any(), any(), any(), any()
-            )
-        ).thenReturn(Pair(null, false))
-        whenever(endSelectable.getLayoutCoordinates()).thenReturn(mock())
-        val previousStartHandlePosition = Offset(3f, 300f)
-        val newStartHandlePosition = Offset(3f, 600f)
-        selectionManager.updateSelection(
-            newPosition = newStartHandlePosition,
-            previousPosition = previousStartHandlePosition,
-            isStartHandle = true,
-            adjustment = SelectionAdjustment.None
-        )
-
-        assertThat(selectable.getSelectionCalledTimes).isEqualTo(1)
-        assertThat(selectable.lastStartHandlePosition).isEqualTo(newStartHandlePosition)
-        assertThat(selectable.lastPreviousHandlePosition).isEqualTo(previousStartHandlePosition)
-        assertThat(selectable.lastContainerLayoutCoordinates)
-            .isEqualTo(selectionManager.requireContainerCoordinates())
-        assertThat(selectable.lastAdjustment).isEqualTo(SelectionAdjustment.None)
-        assertThat(selectable.lastPreviousSelection).isEqualTo(fakeSelection)
-
-        verify(
-            hapticFeedback,
-            times(1)
-        ).performHapticFeedback(HapticFeedbackType.TextHandleMove)
-    }
-
-    @Test
-    fun updateSelection_selectable_drag_endHandle() {
-        selectionRegistrar.subscribe(startSelectable)
-        whenever(
-            startSelectable.updateSelection(
-                anyOffset(), anyOffset(), anyOffset(), any(), any(), any(), any()
-            )
-        ).thenReturn(Pair(null, false))
-        whenever(startSelectable.getLayoutCoordinates()).thenReturn(mock())
-        val previousStartHandlePosition = Offset(3f, 300f)
-        val newStartHandlePosition = Offset(3f, 600f)
-        selectionManager.updateSelection(
-            newPosition = newStartHandlePosition,
-            previousPosition = previousStartHandlePosition,
-            isStartHandle = false,
-            adjustment = SelectionAdjustment.None
-        )
-
-        assertThat(selectable.getSelectionCalledTimes).isEqualTo(1)
-        assertThat(selectable.lastEndHandlePosition).isEqualTo(newStartHandlePosition)
-        assertThat(selectable.lastPreviousHandlePosition).isEqualTo(previousStartHandlePosition)
-        assertThat(selectable.lastContainerLayoutCoordinates)
-            .isEqualTo(selectionManager.requireContainerCoordinates())
-        assertThat(selectable.lastAdjustment).isEqualTo(SelectionAdjustment.None)
-        assertThat(selectable.lastPreviousSelection).isEqualTo(fakeSelection)
-
-        verify(
-            hapticFeedback,
-            times(1)
-        ).performHapticFeedback(HapticFeedbackType.TextHandleMove)
-    }
-
-    @Test
-    fun updateSelection_consumeDrag_return_true() {
-        selectionRegistrar.subscribe(startSelectable)
-        // The start selectable returns true and consumes the drag.
-        whenever(
-            startSelectable.updateSelection(
-                anyOffset(), anyOffset(), anyOffset(), any(), any(), any(), any()
-            )
-        ).thenReturn(Pair(null, true))
-        whenever(startSelectable.getLayoutCoordinates()).thenReturn(mock())
-
-        val previousStartHandlePosition = Offset(3f, 300f)
-        val newStartHandlePosition = Offset(3f, 600f)
-
-        val consumed = selectionManager.updateSelection(
-            newPosition = newStartHandlePosition,
-            previousPosition = previousStartHandlePosition,
-            isStartHandle = false,
-            adjustment = SelectionAdjustment.None
-        )
-
-        assertThat(consumed).isTrue()
-    }
-
-    @Test
-    fun updateSelection_notConsumeDrag_return_false() {
-        selectionRegistrar.subscribe(startSelectable)
-        // The start selectable returns true and consumes the drag.
-        whenever(
-            startSelectable.updateSelection(
-                anyOffset(), anyOffset(), anyOffset(), any(), any(), any(), any()
-            )
-        ).thenReturn(Pair(null, false))
-        whenever(startSelectable.getLayoutCoordinates()).thenReturn(mock())
-
-        val previousStartHandlePosition = Offset(3f, 300f)
-        val newStartHandlePosition = Offset(3f, 600f)
-
-        val consumed = selectionManager.updateSelection(
-            newPosition = newStartHandlePosition,
-            previousPosition = previousStartHandlePosition,
-            isStartHandle = false,
-            adjustment = SelectionAdjustment.None
-        )
-
-        assertThat(consumed).isFalse()
+    fun shouldPerformHaptics_inTouchModeAndNonEmpty_returnsTrue() {
+        selectionManager.isInTouchMode = true
+        selectable.textToReturn = AnnotatedString("hello")
+        val actual = selectionManager.shouldPerformHaptics()
+        assertThat(actual).isTrue()
     }
 
     @Test
@@ -353,6 +240,149 @@ class SelectionManagerTest {
             hapticFeedback,
             times(1)
         ).performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    }
+
+    @Test
+    fun isNonEmptySelection_whenNonEmptySelection_sameLine_returnsTrue() {
+        val text = "Text Demo"
+        val annotatedString = AnnotatedString(text)
+        val startOffset = text.indexOf('e')
+        val endOffset = text.indexOf('m')
+        selectable.textToReturn = annotatedString
+        selectionManager.selection = Selection(
+            start = Selection.AnchorInfo(
+                direction = ResolvedTextDirection.Ltr,
+                offset = startOffset,
+                selectableId = selectableId
+            ),
+            end = Selection.AnchorInfo(
+                direction = ResolvedTextDirection.Ltr,
+                offset = endOffset,
+                selectableId = selectableId
+            ),
+            handlesCrossed = false
+        )
+
+        assertThat(selectionManager.isNonEmptySelection()).isTrue()
+    }
+
+    @Test
+    fun isNonEmptySelection_whenEmptySelection_sameLine_returnsFalse() {
+        val text = "Text Demo"
+        val annotatedString = AnnotatedString(text)
+        val startOffset = text.indexOf('e')
+        selectable.textToReturn = annotatedString
+        selectionManager.selection = Selection(
+            start = Selection.AnchorInfo(
+                direction = ResolvedTextDirection.Ltr,
+                offset = startOffset,
+                selectableId = selectableId
+            ),
+            end = Selection.AnchorInfo(
+                direction = ResolvedTextDirection.Ltr,
+                offset = startOffset,
+                selectableId = selectableId
+            ),
+            handlesCrossed = false
+        )
+
+        assertThat(selectionManager.isNonEmptySelection()).isFalse()
+    }
+
+    @Test
+    fun isNonEmptySelection_whenNonEmptySelection_multiLine_returnsTrue() {
+        val text = "Text Demo"
+        val annotatedString = AnnotatedString(text = text)
+        val startOffset = text.indexOf('m')
+        val endOffset = text.indexOf('x')
+
+        selectionRegistrar.subscribe(endSelectable)
+        selectionRegistrar.subscribe(middleSelectable)
+        selectionRegistrar.subscribe(startSelectable)
+        selectionRegistrar.subscribe(lastSelectable)
+        selectionRegistrar.sorted = true
+        whenever(startSelectable.getText()).thenReturn(annotatedString)
+        whenever(middleSelectable.getText()).thenReturn(annotatedString)
+        whenever(endSelectable.getText()).thenReturn(annotatedString)
+        selectionManager.selection = Selection(
+            start = Selection.AnchorInfo(
+                direction = ResolvedTextDirection.Ltr,
+                offset = startOffset,
+                selectableId = startSelectableId
+            ),
+            end = Selection.AnchorInfo(
+                direction = ResolvedTextDirection.Ltr,
+                offset = endOffset,
+                selectableId = endSelectableId
+            ),
+            handlesCrossed = true
+        )
+
+        assertThat(selectionManager.isNonEmptySelection()).isTrue()
+    }
+
+    @Test
+    fun isNonEmptySelection_whenEmptySelection_multiLine_returnsFalse() {
+        val text = "Text Demo"
+        val annotatedString = AnnotatedString(text)
+        val startOffset = text.length
+        val endOffset = 0
+
+        selectionRegistrar.subscribe(startSelectable)
+        selectionRegistrar.subscribe(middleSelectable)
+        selectionRegistrar.subscribe(endSelectable)
+        selectionRegistrar.subscribe(lastSelectable)
+        selectionRegistrar.sorted = true
+        whenever(startSelectable.getText()).thenReturn(annotatedString)
+        whenever(middleSelectable.getText()).thenReturn(AnnotatedString(""))
+        whenever(endSelectable.getText()).thenReturn(annotatedString)
+        selectionManager.selection = Selection(
+            start = Selection.AnchorInfo(
+                direction = ResolvedTextDirection.Ltr,
+                offset = startOffset,
+                selectableId = startSelectableId
+            ),
+            end = Selection.AnchorInfo(
+                direction = ResolvedTextDirection.Ltr,
+                offset = endOffset,
+                selectableId = endSelectableId
+            ),
+            handlesCrossed = false
+        )
+
+        assertThat(selectionManager.isNonEmptySelection()).isFalse()
+    }
+
+    @Test
+    fun isNonEmptySelection_whenEmptySelection_multiLineCrossed_returnsFalse() {
+        val text = "Text Demo"
+        val annotatedString = AnnotatedString(text)
+        val startOffset = 0
+        val endOffset = text.length
+
+        selectionRegistrar.subscribe(endSelectable)
+        selectionRegistrar.subscribe(middleSelectable)
+        selectionRegistrar.subscribe(startSelectable)
+        selectionRegistrar.subscribe(lastSelectable)
+        selectionRegistrar.sorted = true
+        whenever(startSelectable.getText()).thenReturn(annotatedString)
+        whenever(middleSelectable.getText()).thenReturn(AnnotatedString(""))
+        whenever(endSelectable.getText()).thenReturn(annotatedString)
+        selectionManager.selection = Selection(
+            start = Selection.AnchorInfo(
+                direction = ResolvedTextDirection.Ltr,
+                offset = startOffset,
+                selectableId = startSelectableId
+            ),
+            end = Selection.AnchorInfo(
+                direction = ResolvedTextDirection.Ltr,
+                offset = endOffset,
+                selectableId = endSelectableId
+            ),
+            handlesCrossed = true
+        )
+
+        assertThat(selectionManager.isNonEmptySelection()).isFalse()
     }
 
     @Test
@@ -494,7 +524,7 @@ class SelectionManagerTest {
     }
 
     @Test
-    fun copy_selection_null_not_trigger_clipboardmanager() {
+    fun copy_selection_null_not_trigger_clipboardManager() {
         selectionManager.selection = null
 
         selectionManager.copy()
@@ -503,7 +533,7 @@ class SelectionManagerTest {
     }
 
     @Test
-    fun copy_selection_not_null_trigger_clipboardmanager_setText() {
+    fun copy_selection_not_null_trigger_clipboardManager_setText() {
         val text = "Text Demo"
         val annotatedString = AnnotatedString(text = text)
         val startOffset = text.indexOf('m')
@@ -555,7 +585,7 @@ class SelectionManagerTest {
         )
         selectionManager.hasFocus = true
 
-        selectionManager.showSelectionToolbar()
+        selectionManager.showToolbar = true
 
         verify(textToolbar, times(1)).showMenu(
             eq(Rect.Zero),
@@ -588,7 +618,7 @@ class SelectionManagerTest {
         )
         selectionManager.hasFocus = false
 
-        selectionManager.showSelectionToolbar()
+        selectionManager.showToolbar = true
 
         verify(textToolbar, never()).showMenu(
             eq(Rect.Zero),
@@ -666,10 +696,4 @@ class SelectionManagerTest {
             times(1)
         ).performHapticFeedback(HapticFeedbackType.TextHandleMove)
     }
-}
-
-private fun anyOffset(): Offset {
-    return argThat { any: Any? ->
-        any == null || any is Long || any is Offset
-    } as Offset? ?: Offset.Zero
 }

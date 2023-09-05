@@ -16,21 +16,61 @@
 
 package androidx.credentials
 
+import android.os.Bundle
+import androidx.credentials.internal.FrameworkClassParsingException
+
 /**
  * Represents the user's password credential granted by the user for app sign-in.
  *
  * @property id the user id associated with the password
  * @property password the password
- * @throws NullPointerException If [id] is null
- * @throws NullPointerException If [password] is null
- * @throws IllegalArgumentException If [password] is empty
  */
-class PasswordCredential constructor(
+class PasswordCredential private constructor(
     val id: String,
     val password: String,
-) : Credential() {
+    data: Bundle,
+) : Credential(TYPE_PASSWORD_CREDENTIAL, data) {
+
+    /**
+     * Constructs a [PasswordCredential].
+     *
+     * @param id the user id associated with the password
+     * @param password the password
+     * @throws NullPointerException If [id] is null
+     * @throws NullPointerException If [password] is null
+     * @throws IllegalArgumentException If [password] is empty
+     */
+    constructor(id: String, password: String) : this(id, password, toBundle(id, password))
 
     init {
         require(password.isNotEmpty()) { "password should not be empty" }
+    }
+
+    /** Companion constants / helpers for [PasswordCredential]. */
+    companion object {
+        /** The type value for password related operations. */
+        const val TYPE_PASSWORD_CREDENTIAL: String = "android.credentials.TYPE_PASSWORD_CREDENTIAL"
+
+        internal const val BUNDLE_KEY_ID = "androidx.credentials.BUNDLE_KEY_ID"
+        internal const val BUNDLE_KEY_PASSWORD = "androidx.credentials.BUNDLE_KEY_PASSWORD"
+
+        @JvmStatic
+        internal fun toBundle(id: String, password: String): Bundle {
+            val bundle = Bundle()
+            bundle.putString(BUNDLE_KEY_ID, id)
+            bundle.putString(BUNDLE_KEY_PASSWORD, password)
+            return bundle
+        }
+
+        @JvmStatic
+        internal fun createFrom(data: Bundle): PasswordCredential {
+            try {
+                val id = data.getString(BUNDLE_KEY_ID)
+                val password = data.getString(BUNDLE_KEY_PASSWORD)
+                return PasswordCredential(id!!, password!!, data)
+            } catch (e: Exception) {
+                throw FrameworkClassParsingException()
+            }
+        }
     }
 }

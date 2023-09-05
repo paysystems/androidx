@@ -27,6 +27,7 @@ import static androidx.camera.integration.extensions.IntentExtraKey.INTENT_EXTRA
 import static androidx.camera.integration.extensions.IntentExtraKey.INTENT_EXTRA_KEY_DELETE_CAPTURED_IMAGE;
 import static androidx.camera.integration.extensions.IntentExtraKey.INTENT_EXTRA_KEY_EXTENSION_MODE;
 
+import android.Manifest;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
@@ -64,10 +65,13 @@ import androidx.camera.core.CameraControl;
 import androidx.camera.core.CameraInfo;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.FocusMeteringAction;
+import androidx.camera.core.FocusMeteringResult;
+import androidx.camera.core.ImageAnalysis;
 import androidx.camera.core.ImageCapture;
 import androidx.camera.core.ImageCaptureException;
 import androidx.camera.core.MeteringPoint;
 import androidx.camera.core.Preview;
+import androidx.camera.core.UseCaseGroup;
 import androidx.camera.core.impl.utils.executor.CameraXExecutors;
 import androidx.camera.extensions.ExtensionMode;
 import androidx.camera.extensions.ExtensionsManager;
@@ -92,8 +96,10 @@ import com.google.common.util.concurrent.ListenableFuture;
 import java.io.File;
 import java.text.Format;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -268,7 +274,23 @@ public class CameraExtensionsActivity extends AppCompatActivity
                 mCurrentCameraSelector, mCurrentExtensionMode);
 
         mCameraProvider.unbindAll();
-        mCamera = mCameraProvider.bindToLifecycle(this, cameraSelector, mImageCapture, mPreview);
+
+        UseCaseGroup.Builder useCaseGroupBuilder =
+                new UseCaseGroup.Builder()
+                        .addUseCase(mPreview)
+                        .addUseCase(mImageCapture);
+
+        if (mExtensionsManager.isImageAnalysisSupported(cameraSelector,
+                mCurrentExtensionMode)) {
+            ImageAnalysis imageAnalysis = new ImageAnalysis.Builder().build();
+            imageAnalysis.setAnalyzer(CameraXExecutors.ioExecutor(),  img -> {
+                img.close();
+            });
+            useCaseGroupBuilder.addUseCase(imageAnalysis);
+        }
+
+        mCamera = mCameraProvider.bindToLifecycle(this, cameraSelector,
+                useCaseGroupBuilder.build());
 
         // Update the UI and save location for ImageCapture
         Button toggleButton = findViewById(R.id.PhotoToggle);
@@ -569,8 +591,20 @@ public class CameraExtensionsActivity extends AppCompatActivity
                         previewView.getMeteringPointFactory().createPoint(
                                 motionEvent.getX(), motionEvent.getY());
 
-                mCamera.getCameraControl().startFocusAndMetering(
-                        new FocusMeteringAction.Builder(point).build()).addListener(() -> {},
+                Futures.addCallback(
+                        mCamera.getCameraControl().startFocusAndMetering(
+                                new FocusMeteringAction.Builder(point).build()),
+                        new FutureCallback<FocusMeteringResult>() {
+                            @Override
+                            public void onSuccess(FocusMeteringResult result) {
+                                Log.d(TAG, "Focus and metering succeeded.");
+                            }
+
+                            @Override
+                            public void onFailure(@NonNull Throwable t) {
+                                Log.e(TAG, "Focus and metering failed.", t);
+                            }
+                        },
                         ContextCompat.getMainExecutor(CameraExtensionsActivity.this));
             }
             return true;
@@ -616,8 +650,31 @@ public class CameraExtensionsActivity extends AppCompatActivity
             Log.e(TAG, "Failed to obtain all required permissions.", exception);
             return new String[0];
         }
-        String[] permissions = info.requestedPermissions;
-        if (permissions != null && permissions.length > 0) {
+
+        if (info.requestedPermissions == null || info.requestedPermissions.length == 0) {
+            return new String[0];
+        }
+
+        List<String> requiredPermissions = new ArrayList<>();
+
+        // From Android T, skips the permission check of WRITE_EXTERNAL_STORAGE since it won't be
+        // granted any more. When querying the requested permissions from PackageManager,
+        // READ_EXTERNAL_STORAGE will also be included if we specify WRITE_EXTERNAL_STORAGE
+        // requirement in AndroidManifest.xml. Therefore, also need to skip the permission check
+        // of READ_EXTERNAL_STORAGE.
+        for (String permission : info.requestedPermissions) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && (
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE.equals(permission)
+                            || Manifest.permission.READ_EXTERNAL_STORAGE.equals(permission))) {
+                continue;
+            }
+
+            requiredPermissions.add(permission);
+        }
+
+        String[] permissions = requiredPermissions.toArray(new String[0]);
+
+        if (permissions.length > 0) {
             return permissions;
         } else {
             return new String[0];

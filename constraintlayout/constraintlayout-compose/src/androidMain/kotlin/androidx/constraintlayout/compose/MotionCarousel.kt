@@ -26,6 +26,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -37,11 +39,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
 import androidx.constraintlayout.compose.MotionLayoutScope.MotionProperties
-
-// TODO: replace this implementation?
 import androidx.constraintlayout.compose.carousel.FractionalThreshold
-import androidx.constraintlayout.compose.carousel.rememberCarouselSwipeableState
 import androidx.constraintlayout.compose.carousel.carouselSwipeable
+import androidx.constraintlayout.compose.carousel.rememberCarouselSwipeableState
 
 /**
  * Implements an horizontal Carousel of n elements, driven by drag gestures and customizable
@@ -170,9 +170,9 @@ fun MotionCarousel(
 
     val provider = rememberStateOfItemsProvider(content)
 
-    var componentWidth by remember { mutableStateOf(1000f) }
+    var componentWidth by remember { mutableFloatStateOf(1000f) }
     val swipeableState = rememberCarouselSwipeableState(swipeStateStart)
-    var mprogress = (swipeableState.offset.value / componentWidth)
+    var mprogress = (swipeableState.offset.floatValue / componentWidth)
 
     var state by remember {
         mutableStateOf(
@@ -185,11 +185,11 @@ fun MotionCarousel(
             )
         )
     }
-    var currentIndex = remember { mutableStateOf(0) }
+    var currentIndex by remember { mutableIntStateOf(0) }
 
-    val anchors = if (currentIndex.value == 0) {
+    val anchors = if (currentIndex == 0) {
         mapOf(0f to swipeStateStart, componentWidth to swipeStateForward)
-    } else if (currentIndex.value == provider.value.count() - 1) {
+    } else if (currentIndex == provider.value.count() - 1) {
         mapOf(-componentWidth to swipeStateBackward, 0f to swipeStateStart)
     } else {
         mapOf(
@@ -234,13 +234,12 @@ fun MotionCarousel(
                 state.direction = MotionCarouselDirection.FORWARD
             }
         }
-        currentIndex.value = state.index
+        currentIndex = state.index
     }
 
     MotionLayout(motionScene = motionScene,
         transitionName = transitionName.value,
         progress = mprogress,
-        motionLayoutFlags = setOf(MotionLayoutFlag.FullMeasure), // TODO: only apply as needed
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
@@ -248,6 +247,7 @@ fun MotionCarousel(
                 state = swipeableState,
                 anchors = anchors,
                 reverseDirection = true,
+                // TODO: replace this implementation?
                 thresholds = { _, _ -> FractionalThreshold(0.3f) },
                 orientation = Orientation.Horizontal
             )
@@ -256,11 +256,12 @@ fun MotionCarousel(
             }
     ) {
         for (i in 0 until numSlots) {
-            val idx = i + currentIndex.value - initialSlotIndex
+            val idx = i + currentIndex - initialSlotIndex
             val visible = idx in 0 until provider.value.count()
             ItemHolder(i, slotPrefix, showSlots) {
                 if (visible) {
                     if (provider.value.hasItemsWithProperties()) {
+                        @Suppress("DEPRECATION")
                         val properties = motionProperties("$slotPrefix$i")
                         provider.value.getContent(idx, properties).invoke()
                     } else {

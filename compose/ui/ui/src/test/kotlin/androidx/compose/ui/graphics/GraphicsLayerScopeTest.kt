@@ -20,7 +20,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.toRect
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
 import com.google.common.truth.Truth.assertThat
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -57,17 +56,18 @@ class GraphicsLayerScopeTest {
             ) = Outline.Rectangle(size.toRect())
         }
         scope.clip = true
+        scope.size = Size(100f, 200f)
         scope.reset()
         scope.assertCorrectDefaultValuesAreCorrect()
     }
 
     @Test
-    fun testDpPixelConversions() {
+    fun testGraphicsLayerSize() {
         val scope = GraphicsLayerScope() as ReusableGraphicsLayerScope
-        scope.graphicsDensity = Density(2.0f, 3.0f)
+        scope.size = Size(2560f, 1400f)
         with(scope) {
-            assertEquals(4.0f, 2f.dp.toPx())
-            assertEquals(6.0f, 3f.dp.toSp().toPx())
+            assertEquals(2560f, size.width)
+            assertEquals(1400f, size.height)
         }
     }
 
@@ -85,5 +85,6 @@ class GraphicsLayerScopeTest {
         assertThat(transformOrigin).isEqualTo(TransformOrigin.Center)
         assertThat(shape).isEqualTo(RectangleShape)
         assertThat(clip).isEqualTo(false)
+        assertThat(size).isEqualTo(Size.Unspecified)
     }
 }
