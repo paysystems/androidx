@@ -55,6 +55,7 @@ import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
+import org.gradle.api.JavaVersion
 import org.gradle.api.JavaVersion.VERSION_11
 import org.gradle.api.JavaVersion.VERSION_17
 import org.gradle.api.JavaVersion.VERSION_1_8
@@ -375,16 +376,7 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
 
         project.afterEvaluate {
             project.tasks.withType(KotlinCompile::class.java).configureEach { task ->
-                if (extension.type == LibraryType.COMPILER_PLUGIN) {
-                    task.kotlinOptions.jvmTarget = "11"
-                } else if (
-                    extension.type.compilationTarget == CompilationTarget.HOST &&
-                        extension.type != LibraryType.ANNOTATION_PROCESSOR_UTILS
-                ) {
-                    task.kotlinOptions.jvmTarget = "17"
-                } else {
-                    task.kotlinOptions.jvmTarget = "1.8"
-                }
+                task.kotlinOptions.jvmTarget = getTargetJvmVersion(extension).kotlin
                 val kotlinCompilerArgs =
                     mutableListOf(
                         "-Xskip-metadata-version-check",
@@ -603,24 +595,10 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
         // Force Java 1.8 source- and target-compatibility for all Java libraries.
         val javaExtension = project.extensions.getByType<JavaPluginExtension>()
         project.afterEvaluate {
-            if (extension.type == LibraryType.COMPILER_PLUGIN) {
-                javaExtension.apply {
-                    sourceCompatibility = VERSION_11
-                    targetCompatibility = VERSION_11
-                }
-            } else if (
-                extension.type.compilationTarget == CompilationTarget.HOST &&
-                    extension.type != LibraryType.ANNOTATION_PROCESSOR_UTILS
-            ) {
-                javaExtension.apply {
-                    sourceCompatibility = VERSION_17
-                    targetCompatibility = VERSION_17
-                }
-            } else {
-                javaExtension.apply {
-                    sourceCompatibility = VERSION_1_8
-                    targetCompatibility = VERSION_1_8
-                }
+            javaExtension.apply {
+                val jvmVersion = getTargetJvmVersion(extension)
+                sourceCompatibility = jvmVersion.java
+                targetCompatibility = jvmVersion.java
             }
             if (!project.plugins.hasPlugin(KotlinBasePluginWrapper::class.java)) {
                 project.configureSourceJarForJava()
@@ -1059,6 +1037,36 @@ constructor(private val componentFactory: SoftwareComponentFactory) : Plugin<Pro
         if (ProjectLayoutType.isPlayground(this)) return false
         return true
     }
+
+    private sealed interface JvmVersion {
+        val kotlin: String
+        val java: JavaVersion
+    }
+
+    private object Jvm8 : JvmVersion {
+        override val kotlin = "1.8"
+        override val java: JavaVersion = VERSION_1_8
+    }
+
+    private object Jvm11 : JvmVersion {
+        override val kotlin = "11"
+        override val java: JavaVersion = VERSION_11
+    }
+
+    private object Jvm17 : JvmVersion {
+        override val kotlin = "17"
+        override val java: JavaVersion = VERSION_17
+    }
+
+    private fun getTargetJvmVersion(extension: AndroidXExtension): JvmVersion =
+        when {
+            extension.type == LibraryType.ANNOTATION_PROCESSOR &&
+                extension.mavenGroup?.group == "androidx.room" -> Jvm11
+            extension.type == LibraryType.COMPILER_PLUGIN -> Jvm11
+            extension.type.compilationTarget == CompilationTarget.HOST &&
+                extension.type != LibraryType.ANNOTATION_PROCESSOR_UTILS -> Jvm17
+            else -> Jvm8
+        }
 
     companion object {
         const val CREATE_LIBRARY_BUILD_INFO_FILES_TASK = "createLibraryBuildInfoFiles"
