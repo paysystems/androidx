@@ -39,8 +39,8 @@ android {
 
 dependencies {
     api(project(":room:room-common"))
-    api(project(":sqlite:sqlite-framework"))
-    api(project(":sqlite:sqlite"))
+    api("androidx.sqlite:sqlite-framework:2.4.0")
+    api("androidx.sqlite:sqlite:2.4.0")
     implementation("androidx.arch.core:core-runtime:2.2.0")
     compileOnly("androidx.collection:collection:1.2.0")
     compileOnly("androidx.paging:paging-common:2.0.0")
