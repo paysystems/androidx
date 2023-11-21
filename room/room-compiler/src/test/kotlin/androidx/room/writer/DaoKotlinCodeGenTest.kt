@@ -961,6 +961,8 @@ class DaoKotlinCodeGenTest : BaseDaoKotlinCodeGenTest() {
             data class MyEntity(
                 @PrimaryKey
                 val pk: Long,
+                val doubleColumn: Double,
+                val floatColumn: Float,
             )
             """.trimIndent()
         )
