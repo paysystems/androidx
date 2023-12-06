@@ -56,7 +56,6 @@ import java.util.concurrent.TimeUnit;
 /**
  * Utility functions to work with {@link android.car.hardware.CarPropertyValue}
  *
- * @hide
  */
 @RestrictTo(LIBRARY)
 public final class PropertyUtils {
@@ -333,7 +332,7 @@ public final class PropertyUtils {
     /**
      * Creates a response from {@link CarPropertyValue}.
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "deprecation"})
     @NonNull
     @OptIn(markerClass = ExperimentalCarApi.class)
     public static CarPropertyResponse<?> convertPropertyValueToPropertyResponse(

@@ -20,11 +20,16 @@ import org.intellij.lang.annotations.Language
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.declarations.IrValueParameter
+import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.expressions.IrGetValue
+import org.jetbrains.kotlin.ir.types.classFqName
+import org.jetbrains.kotlin.ir.util.fqNameForIrSerialization
 import org.jetbrains.kotlin.ir.visitors.IrElementVisitorVoid
+import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
+import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class ComposerParamTransformTests : ComposeIrTransformTest() {
+class ComposerParamTransformTests(useFir: Boolean) : AbstractIrTransformTest(useFir) {
     private fun composerParam(
         @Language("kotlin")
         source: String,
@@ -87,7 +92,7 @@ class ComposerParamTransformTests : ComposeIrTransformTest() {
               if (isTraceInProgress()) {
                 traceEventStart(<>, %changed, -1, <>)
               }
-              bar
+              <get-bar>(%composer, 0)
               if (isTraceInProgress()) {
                 traceEventEnd()
               }
@@ -249,7 +254,7 @@ class ComposerParamTransformTests : ComposeIrTransformTest() {
                 traceEventEnd()
               }
               %composer.endRestartGroup()?.updateScope { %composer: Composer?, %force: Int ->
-                VarArgsFirst(*foo, %composer, %changed or 0b0001)
+                VarArgsFirst(*foo, %composer, updateChangedFlags(%changed or 0b0001))
               }
             }
             @Composable
@@ -271,8 +276,71 @@ class ComposerParamTransformTests : ComposeIrTransformTest() {
                 %composer.skipToGroupEnd()
               }
               %composer.endRestartGroup()?.updateScope { %composer: Composer?, %force: Int ->
-                VarArgsCaller(%composer, %changed or 0b0001)
+                VarArgsCaller(%composer, updateChangedFlags(%changed or 0b0001))
               }
+            }
+        """
+    )
+
+    // Regression test for b/286132194
+    @Test
+    fun testStableVarargParams(): Unit = composerParam(
+        """
+            @Composable
+            fun B(vararg values: Int) {
+                print(values)
+            }
+
+            @NonRestartableComposable
+            @Composable
+            fun Test() {
+                B(0, 1, 2, 3)
+            }
+        """,
+        """
+            @Composable
+            fun B(values: IntArray, %composer: Composer?, %changed: Int) {
+              %composer = %composer.startRestartGroup(<>)
+              sourceInformation(%composer, "C(B):Test.kt#2487m")
+              val %dirty = %changed
+              %composer.startMovableGroup(<>, values.size)
+              val <iterator> = values.iterator()
+              while (<iterator>.hasNext()) {
+                val value = <iterator>.next()
+                %dirty = %dirty or if (%composer.changed(value)) 0b0100 else 0
+              }
+              %composer.endMovableGroup()
+              if (%dirty and 0b1110 === 0) {
+                %dirty = %dirty or 0b0010
+              }
+              if (%dirty and 0b1011 !== 0b0010 || !%composer.skipping) {
+                if (isTraceInProgress()) {
+                  traceEventStart(<>, %dirty, -1, <>)
+                }
+                print(values)
+                if (isTraceInProgress()) {
+                  traceEventEnd()
+                }
+              } else {
+                %composer.skipToGroupEnd()
+              }
+              %composer.endRestartGroup()?.updateScope { %composer: Composer?, %force: Int ->
+                B(*values, %composer, updateChangedFlags(%changed or 0b0001))
+              }
+            }
+            @NonRestartableComposable
+            @Composable
+            fun Test(%composer: Composer?, %changed: Int) {
+              %composer.startReplaceableGroup(<>)
+              sourceInformation(%composer, "C(Test)<B(0,>:Test.kt#2487m")
+              if (isTraceInProgress()) {
+                traceEventStart(<>, %changed, -1, <>)
+              }
+              B(0, 1, 2, 3, %composer, 0)
+              if (isTraceInProgress()) {
+                traceEventEnd()
+              }
+              %composer.endReplaceableGroup()
             }
         """
     )
@@ -379,7 +447,7 @@ class ComposerParamTransformTests : ComposeIrTransformTest() {
             @ComposableInferredTarget(scheme = "[0[0]]")
             fun Example(content: Function2<Composer, Int, Unit>, %composer: Composer?, %changed: Int) {
               %composer.startReplaceableGroup(<>)
-              sourceInformation(%composer, "C(Example)<conten...>:Test.kt#2487m")
+              sourceInformation(%composer, "CC(Example)<conten...>:Test.kt#2487m")
               content(%composer, 0b1110 and %changed)
               %composer.endReplaceableGroup()
             }
@@ -392,14 +460,9 @@ class ComposerParamTransformTests : ComposeIrTransformTest() {
                 traceEventStart(<>, %changed, -1, <>)
               }
               Example({ %composer: Composer?, %changed: Int ->
-                %composer.startReplaceableGroup(<>)
-                sourceInformation(%composer, "C:Test.kt#2487m")
-                if (%changed and 0b1011 !== 0b0010 || !%composer.skipping) {
-                  Unit
-                } else {
-                  %composer.skipToGroupEnd()
-                }
-                %composer.endReplaceableGroup()
+                sourceInformationMarkerStart(%composer, <>, "C:Test.kt#2487m")
+                Unit
+                sourceInformationMarkerEnd(%composer)
               }, %composer, 0)
               if (isTraceInProgress()) {
                 traceEventEnd()
@@ -515,7 +578,7 @@ class ComposerParamTransformTests : ComposeIrTransformTest() {
                     %composer.skipToGroupEnd()
                   }
                   %composer.endRestartGroup()?.updateScope { %composer: Composer?, %force: Int ->
-                    Wrapper(block, %composer, %changed or 0b0001)
+                    Wrapper(block, %composer, updateChangedFlags(%changed or 0b0001))
                   }
                 }
                 @Composable
@@ -528,7 +591,7 @@ class ComposerParamTransformTests : ComposeIrTransformTest() {
                   }
                   if (%dirty and 0b1011 !== 0b0010 || !%composer.skipping) {
                     if (isTraceInProgress()) {
-                      traceEventStart(<>, %changed, -1, <>)
+                      traceEventStart(<>, %dirty, -1, <>)
                     }
                     used(text)
                     if (isTraceInProgress()) {
@@ -538,7 +601,7 @@ class ComposerParamTransformTests : ComposeIrTransformTest() {
                     %composer.skipToGroupEnd()
                   }
                   %composer.endRestartGroup()?.updateScope { %composer: Composer?, %force: Int ->
-                    Leaf(text, %composer, %changed or 0b0001)
+                    Leaf(text, %composer, updateChangedFlags(%changed or 0b0001))
                   }
                 }
                 @Composable
@@ -551,7 +614,7 @@ class ComposerParamTransformTests : ComposeIrTransformTest() {
                   }
                   if (%dirty and 0b1011 !== 0b0010 || !%composer.skipping) {
                     if (isTraceInProgress()) {
-                      traceEventStart(<>, %changed, -1, <>)
+                      traceEventStart(<>, %dirty, -1, <>)
                     }
                     %composer.startMovableGroup(<>, value)
                     sourceInformation(%composer, "<Wrappe...>")
@@ -577,7 +640,7 @@ class ComposerParamTransformTests : ComposeIrTransformTest() {
                     %composer.skipToGroupEnd()
                   }
                   %composer.endRestartGroup()?.updateScope { %composer: Composer?, %force: Int ->
-                    Test(value, %composer, %changed or 0b0001)
+                    Test(value, %composer, updateChangedFlags(%changed or 0b0001))
                   }
                 }
             """,
@@ -655,23 +718,13 @@ class ComposerParamTransformTests : ComposeIrTransformTest() {
                       traceEventStart(<>, %dirty, -1, <>)
                     }
                     emit({ %composer: Composer?, %changed: Int ->
-                      %composer.startReplaceableGroup(<>)
-                      sourceInformation(%composer, "C<emit>:Test.kt#2487m")
-                      if (%changed and 0b1011 !== 0b0010 || !%composer.skipping) {
-                        emit({ %composer: Composer?, %changed: Int ->
-                          %composer.startReplaceableGroup(<>)
-                          sourceInformation(%composer, "C<compos...>:Test.kt#2487m")
-                          if (%changed and 0b1011 !== 0b0010 || !%composer.skipping) {
-                            composable(%composer, 0b1110 and %dirty)
-                          } else {
-                            %composer.skipToGroupEnd()
-                          }
-                          %composer.endReplaceableGroup()
-                        }, %composer, 0)
-                      } else {
-                        %composer.skipToGroupEnd()
-                      }
-                      %composer.endReplaceableGroup()
+                      sourceInformationMarkerStart(%composer, <>, "C<emit>:Test.kt#2487m")
+                      emit({ %composer: Composer?, %changed: Int ->
+                        sourceInformationMarkerStart(%composer, <>, "C<compos...>:Test.kt#2487m")
+                        composable(%composer, 0b1110 and %dirty)
+                        sourceInformationMarkerEnd(%composer)
+                      }, %composer, 0)
+                      sourceInformationMarkerEnd(%composer)
                     }, %composer, 0)
                     if (isTraceInProgress()) {
                       traceEventEnd()
@@ -680,18 +733,476 @@ class ComposerParamTransformTests : ComposeIrTransformTest() {
                     %composer.skipToGroupEnd()
                   }
                   %composer.endRestartGroup()?.updateScope { %composer: Composer?, %force: Int ->
-                    composeVector(composable, %composer, %changed or 0b0001)
+                    composeVector(composable, %composer, updateChangedFlags(%changed or 0b0001))
                   }
                 }
                 @Composable
                 @ComposableInferredTarget(scheme = "[0[0]]")
                 fun emit(composable: Function2<Composer, Int, Unit>, %composer: Composer?, %changed: Int) {
                   %composer.startReplaceableGroup(<>)
-                  sourceInformation(%composer, "C(emit)<compos...>:Test.kt#2487m")
+                  sourceInformation(%composer, "CC(emit)<compos...>:Test.kt#2487m")
                   composable(%composer, 0b1110 and %changed)
                   %composer.endReplaceableGroup()
                 }
             """.trimIndent()
         )
     }
+
+    @Test
+    fun testDelegateCall() {
+        composerParam(
+            """
+                import kotlin.reflect.KProperty
+
+                class Foo
+                @Composable
+                operator fun Foo.getValue(thisObj: Any?, property: KProperty<*>): Foo = this
+
+                class FooDelegate {
+                    @Composable
+                    operator fun getValue(thisObj: Any?, property: KProperty<*>): FooDelegate = this
+                }
+
+                class Bar {
+                    @get:Composable
+                    val foo by Foo()
+                }
+
+                @Composable
+                fun test() {
+                    val foo by Foo()
+                    val fooDelegate by FooDelegate()
+                    val bar = Bar()
+                    println(foo)
+                    println(fooDelegate)
+                    println(bar.foo)
+                }
+            """,
+            """
+                @StabilityInferred(parameters = 0)
+                class Foo {
+                  static val %stable: Int = 0
+                }
+                @Composable
+                fun Foo.getValue(thisObj: Any?, property: KProperty<*>, %composer: Composer?, %changed: Int): Foo {
+                  %composer.startReplaceableGroup(<>)
+                  sourceInformation(%composer, "C(getValue)P(1):Test.kt#2487m")
+                  if (isTraceInProgress()) {
+                    traceEventStart(<>, %changed, -1, <>)
+                  }
+                  val tmp0 = <this>
+                  if (isTraceInProgress()) {
+                    traceEventEnd()
+                  }
+                  %composer.endReplaceableGroup()
+                  return tmp0
+                }
+                @StabilityInferred(parameters = 0)
+                class FooDelegate {
+                  @Composable
+                  fun getValue(thisObj: Any?, property: KProperty<*>, %composer: Composer?, %changed: Int): FooDelegate {
+                    %composer.startReplaceableGroup(<>)
+                    sourceInformation(%composer, "C(getValue)P(1):Test.kt#2487m")
+                    if (isTraceInProgress()) {
+                      traceEventStart(<>, %changed, -1, <>)
+                    }
+                    val tmp0 = <this>
+                    if (isTraceInProgress()) {
+                      traceEventEnd()
+                    }
+                    %composer.endReplaceableGroup()
+                    return tmp0
+                  }
+                  static val %stable: Int = 0
+                }
+                @StabilityInferred(parameters = 0)
+                class Bar {
+                  val foo: Foo = Foo()
+                    @Composable @JvmName(name = "getFoo")
+                    get() {
+                      sourceInformationMarkerStart(%composer, <>, "C<Foo()>:Test.kt#2487m")
+                      if (isTraceInProgress()) {
+                        traceEventStart(<>, %changed, -1, <>)
+                      }
+                      val tmp0 = <this>.foo%delegate.getValue(<this>, ::foo, %composer, 0b001000000000 or 0b01110000 and %changed shl 0b0011)
+                      if (isTraceInProgress()) {
+                        traceEventEnd()
+                      }
+                      sourceInformationMarkerEnd(%composer)
+                      return tmp0
+                    }
+                  static val %stable: Int = 0
+                }
+                @Composable
+                fun test(%composer: Composer?, %changed: Int) {
+                  %composer = %composer.startRestartGroup(<>)
+                  sourceInformation(%composer, "C(test)*<foo>,<fooDel...>,<foo>:Test.kt#2487m")
+                  if (%changed !== 0 || !%composer.skipping) {
+                    if (isTraceInProgress()) {
+                      traceEventStart(<>, %changed, -1, <>)
+                    }
+                    val foo by {
+                      val foo%delegate = Foo()
+                      @Composable
+                      get(%composer: Composer?, %changed: Int) {
+                        sourceInformationMarkerStart(%composer, <>, "C<Foo()>:Test.kt#2487m")
+                        if (isTraceInProgress()) {
+                          traceEventStart(<>, %changed, -1, <>)
+                        }
+                        val tmp0 = foo%delegate.getValue(null, ::foo%delegate, %composer, 0b00110000)
+                        if (isTraceInProgress()) {
+                          traceEventEnd()
+                        }
+                        sourceInformationMarkerEnd(%composer)
+                        return tmp0
+                      }
+                    }
+                    val fooDelegate by {
+                      val fooDelegate%delegate = FooDelegate()
+                      @Composable
+                      get(%composer: Composer?, %changed: Int) {
+                        sourceInformationMarkerStart(%composer, <>, "C<FooDel...>:Test.kt#2487m")
+                        if (isTraceInProgress()) {
+                          traceEventStart(<>, %changed, -1, <>)
+                        }
+                        val tmp0 = fooDelegate%delegate.getValue(null, ::fooDelegate%delegate, %composer, 0b0110)
+                        if (isTraceInProgress()) {
+                          traceEventEnd()
+                        }
+                        sourceInformationMarkerEnd(%composer)
+                        return tmp0
+                      }
+                    }
+                    val bar = Bar()
+                    println(<get-foo>(%composer, 0))
+                    println(<get-fooDelegate>(%composer, 0))
+                    println(bar.<get-foo>(%composer, 0))
+                    if (isTraceInProgress()) {
+                      traceEventEnd()
+                    }
+                  } else {
+                    %composer.skipToGroupEnd()
+                  }
+                  %composer.endRestartGroup()?.updateScope { %composer: Composer?, %force: Int ->
+                    test(%composer, updateChangedFlags(%changed or 0b0001))
+                  }
+                }
+            """,
+        )
+    }
+
+    @Test
+    fun testUnstableDelegateCall() = composerParam(
+        """
+                import kotlin.reflect.KProperty
+
+                class Foo {
+                    var unstableField: Int = 0
+                }
+
+                @Composable
+                inline operator fun Foo.getValue(thisObj: Any?, property: KProperty<*>): Foo = this
+
+                @Composable
+                fun test() {
+                    val foo by Foo()
+                    println(foo)
+                }
+            """,
+        """
+            @StabilityInferred(parameters = 0)
+            class Foo {
+              var unstableField: Int = 0
+              static val %stable: Int = 8
+            }
+            @Composable
+            fun Foo.getValue(thisObj: Any?, property: KProperty<*>, %composer: Composer?, %changed: Int): Foo {
+              %composer.startReplaceableGroup(<>)
+              sourceInformation(%composer, "CC(getValue)P(1):Test.kt#2487m")
+              val tmp0 = <this>
+              %composer.endReplaceableGroup()
+              return tmp0
+            }
+            @Composable
+            fun test(%composer: Composer?, %changed: Int) {
+              %composer = %composer.startRestartGroup(<>)
+              sourceInformation(%composer, "C(test)*<foo>:Test.kt#2487m")
+              if (%changed !== 0 || !%composer.skipping) {
+                if (isTraceInProgress()) {
+                  traceEventStart(<>, %changed, -1, <>)
+                }
+                val foo by {
+                  val foo%delegate = Foo()
+                  @Composable
+                  get(%composer: Composer?, %changed: Int) {
+                    sourceInformationMarkerStart(%composer, <>, "C<Foo()>:Test.kt#2487m")
+                    if (isTraceInProgress()) {
+                      traceEventStart(<>, %changed, -1, <>)
+                    }
+                    val tmp0 = foo%delegate.getValue(null, ::foo%delegate, %composer, 0b00111000)
+                    if (isTraceInProgress()) {
+                      traceEventEnd()
+                    }
+                    sourceInformationMarkerEnd(%composer)
+                    return tmp0
+                  }
+                }
+                println(<get-foo>(%composer, 0))
+                if (isTraceInProgress()) {
+                  traceEventEnd()
+                }
+              } else {
+                %composer.skipToGroupEnd()
+              }
+              %composer.endRestartGroup()?.updateScope { %composer: Composer?, %force: Int ->
+                test(%composer, updateChangedFlags(%changed or 0b0001))
+              }
+            }
+        """
+    )
+
+    @Test
+    fun testStableDelegateCall() = composerParam(
+        """
+            import kotlin.reflect.KProperty
+
+            class Foo
+
+            @Composable
+            inline operator fun Foo.getValue(thisObj: Any?, property: KProperty<*>): Foo = this
+
+            @Composable
+            fun test(foo: Foo) {
+                val delegated by foo
+                used(delegated)
+            }
+        """,
+        """
+            @StabilityInferred(parameters = 0)
+            class Foo {
+              static val %stable: Int = 0
+            }
+            @Composable
+            fun Foo.getValue(thisObj: Any?, property: KProperty<*>, %composer: Composer?, %changed: Int): Foo {
+              %composer.startReplaceableGroup(<>)
+              sourceInformation(%composer, "CC(getValue)P(1):Test.kt#2487m")
+              val tmp0 = <this>
+              %composer.endReplaceableGroup()
+              return tmp0
+            }
+            @Composable
+            fun test(foo: Foo, %composer: Composer?, %changed: Int) {
+              %composer = %composer.startRestartGroup(<>)
+              sourceInformation(%composer, "C(test)<delega...>:Test.kt#2487m")
+              val %dirty = %changed
+              if (%changed and 0b1110 === 0) {
+                %dirty = %dirty or if (%composer.changed(foo)) 0b0100 else 0b0010
+              }
+              if (%dirty and 0b1011 !== 0b0010 || !%composer.skipping) {
+                if (isTraceInProgress()) {
+                  traceEventStart(<>, %dirty, -1, <>)
+                }
+                val delegated by {
+                  val delegated%delegate = foo
+                  @Composable
+                  get(%composer: Composer?, %changed: Int) {
+                    sourceInformationMarkerStart(%composer, <>, "C<foo>:Test.kt#2487m")
+                    if (isTraceInProgress()) {
+                      traceEventStart(<>, %changed, -1, <>)
+                    }
+                    val tmp0 = delegated%delegate.getValue(null, ::delegated%delegate, %composer, 0b00110000 or 0b1110 and %dirty)
+                    if (isTraceInProgress()) {
+                      traceEventEnd()
+                    }
+                    sourceInformationMarkerEnd(%composer)
+                    return tmp0
+                  }
+                }
+                used(<get-delegated>(%composer, 0))
+                if (isTraceInProgress()) {
+                  traceEventEnd()
+                }
+              } else {
+                %composer.skipToGroupEnd()
+              }
+              %composer.endRestartGroup()?.updateScope { %composer: Composer?, %force: Int ->
+                test(foo, %composer, updateChangedFlags(%changed or 0b0001))
+              }
+            }
+        """
+    )
+
+    @Test
+    fun validateNoComposableFunctionSymbolCalls() = composerParam(
+        source = """
+            fun abc0(l: @Composable () -> Unit) {
+                val hc = l.hashCode()
+            }
+            fun abc1(l: @Composable (String) -> Unit) {
+                val hc = l.hashCode()
+            }
+            fun abc2(l: @Composable (String, Int) -> Unit) {
+                val hc = l.hashCode()
+            }
+            fun abc3(
+                l: @Composable (Any, Any, Any, Any, Any, Any, Any, Any, Any, Any, Any, Any) -> Any
+            ) {
+                val hc = l.hashCode()
+            }
+        """.trimIndent(),
+        expectedTransformed = """
+            fun abc0(l: Function2<Composer, Int, Unit>) {
+              val hc = l.hashCode()
+            }
+            fun abc1(l: Function3<String, Composer, Int, Unit>) {
+              val hc = l.hashCode()
+            }
+            fun abc2(l: Function4<String, Int, Composer, Int, Unit>) {
+              val hc = l.hashCode()
+            }
+            fun abc3(l: Function15<Any, Any, Any, Any, Any, Any, Any, Any, Any, Any, Any, Any, Composer, Int, Int, Any>) {
+              val hc = l.hashCode()
+            }
+        """.trimIndent(),
+        validator = {
+            val expectedArity = listOf(2, 3, 4, 15)
+            var i = 0 // to iterate over `hashCode` calls
+            it.acceptChildrenVoid(object : IrElementVisitorVoid {
+                override fun visitElement(element: IrElement) {
+                    element.acceptChildrenVoid(this)
+                }
+
+                override fun visitCall(expression: IrCall) {
+                    if (expression.symbol.owner.name.asString() == "hashCode") {
+                        assertEquals(
+                            "kotlin.Function${expectedArity[i]}.hashCode",
+                            expression.symbol.owner.fqNameForIrSerialization.asString())
+                        i++
+                    }
+                }
+            })
+        }
+    )
+
+    @Test
+    fun validateNoComposableFunctionReferencesInOverriddenSymbols() =
+        verifyCrossModuleComposeIrTransform(
+            dependencySource = """
+            package dependency
+
+            import androidx.compose.runtime.Composable
+
+            interface Content {
+                fun setContent(c: @Composable () -> Unit)
+            }
+        """.trimIndent(),
+            source = """
+            package test
+
+            import androidx.compose.runtime.Composable
+            import dependency.Content
+
+            class ContentImpl : Content {
+                override fun setContent(c: @Composable () -> Unit) {}
+            }
+        """.trimIndent(),
+            validator = {
+                it.acceptChildrenVoid(object : IrElementVisitorVoid {
+                    override fun visitElement(element: IrElement) {
+                        element.acceptChildrenVoid(this)
+                    }
+
+                    private val targetFqName = "test.ContentImpl.setContent"
+
+                    override fun visitSimpleFunction(declaration: IrSimpleFunction) {
+                        if (declaration.fqNameForIrSerialization.asString() == targetFqName) {
+                            assertEquals(1, declaration.overriddenSymbols.size)
+                            val firstParameterOfOverridden =
+                                declaration.overriddenSymbols.first().owner.valueParameters.first()
+                                    .takeIf { it.name.asString() == "c" }!!
+                            assertEquals(
+                                "kotlin.Function2",
+                                firstParameterOfOverridden.type.classFqName?.asString()
+                            )
+                        }
+                    }
+                })
+            },
+            expectedTransformed = """
+            @StabilityInferred(parameters = 0)
+            class ContentImpl : Content {
+              override fun setContent(c: Function2<Composer, Int, Unit>) { }
+              static val %stable: Int = 0
+            }
+        """.trimIndent()
+        )
+
+    @Test
+    fun validateNoComposableFunctionReferencesInCalleeOverriddenSymbols() =
+        verifyCrossModuleComposeIrTransform(
+            dependencySource = """
+            package dependency
+
+            import androidx.compose.runtime.Composable
+
+            interface Content {
+                fun setContent(c: @Composable () -> Unit = {})
+            }
+            class ContentImpl : Content {
+                override fun setContent(c: @Composable () -> Unit) {}
+            }
+        """.trimIndent(),
+            source = """
+            package test
+
+            import androidx.compose.runtime.Composable
+            import androidx.compose.runtime.NonRestartableComposable
+            import dependency.ContentImpl
+
+            @Composable
+            @NonRestartableComposable
+            fun Foo() {
+                ContentImpl().setContent()
+            }
+        """.trimIndent(),
+            validator = {
+                it.acceptChildrenVoid(object : IrElementVisitorVoid {
+                    override fun visitElement(element: IrElement) {
+                        element.acceptChildrenVoid(this)
+                    }
+
+                    private val targetFqName = "dependency.ContentImpl.setContent"
+
+                    override fun visitCall(expression: IrCall) {
+                        val callee = expression.symbol.owner
+                        if (callee.fqNameForIrSerialization.asString() == targetFqName) {
+                            val firstParameterOfOverridden =
+                                callee.overriddenSymbols.first().owner.valueParameters.first()
+                                    .takeIf { it.name.asString() == "c" }!!
+                            assertEquals(
+                                "kotlin.Function2",
+                                firstParameterOfOverridden.type.classFqName?.asString()
+                            )
+                        }
+                        super.visitCall(expression)
+                    }
+                })
+            },
+            expectedTransformed = """
+            @Composable
+            @NonRestartableComposable
+            fun Foo(%composer: Composer?, %changed: Int) {
+              %composer.startReplaceableGroup(<>)
+              sourceInformation(%composer, "C(Foo):Test.kt#2487m")
+              if (isTraceInProgress()) {
+                traceEventStart(<>, %changed, -1, <>)
+              }
+              ContentImpl().setContent()
+              if (isTraceInProgress()) {
+                traceEventEnd()
+              }
+              %composer.endReplaceableGroup()
+            }
+        """.trimIndent()
+        )
 }

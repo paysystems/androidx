@@ -52,15 +52,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
+import androidx.compose.ui.util.fastFirst
 import kotlin.math.max
 
-// TODO: Provide M3 tab asset and docs when available.
 /**
- * Material Design tab.
+ * <a href="https://m3.material.io/components/tabs/overview" class="external" target="_blank">Material Design tab.</a>
  *
  * A default Tab, also known as a Primary Navigation Tab. Tabs organize content across different
  * screens, data sets, and other interactions.
+ *
+ * ![Tabs image](https://developer.android.com/images/reference/androidx/compose/material3/secondary-tabs.png)
  *
  * A Tab represents a single page of content using a text label and/or icon. It represents its
  * selected state by tinting the text label and/or image with [selectedContentColor].
@@ -121,9 +122,8 @@ fun Tab(
     }
 }
 
-// TODO: Provide M3 tab asset and docs when available.
 /**
- * Material Design tab.
+ * <a href="https://m3.material.io/components/tabs/overview" class="external" target="_blank">Material Design tab.</a>
  *
  * Tabs organize content across different screens, data sets, and other interactions.
  *
@@ -137,7 +137,7 @@ fun Tab(
  * @param selected whether this tab is selected or not
  * @param onClick called when this tab is clicked
  * @param text the text label displayed in this tab
- * @param icon the icon displayed in this tab
+ * @param icon the icon displayed in this tab. Should be 24.dp.
  * @param modifier the [Modifier] to be applied to this tab
  * @param enabled controls the enabled state of this tab. When `false`, this component will not
  * respond to user input, and it will appear visually disabled and disabled to accessibility
@@ -194,11 +194,12 @@ fun LeadingIconTab(
     }
 }
 
-// TODO: Provide M3 tab asset and docs when available.
 /**
- * Material Design tab.
+ * <a href="https://m3.material.io/components/tabs/overview" class="external" target="_blank">Material Design tab.</a>
  *
  * Tabs organize content across different screens, data sets, and other interactions.
+ *
+ * ![Tabs image](https://developer.android.com/images/reference/androidx/compose/material3/secondary-tabs.png)
  *
  * Generic [Tab] overload that is not opinionated about content / color. See the other overload
  * for a Tab that has specific slots for text and / or an icon, as well as providing the correct
@@ -319,7 +320,7 @@ private fun TabBaselineLayout(
         }
     ) { measurables, constraints ->
         val textPlaceable = text?.let {
-            measurables.first { it.layoutId == "text" }.measure(
+            measurables.fastFirst { it.layoutId == "text" }.measure(
                 // Measure with loose constraints for height as we don't want the text to take up more
                 // space than it needs
                 constraints.copy(minHeight = 0)
@@ -327,7 +328,7 @@ private fun TabBaselineLayout(
         }
 
         val iconPlaceable = icon?.let {
-            measurables.first { it.layoutId == "icon" }.measure(constraints)
+            measurables.fastFirst { it.layoutId == "icon" }.measure(constraints)
         }
 
         val tabWidth = max(textPlaceable?.width ?: 0, iconPlaceable?.width ?: 0)
@@ -429,7 +430,7 @@ private const val TabFadeInAnimationDelay = 100
 private const val TabFadeOutAnimationDuration = 100
 
 // The horizontal padding on the left and right of text
-private val HorizontalTextPadding = 16.dp
+internal val HorizontalTextPadding = 16.dp
 
 // Distance from the top of the indicator to the text baseline when there is one line of text and an
 // icon

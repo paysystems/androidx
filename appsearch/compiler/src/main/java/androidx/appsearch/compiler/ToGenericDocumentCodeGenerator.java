@@ -17,6 +17,7 @@
 package androidx.appsearch.compiler;
 
 import static androidx.appsearch.compiler.IntrospectionHelper.getDocumentAnnotation;
+import static androidx.appsearch.compiler.IntrospectionHelper.getPropertyType;
 
 import androidx.annotation.NonNull;
 
@@ -34,7 +35,6 @@ import java.util.Objects;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.Modifier;
-import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
@@ -93,7 +93,7 @@ class ToGenericDocumentCodeGenerator {
         setSpecialFields(methodBuilder);
 
         // Set properties
-        for (Map.Entry<String, VariableElement> entry : mModel.getPropertyFields().entrySet()) {
+        for (Map.Entry<String, Element> entry : mModel.getPropertyElements().entrySet()) {
             fieldToGenericDoc(methodBuilder, entry.getKey(), entry.getValue());
         }
 
@@ -108,7 +108,7 @@ class ToGenericDocumentCodeGenerator {
     private void fieldToGenericDoc(
             @NonNull MethodSpec.Builder method,
             @NonNull String fieldName,
-            @NonNull VariableElement property) throws ProcessingException {
+            @NonNull Element property) throws ProcessingException {
         // Scenario 1: field is a Collection
         //   1a: CollectionForLoopAssign
         //       Collection contains boxed Long, Integer, Double, Float, Boolean or byte[].
@@ -192,9 +192,10 @@ class ToGenericDocumentCodeGenerator {
             @NonNull MethodSpec.Builder method,
             @NonNull String fieldName,
             @NonNull String propertyName,
-            @NonNull VariableElement property) throws ProcessingException {
+            @NonNull Element property) throws ProcessingException {
         Types typeUtil = mEnv.getTypeUtils();
-        if (!typeUtil.isAssignable(typeUtil.erasure(property.asType()), mHelper.mCollectionType)) {
+        TypeMirror propertyType = getPropertyType(property);
+        if (!typeUtil.isAssignable(typeUtil.erasure(propertyType), mHelper.mCollectionType)) {
             return false;  // This is not a scenario 1 collection
         }
 
@@ -202,21 +203,20 @@ class ToGenericDocumentCodeGenerator {
         CodeBlock.Builder body = CodeBlock.builder()
                 .addStatement(
                         "$T $NCopy = $L",
-                        property.asType(),
+                        propertyType,
                         fieldName,
                         createAppSearchFieldRead(fieldName));
 
-        List<? extends TypeMirror> genericTypes =
-                ((DeclaredType) property.asType()).getTypeArguments();
-        TypeMirror propertyType = genericTypes.get(0);
+        List<? extends TypeMirror> genericTypes = ((DeclaredType) propertyType).getTypeArguments();
+        TypeMirror componentType = genericTypes.get(0);
 
-        if (!tryCollectionForLoopAssign(body, fieldName, propertyName, propertyType)           // 1a
-                && !tryCollectionCallToArray(body, fieldName, propertyName, propertyType)      // 1b
+        if (!tryCollectionForLoopAssign(body, fieldName, propertyName, componentType)         // 1a
+                && !tryCollectionCallToArray(body, fieldName, propertyName, componentType)    // 1b
                 && !tryCollectionForLoopCallToGenericDocument(
-                body, fieldName, propertyName, propertyType)) {                        // 1c
+                body, fieldName, propertyName, componentType)) {                        // 1c
             // Scenario 1x
             throw new ProcessingException(
-                    "Unhandled out property type (1x): " + property.asType().toString(), property);
+                    "Unhandled out property type (1x): " + propertyType.toString(), property);
         }
 
         method.addCode(body.build());
@@ -359,12 +359,13 @@ class ToGenericDocumentCodeGenerator {
             @NonNull MethodSpec.Builder method,
             @NonNull String fieldName,
             @NonNull String propertyName,
-            @NonNull VariableElement property) throws ProcessingException {
+            @NonNull Element property) throws ProcessingException {
         Types typeUtil = mEnv.getTypeUtils();
-        if (property.asType().getKind() != TypeKind.ARRAY
+        TypeMirror propertyType = getPropertyType(property);
+        if (propertyType.getKind() != TypeKind.ARRAY
                 // Byte arrays have a native representation in Icing, so they are not considered a
                 // "repeated" type
-                || typeUtil.isSameType(property.asType(), mHelper.mBytePrimitiveArrayType)) {
+                || typeUtil.isSameType(propertyType, mHelper.mBytePrimitiveArrayType)) {
             return false;  // This is not a scenario 2 array
         }
 
@@ -372,19 +373,19 @@ class ToGenericDocumentCodeGenerator {
         CodeBlock.Builder body = CodeBlock.builder()
                 .addStatement(
                         "$T $NCopy = $L",
-                        property.asType(),
+                        propertyType,
                         fieldName,
                         createAppSearchFieldRead(fieldName));
 
-        TypeMirror propertyType = ((ArrayType) property.asType()).getComponentType();
+        TypeMirror componentType = ((ArrayType) propertyType).getComponentType();
 
-        if (!tryArrayForLoopAssign(body, fieldName, propertyName, propertyType)                // 2a
-                && !tryArrayUseDirectly(body, fieldName, propertyName, propertyType)           // 2b
+        if (!tryArrayForLoopAssign(body, fieldName, propertyName, componentType)              // 2a
+                && !tryArrayUseDirectly(body, fieldName, propertyName, componentType)         // 2b
                 && !tryArrayForLoopCallToGenericDocument(
-                body, fieldName, propertyName, propertyType)) {                        // 2c
+                body, fieldName, propertyName, componentType)) {                        // 2c
             // Scenario 2x
             throw new ProcessingException(
-                    "Unhandled out property type (2x): " + property.asType().toString(), property);
+                    "Unhandled out property type (2x): " + propertyType.toString(), property);
         }
 
         method.addCode(body.build());
@@ -533,15 +534,16 @@ class ToGenericDocumentCodeGenerator {
             @NonNull MethodSpec.Builder method,
             @NonNull String fieldName,
             @NonNull String propertyName,
-            @NonNull VariableElement property) throws ProcessingException {
+            @NonNull Element property) throws ProcessingException {
         // TODO(b/156296904): Handle scenario 3c (FieldCallToGenericDocument)
+        TypeMirror propertyType = getPropertyType(property);
         CodeBlock.Builder body = CodeBlock.builder();
         if (!tryFieldUseDirectlyWithNullCheck(
-                body, fieldName, propertyName, property.asType())  // 3a
+                body, fieldName, propertyName, propertyType)  // 3a
                 && !tryFieldUseDirectlyWithoutNullCheck(
-                body, fieldName, propertyName, property.asType())  // 3b
+                body, fieldName, propertyName, propertyType)  // 3b
                 && !tryFieldCallToGenericDocument(
-                body, fieldName, propertyName, property.asType())) {  // 3c
+                body, fieldName, propertyName, propertyType)) {  // 3c
             throw new ProcessingException("Unhandled property type.", property);
         }
         method.addCode(body.build());
@@ -674,28 +676,50 @@ class ToGenericDocumentCodeGenerator {
                 case CREATION_TIMESTAMP_MILLIS:
                     method.addStatement(
                             "builder.setCreationTimestampMillis($L)",
-                            createAppSearchFieldRead(fieldName));
+                            createAppSearchFieldReadNumeric(fieldName));
                     break;
                 case TTL_MILLIS:
                     method.addStatement(
-                            "builder.setTtlMillis($L)", createAppSearchFieldRead(fieldName));
+                            "builder.setTtlMillis($L)", createAppSearchFieldReadNumeric(fieldName));
                     break;
                 case SCORE:
                     method.addStatement(
-                            "builder.setScore($L)", createAppSearchFieldRead(fieldName));
+                            "builder.setScore($L)", createAppSearchFieldReadNumeric(fieldName));
                     break;
             }
         }
     }
 
     private CodeBlock createAppSearchFieldRead(@NonNull String fieldName) {
-        switch (Objects.requireNonNull(mModel.getFieldReadKind(fieldName))) {
+        switch (Objects.requireNonNull(mModel.getElementReadKind(fieldName))) {
             case FIELD:
                 return CodeBlock.of("document.$N", fieldName);
             case GETTER:
-                String getter = mModel.getGetterForField(fieldName).getSimpleName().toString();
+                String getter = mModel.getGetterForElement(fieldName).getSimpleName().toString();
                 return CodeBlock.of("document.$N()", getter);
         }
         return null;
+    }
+
+    private CodeBlock createAppSearchFieldReadNumeric(@NonNull String fieldName) {
+        CodeBlock fieldRead = createAppSearchFieldRead(fieldName);
+
+        TypeMirror fieldType =
+                IntrospectionHelper.getPropertyType(mModel.getAllElements().get(fieldName));
+
+        String toPrimitiveMethod;
+        Object primitiveFallback;
+        if (fieldType.toString().equals("java.lang.Integer")) {
+            toPrimitiveMethod = "intValue";
+            primitiveFallback = 0;
+        } else if (fieldType.toString().equals("java.lang.Long")) {
+            toPrimitiveMethod = "longValue";
+            primitiveFallback = "0L";
+        } else {
+            return fieldRead;
+        }
+
+        return CodeBlock.of("($L != null) ? $L.$L() : $L",
+                fieldRead, fieldRead, toPrimitiveMethod, primitiveFallback);
     }
 }

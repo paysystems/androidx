@@ -24,11 +24,14 @@ import static org.junit.Assert.assertTrue;
 
 import android.graphics.Point;
 import android.view.KeyEvent;
+import android.view.Surface;
 import android.widget.TextView;
 
 import androidx.test.filters.LargeTest;
+import androidx.test.filters.SdkSuppress;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.uiautomator.By;
+import androidx.test.uiautomator.BySelector;
 import androidx.test.uiautomator.UiDevice;
 import androidx.test.uiautomator.UiObject2;
 import androidx.test.uiautomator.Until;
@@ -40,6 +43,7 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -54,7 +58,8 @@ import javax.xml.xpath.XPathFactory;
 public class UiDeviceTest extends BaseTest {
 
     private static final long TIMEOUT_MS = 5_000;
-
+    private static final long LONG_TIMEOUT_MS = 30_000;
+    private static final String PACKAGE_NAME = "androidx.test.uiautomator.testapp";
     // Defined in 'AndroidManifest.xml'.
     private static final String APP_NAME = "UiAutomator Test App";
 
@@ -240,22 +245,22 @@ public class UiDeviceTest extends BaseTest {
 
     @Test
     public void testPressRecentApps() throws Exception {
+        launchTestActivity(MainActivity.class);
+
+        // Test app appears in the "Recent Apps" screen after pressing button (may need to wait
+        // for a tooltip that shows up the first time the screen is opened).
+        assertFalse(mDevice.hasObject(By.desc(APP_NAME)));
+        mDevice.pressRecentApps();
+        assertTrue(mDevice.wait(Until.hasObject(By.desc(APP_NAME)), LONG_TIMEOUT_MS));
+    }
+
+    @Test
+    public void testMultipleKeys() {
         launchTestActivity(KeycodeTestActivity.class);
 
-        // No app name when the app is running.
-        assertFalse(mDevice.wait(Until.hasObject(By.text(APP_NAME)), TIMEOUT_MS));
-
-        mDevice.pressRecentApps();
-
-        Pattern iconResIdPattern = Pattern.compile(".*launcher.*icon");
-        // For API 28 and above, click on the app icon to make the name visible.
-        if (mDevice.wait(Until.hasObject(By.res(iconResIdPattern)), TIMEOUT_MS)) {
-            UiObject2 icon = mDevice.findObject(By.res(iconResIdPattern));
-            icon.click();
-        }
-
-        // App name appears when on Recent screen.
-        assertTrue(mDevice.wait(Until.hasObject(By.text(APP_NAME)), TIMEOUT_MS));
+        UiObject2 textView = mDevice.findObject(By.res(TEST_APP, "text_view"));
+        mDevice.pressKeyCodes(new int[]{KeyEvent.KEYCODE_A, KeyEvent.KEYCODE_B});
+        assertEquals("keycode A and keycode B are pressed", textView.getText());
     }
 
     @Test
@@ -271,11 +276,12 @@ public class UiDeviceTest extends BaseTest {
     }
 
     @Test
+    @SdkSuppress(minSdkVersion = 21) // Quick settings menu might not be present prior to API 21.
     public void testOpenQuickSettings() {
         mDevice.openQuickSettings();
 
-        assertTrue(mDevice.wait(Until.hasObject(By.res(Pattern.compile(".*quick_settings_panel"))),
-                TIMEOUT_MS));
+        BySelector quickSettings = By.res(Pattern.compile(".*quick_settings.*"));
+        assertTrue(mDevice.wait(Until.hasObject(quickSettings), TIMEOUT_MS));
     }
 
     @Test
@@ -293,69 +299,154 @@ public class UiDeviceTest extends BaseTest {
         assertEquals("I've been clicked!", button.getText());
     }
 
-    /* TODO(b/235841020): Implement these tests, and the tests for exceptions of each tested method.
+    @Test
+    public void testSwipe() {
+        launchTestActivity(SwipeTestActivity.class);
 
-    public void testSwipe() {}
+        UiObject2 swipeRegion = mDevice.findObject(By.res(TEST_APP, "swipe_region"));
 
-    public void testDrag() {}
+        int width = mDevice.getDisplayWidth();
+        int height = mDevice.getDisplayHeight();
+        mDevice.swipe(width / 10, height / 2, 9 * width / 10, height / 2, 10);
 
-    public void testSwipe_withPointArray() {}
-
-    public void testWaitForIdle() {}
-
-    public void testWaitForIdle_withTimeout() {}
-
-    public void testGetCurrentActivityName() {}
-
-    public void testGetCurrentPackageName() {}
-
-    public void testRegisterWatcher() {}
-
-    public void testRemoveWatcher() {}
-
-    public void testRunWatchers() {}
-
-    public void testResetWatcherTriggers() {}
-
-    public void testHasWatcherTriggered() {}
-
-    public void testHasAnyWatcherTriggered() {}
-
-    public void testIsNaturalOrientation() {}
-
-    public void testGetDisplayRotation() {}
-
-    public void testFreezeRotation() {}
-
-    public void testUnfreezeRotation() {}
-
-    public void testSetOrientationLeft() {}
-
-    public void testSetOrientationRight() {}
-
-    public void testSetOrientationNatural() {}
-
-    public void testWakeUp() {}
-
-    public void testIsScreenOn() {}
-
-    public void testSleep() {}
-
-    public void testDumpWindowHierarchy_withString() {}
-
-    public void testDumpWindowHierarchy_withFile() {} // already added
-
-    public void testDumpWindowHierarchy_withOutputStream() {}
-    */
+        assertTrue(swipeRegion.wait(Until.textEquals("swipe_right"), TIMEOUT_MS));
+    }
 
     @Test
-    public void testDumpWindowHierarchy() throws Exception {
+    @SdkSuppress(minSdkVersion = 24)
+    public void testDrag() {
+        launchTestActivity(DragTestActivity.class);
+
+        UiObject2 dragButton = mDevice.findObject(By.res(TEST_APP, "drag_button"));
+        UiObject2 dragDestination = mDevice.findObject(By.res(TEST_APP, "drag_destination"));
+
+        Point start = dragButton.getVisibleCenter();
+        Point end = dragDestination.getVisibleCenter();
+
+        assertEquals("no_drag_yet", dragDestination.getText());
+        mDevice.drag(start.x, start.y, end.x, end.y, 10);
+        assertTrue(dragDestination.wait(Until.textEquals("drag_received"), TIMEOUT_MS));
+    }
+
+    @Test
+    public void testSwipe_withPointArray() {
+        launchTestActivity(SwipeTestActivity.class);
+
+        UiObject2 swipeRegion = mDevice.findObject(By.res(TEST_APP, "swipe_region"));
+
+        int width = mDevice.getDisplayWidth();
+        int height = mDevice.getDisplayHeight();
+
+        Point point1 = new Point(width / 10, height / 2);
+        Point point2 = new Point(width / 2, height / 2);
+        Point point3 = new Point(9 * width / 10, height / 2);
+
+        mDevice.swipe(new Point[]{point1, point2, point3}, 10);
+
+        assertTrue(swipeRegion.wait(Until.textEquals("swipe_right"), TIMEOUT_MS));
+    }
+
+    @Test
+    public void testGetCurrentPackageName() {
+        launchTestActivity(KeycodeTestActivity.class);
+
+        assertEquals(PACKAGE_NAME, mDevice.getCurrentPackageName());
+    }
+
+    @Test
+    public void testSetOrientations() throws Exception {
+        launchTestActivity(KeycodeTestActivity.class);
+
+        try {
+            mDevice.setOrientationNatural();
+            assertEquals(Surface.ROTATION_0, mDevice.getDisplayRotation());
+
+            mDevice.setOrientationLeft();
+            assertEquals(Surface.ROTATION_90, mDevice.getDisplayRotation());
+
+            mDevice.setOrientationRight();
+            assertEquals(Surface.ROTATION_270, mDevice.getDisplayRotation());
+
+            mDevice.setOrientationPortrait();
+            assertTrue(mDevice.getDisplayHeight() >= mDevice.getDisplayWidth());
+
+            mDevice.setOrientationLandscape();
+            assertTrue(mDevice.getDisplayHeight() <= mDevice.getDisplayWidth());
+        } finally {
+            mDevice.setOrientationNatural();
+        }
+    }
+
+    @Test
+    public void testIsScreenOn() throws Exception {
+        launchTestActivity(MainActivity.class);
+
+        mDevice.wakeUp();
+        assertTrue(mDevice.isScreenOn());
+
+        try {
+            mDevice.sleep();
+            assertFalse(mDevice.isScreenOn());
+        } finally {
+            mDevice.wakeUp();
+            mDevice.pressMenu();
+            assertTrue("Failed to wake up device and remove lockscreen",
+                    mDevice.hasObject(By.pkg(TEST_APP)));
+        }
+    }
+
+    @Test
+    public void testDumpWindowHierarchy_withString() throws Exception {
+        launchTestActivity(MainActivity.class);
+        File outFile = mTmpDir.newFile();
+        mDevice.dumpWindowHierarchy(outFile.getAbsolutePath());
+
+        // Verify that a valid XML file was generated and that node attributes are correct.
+        Document xml = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(outFile);
+        validateMainActivityXml(xml);
+    }
+
+    @Test
+    public void testDumpWindowHierarchy_withFile() throws Exception {
         launchTestActivity(MainActivity.class);
         File outFile = mTmpDir.newFile();
         mDevice.dumpWindowHierarchy(outFile);
 
         // Verify that a valid XML file was generated and that node attributes are correct.
         Document xml = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(outFile);
+        validateMainActivityXml(xml);
+    }
+
+    @Test
+    public void testDumpWindowHierarchy_withOutputStream() throws Exception {
+        launchTestActivity(MainActivity.class);
+        File outFile = mTmpDir.newFile();
+        FileOutputStream outStream = new FileOutputStream(outFile);
+        mDevice.dumpWindowHierarchy(outStream);
+
+        Document xml = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(outFile);
+        validateMainActivityXml(xml);
+    }
+
+    @Test
+    public void testWaitForWindowUpdate() {
+        launchTestActivity(WaitTestActivity.class);
+
+        // Times out if package mismatch or no content changes detected.
+        assertFalse(mDevice.waitForWindowUpdate("non-existent package name", 1_000));
+        assertFalse(mDevice.waitForWindowUpdate(TEST_APP, 1_000));
+
+        // Detects content changes (text updated after click).
+        mDevice.findObject(By.res(TEST_APP, "text_1")).click();
+        assertTrue(mDevice.waitForWindowUpdate(TEST_APP, 5_000));
+    }
+
+    @Test
+    public void testGetLauncherPackageName() {
+        assertTrue(mDevice.wait(Until.hasObject(By.pkg(mDevice.getLauncherPackageName())), 5_000));
+    }
+
+    private static void validateMainActivityXml(Document xml) throws Exception {
         Element element = (Element) XPathFactory.newInstance().newXPath()
                 .compile("//hierarchy//*/node[@resource-id='" + TEST_APP + ":id/button']")
                 .evaluate(xml, XPathConstants.NODE);
@@ -379,17 +470,4 @@ public class UiDeviceTest extends BaseTest {
         assertEquals("true", element.getAttribute("visible-to-user"));
         assertNotNull(element.getAttribute("bounds"));
     }
-
-    /* TODO(b/235841020): Implement these tests, and the tests for exceptions of each tested method.
-
-    public void testWaitForWindowUpdate() {}
-
-    public void testTakeScreenshot() {} // already added
-
-    public void testTakeScreenshot_withScaleAndQuality() {} // already added
-
-    public void testGetLauncherPackageName() {}
-
-    public void testExecuteShellCommand() {} // already added
-    */
 }

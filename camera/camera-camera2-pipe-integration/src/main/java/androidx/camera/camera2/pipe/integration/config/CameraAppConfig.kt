@@ -22,6 +22,7 @@ import android.content.Context
 import androidx.annotation.RequiresApi
 import androidx.camera.camera2.pipe.CameraDevices
 import androidx.camera.camera2.pipe.CameraPipe
+import androidx.camera.camera2.pipe.integration.impl.CameraInteropStateCallbackRepository
 import androidx.camera.core.impl.CameraFactory
 import androidx.camera.core.impl.CameraThreadConfig
 import dagger.Component
@@ -35,12 +36,6 @@ import javax.inject.Singleton
 )
 abstract class CameraAppModule {
     companion object {
-        @Singleton
-        @Provides
-        fun provideCameraPipe(context: Context): CameraPipe {
-            return CameraPipe(CameraPipe.Config(appContext = context.applicationContext))
-        }
-
         @Provides
         fun provideCameraDevices(cameraPipe: CameraPipe): CameraDevices {
             return cameraPipe.cameras()
@@ -52,13 +47,22 @@ abstract class CameraAppModule {
 @Module
 class CameraAppConfig(
     private val context: Context,
-    private val cameraThreadConfig: CameraThreadConfig
+    private val cameraThreadConfig: CameraThreadConfig,
+    private val cameraPipe: CameraPipe,
+    private val camera2InteropCallbacks: CameraInteropStateCallbackRepository
 ) {
     @Provides
     fun provideContext(): Context = context
 
     @Provides
     fun provideCameraThreadConfig(): CameraThreadConfig = cameraThreadConfig
+
+    @Provides
+    fun provideCameraPipe(): CameraPipe = cameraPipe
+
+    @Provides
+    fun provideCamera2InteropCallbacks(): CameraInteropStateCallbackRepository =
+        camera2InteropCallbacks
 }
 
 /** Dagger component for Application (Process) scoped dependencies. */

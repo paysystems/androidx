@@ -16,17 +16,21 @@
 
 package androidx.test.uiautomator.testapp;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import android.widget.Button;
 import android.widget.TextView;
 
+import androidx.test.filters.SdkSuppress;
 import androidx.test.uiautomator.By;
 import androidx.test.uiautomator.BySelector;
+import androidx.test.uiautomator.UiObject2;
 
 import org.junit.Test;
 
+import java.util.List;
 import java.util.regex.Pattern;
 
 public class BySelectorTest extends BaseTest {
@@ -81,22 +85,22 @@ public class BySelectorTest extends BaseTest {
         launchTestActivity(BySelectorTestActivity.class);
 
         // String as the exact content description.
-        assertTrue(mDevice.hasObject(By.res(TEST_APP, "desc_family").desc("The button desc.")));
-        assertFalse(mDevice.hasObject(By.res(TEST_APP, "desc_family").desc("button")));
+        assertTrue(mDevice.hasObject(By.res(TEST_APP, "desc_family").desc("The is\nthe desc.")));
+        assertFalse(mDevice.hasObject(By.res(TEST_APP, "desc_family").desc("desc")));
 
         // Pattern of the content description.
         assertTrue(mDevice.hasObject(
-                By.res(TEST_APP, "desc_family").desc(Pattern.compile(".*button.*"))));
-        assertFalse(mDevice.hasObject(By.res(TEST_APP, "desc_family").desc(Pattern.compile(
-                ".*not_button.*"))));
+                By.res(TEST_APP, "desc_family").desc(Pattern.compile(".*desc.*", Pattern.DOTALL))));
+        assertFalse(mDevice.hasObject(By.res(TEST_APP, "desc_family").desc(
+                Pattern.compile(".*not_desc.*", Pattern.DOTALL))));
     }
 
     @Test
     public void testDescContains() {
         launchTestActivity(BySelectorTestActivity.class);
 
-        assertTrue(mDevice.hasObject(By.res(TEST_APP, "desc_family").descContains("button")));
-        assertFalse(mDevice.hasObject(By.res(TEST_APP, "desc_family").descContains("not_button")));
+        assertTrue(mDevice.hasObject(By.res(TEST_APP, "desc_family").descContains("desc")));
+        assertFalse(mDevice.hasObject(By.res(TEST_APP, "desc_family").descContains("not_desc")));
     }
 
     @Test
@@ -150,14 +154,14 @@ public class BySelectorTest extends BaseTest {
         launchTestActivity(BySelectorTestActivity.class);
 
         // Single string as the exact content of the text.
-        assertTrue(mDevice.hasObject(By.res(TEST_APP, "text_family").text("This is the text.")));
+        assertTrue(mDevice.hasObject(By.res(TEST_APP, "text_family").text("This is\nthe text.")));
         assertFalse(mDevice.hasObject(By.res(TEST_APP, "text_family").text("the text")));
 
         // Pattern of the text.
         assertTrue(mDevice.hasObject(
-                By.res(TEST_APP, "text_family").text(Pattern.compile(".*text.*"))));
-        assertFalse(mDevice.hasObject(
-                By.res(TEST_APP, "text_family").text(Pattern.compile(".*nottext.*"))));
+                By.res(TEST_APP, "text_family").text(Pattern.compile(".*text.*", Pattern.DOTALL))));
+        assertFalse(mDevice.hasObject(By.res(TEST_APP, "text_family").text(
+                Pattern.compile(".*nottext.*", Pattern.DOTALL))));
     }
 
     @Test
@@ -182,6 +186,47 @@ public class BySelectorTest extends BaseTest {
 
         assertTrue(mDevice.hasObject(By.res(TEST_APP, "text_family").textEndsWith("text.")));
         assertFalse(mDevice.hasObject(By.res(TEST_APP, "text_family").textEndsWith("not.")));
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = 26)
+    public void testHint() {
+        launchTestActivity(HintTestActivity.class);
+
+        // Single string as the exact content of the hint.
+        assertTrue(mDevice.hasObject(By.hint("sample_hint")));
+        assertFalse(mDevice.hasObject(By.hint("hint")));
+
+        // Pattern of the hint.
+        assertTrue(mDevice.hasObject(By.hint(Pattern.compile(".*hint.*", Pattern.DOTALL))));
+        assertFalse(mDevice.hasObject(By.hint(Pattern.compile(".*not_hint.*", Pattern.DOTALL))));
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = 26)
+    public void testHintContains() {
+        launchTestActivity(HintTestActivity.class);
+
+        assertTrue(mDevice.hasObject(By.hintContains("hint")));
+        assertFalse(mDevice.hasObject(By.hintContains("not_hint")));
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = 26)
+    public void testHintStartsWith() {
+        launchTestActivity(HintTestActivity.class);
+
+        assertTrue(mDevice.hasObject(By.hintStartsWith("sample")));
+        assertFalse(mDevice.hasObject(By.hintStartsWith("not_sample")));
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = 26)
+    public void testHintEndsWith() {
+        launchTestActivity(HintTestActivity.class);
+
+        assertTrue(mDevice.hasObject(By.hintEndsWith("hint")));
+        assertFalse(mDevice.hasObject(By.hintEndsWith("hint_not")));
     }
 
     @Test
@@ -318,6 +363,61 @@ public class BySelectorTest extends BaseTest {
         assertFalse(mDevice.hasObject(By.res(TEST_APP, "tree_N2").depth(1)));
         assertFalse(mDevice.hasObject(By.res(TEST_APP, "tree_N3").depth(1)));
         assertFalse(mDevice.hasObject(By.res(TEST_APP, "tree_N4").depth(2)));
+    }
+
+    @Test
+    public void testHasParent() {
+        launchTestActivity(ParentChildTestActivity.class);
+        BySelector n1 = By.res(TEST_APP, "tree_N1"); // grandparent
+        BySelector n3 = By.res(TEST_APP, "tree_N3"); // parent
+        BySelector n4 = By.res(TEST_APP, "tree_N4"); // sibling
+        BySelector n5 = By.res(TEST_APP, "tree_N5"); // child
+
+        // Can search by parent-child relationship.
+        UiObject2 child = mDevice.findObject(By.copy(n5).hasParent(n3));
+        assertEquals("tree_N5", child.getText());
+
+        // Can find all children by parent-child relationship.
+        List<UiObject2> descendants = mDevice.findObjects(By.hasParent(n3));
+        assertEquals(2, descendants.size());
+
+        // Parent selector can have a parent (grandparent search).
+        UiObject2 grandchild = mDevice.findObject(By.copy(n5).hasParent(By.hasParent(n1)));
+        assertEquals("tree_N5", grandchild.getText());
+
+        // Parent selectors can have children (sibling search).
+        UiObject2 sibling = mDevice.findObject(By.copy(n4).hasParent(By.hasChild(n5)));
+        assertEquals("tree_N4", sibling.getText());
+
+        // Parent must be a direct ancestor.
+        assertFalse(mDevice.hasObject(By.copy(n5).hasParent(n1)));
+        assertFalse(mDevice.hasObject(By.copy(n5).hasParent(n4)));
+    }
+
+    @Test
+    public void testHasAncestor() {
+        launchTestActivity(ParentChildTestActivity.class);
+        BySelector n1 = By.res(TEST_APP, "tree_N1"); // grandparent
+        BySelector n3 = By.res(TEST_APP, "tree_N3"); // parent
+        BySelector n4 = By.res(TEST_APP, "tree_N4"); // sibling
+        BySelector n5 = By.res(TEST_APP, "tree_N5"); // child
+
+        // Can search by any ancestor or a subset of ancestors.
+        assertTrue(mDevice.hasObject(By.copy(n5).hasAncestor(n1)));
+        assertTrue(mDevice.hasObject(By.copy(n5).hasAncestor(n3)));
+        assertFalse(mDevice.hasObject(By.copy(n5).hasAncestor(n4)));
+        assertTrue(mDevice.hasObject(By.copy(n5).hasAncestor(n1, 2)));
+        assertTrue(mDevice.hasObject(By.copy(n5).hasAncestor(n3, 1)));
+        assertFalse(mDevice.hasObject(By.copy(n5).hasAncestor(n1, 1)));
+
+        // Can find all descendants (N2, N3, N4, N5).
+        List<UiObject2> descendants = mDevice.findObjects(By.hasAncestor(n1));
+        assertEquals(4, descendants.size());
+
+        // Ancestor selectors can have ancestors and descendants.
+        assertTrue(mDevice.hasObject(By.copy(n5).hasAncestor(By.hasAncestor(n1))));
+        assertFalse(mDevice.hasObject(By.copy(n5).hasAncestor(By.hasAncestor(n3))));
+        assertTrue(mDevice.hasObject(By.copy(n5).hasAncestor(By.hasDescendant(n3))));
     }
 
     @Test

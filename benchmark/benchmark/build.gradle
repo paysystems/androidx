@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import androidx.build.LibraryType
 
 plugins {
     id("AndroidXPlugin")
@@ -37,4 +37,8 @@ dependencies {
 
 android {
     namespace "androidx.benchmark.benchmark"
+}
+
+androidx {
+    type = LibraryType.INTERNAL_TEST_LIBRARY
 }

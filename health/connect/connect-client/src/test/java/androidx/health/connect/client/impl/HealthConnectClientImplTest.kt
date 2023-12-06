@@ -24,16 +24,17 @@ import android.content.pm.PackageInfo
 import android.os.Looper
 import androidx.health.connect.client.changes.DeletionChange
 import androidx.health.connect.client.changes.UpsertionChange
-import androidx.health.connect.client.impl.converters.datatype.toDataType
-import androidx.health.connect.client.permission.HealthPermission.Companion.createReadPermission
+import androidx.health.connect.client.permission.HealthPermission
+import androidx.health.connect.client.permission.HealthPermission.Companion.getReadPermission
+import androidx.health.connect.client.permission.HealthPermission.Companion.getWritePermission
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.records.MealType
 import androidx.health.connect.client.records.NutritionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.StepsRecord.Companion.COUNT_TOTAL
 import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.records.metadata.DataOrigin
-import androidx.health.connect.client.records.metadata.Device
 import androidx.health.connect.client.records.metadata.Metadata
 import androidx.health.connect.client.request.AggregateGroupByDurationRequest
 import androidx.health.connect.client.request.AggregateGroupByPeriodRequest
@@ -86,7 +87,6 @@ private const val PROVIDER_PACKAGE_NAME = "com.google.fake.provider"
 
 private val API_METHOD_LIST =
     listOf<suspend HealthConnectClientImpl.() -> Unit>(
-        { getGrantedPermissions(setOf()) },
         { revokeAllPermissions() },
         { insertRecords(listOf()) },
         { updateRecords(listOf()) },
@@ -117,13 +117,6 @@ private val API_METHOD_LIST =
         },
         { getChanges("token") },
         { getChangesToken(ChangesTokenRequest(recordTypes = setOf(StepsRecord::class))) },
-        {
-            registerForDataNotifications(
-                notificationIntentAction = "action",
-                recordTypes = emptyList(),
-            )
-        },
-        { unregisterFromDataNotifications(notificationIntentAction = "action") }
     )
 
 @Suppress("GoodTime") // Safe to use in test setup
@@ -141,7 +134,6 @@ class HealthConnectClientImplTest {
 
         healthConnectClient =
             HealthConnectClientImpl(
-                PROVIDER_PACKAGE_NAME,
                 ServiceBackedHealthDataClient(
                     ApplicationProvider.getApplicationContext(),
                     clientConfig,
@@ -190,32 +182,48 @@ class HealthConnectClientImplTest {
 
     @Test
     fun getGrantedPermissions_none() = runTest {
-        val response = testBlocking {
-            healthConnectClient.getGrantedPermissions(
-                setOf(createReadPermission(StepsRecord::class))
-            )
-        }
+        val response = testBlocking { healthConnectClient.getGrantedPermissions() }
 
         assertThat(response).isEmpty()
     }
 
     @Test
-    fun getGrantedPermissions_steps() = runTest {
+    fun getGrantedPermissions() = runTest {
         fakeAhpServiceStub.addGrantedPermission(
             androidx.health.platform.client.permission.Permission(
                 PermissionProto.Permission.newBuilder()
-                    .setDataType(DataProto.DataType.newBuilder().setName("Steps"))
-                    .setAccessType(PermissionProto.AccessType.ACCESS_TYPE_READ)
+                    .setPermission(getReadPermission(StepsRecord::class))
                     .build()
             )
         )
-        val response = testBlocking {
-            healthConnectClient.getGrantedPermissions(
-                setOf(createReadPermission(StepsRecord::class))
+        fakeAhpServiceStub.addGrantedPermission(
+            androidx.health.platform.client.permission.Permission(
+                PermissionProto.Permission.newBuilder()
+                    .setPermission(getWritePermission(HeartRateRecord::class))
+                    .build()
             )
-        }
+        )
+        val response = testBlocking { healthConnectClient.getGrantedPermissions() }
 
-        assertThat(response).containsExactly(createReadPermission(StepsRecord::class))
+        assertThat(response)
+            .containsExactly(
+                getReadPermission(StepsRecord::class),
+                getWritePermission(HeartRateRecord::class)
+            )
+    }
+
+    @Test
+    fun getGrantedPermissions_exerciseRoute() = runTest {
+        fakeAhpServiceStub.addGrantedPermission(
+            androidx.health.platform.client.permission.Permission(
+                PermissionProto.Permission.newBuilder()
+                    .setPermission(HealthPermission.PERMISSION_WRITE_EXERCISE_ROUTE)
+                    .build()
+            )
+        )
+        val response = testBlocking { healthConnectClient.getGrantedPermissions() }
+
+        assertThat(response).containsExactly(HealthPermission.PERMISSION_WRITE_EXERCISE_ROUTE)
     }
 
     @Test
@@ -229,7 +237,9 @@ class HealthConnectClientImplTest {
                         startTime = Instant.ofEpochMilli(1234L),
                         startZoneOffset = null,
                         endTime = Instant.ofEpochMilli(5678L),
-                        endZoneOffset = null
+                        endZoneOffset = null,
+                        metadata =
+                            Metadata(recordingMethod = Metadata.RECORDING_METHOD_ACTIVELY_RECORDED)
                     )
                 )
             )
@@ -243,6 +253,7 @@ class HealthConnectClientImplTest {
                     .setEndTimeMillis(5678L)
                     .putValues("count", DataProto.Value.newBuilder().setLongVal(100).build())
                     .setDataType(DataProto.DataType.newBuilder().setName("Steps"))
+                    .setRecordingMethod(Metadata.RECORDING_METHOD_ACTIVELY_RECORDED)
                     .build()
             )
     }
@@ -301,6 +312,10 @@ class HealthConnectClientImplTest {
                     .setEndTimeMillis(5678L)
                     .putValues("vitaminC", DataProto.Value.newBuilder().setDoubleVal(20.0).build())
                     .putValues("vitaminE", DataProto.Value.newBuilder().setDoubleVal(10.0).build())
+                    .putValues(
+                        "mealType",
+                        DataProto.Value.newBuilder().setEnumVal(MealType.UNKNOWN).build()
+                    )
                     .setDataType(DataProto.DataType.newBuilder().setName("Nutrition"))
                     .build()
             )
@@ -350,11 +365,7 @@ class HealthConnectClientImplTest {
                     startZoneOffset = null,
                     endTime = Instant.ofEpochMilli(5678L),
                     endZoneOffset = null,
-                    metadata =
-                        Metadata(
-                            id = "testUid",
-                            device = Device(),
-                        )
+                    metadata = Metadata(id = "testUid")
                 )
             )
     }
@@ -369,6 +380,7 @@ class HealthConnectClientImplTest {
                             .setUid("testUid")
                             .setStartTimeMillis(1234L)
                             .setEndTimeMillis(5678L)
+                            .setRecordingMethod(Metadata.RECORDING_METHOD_ACTIVELY_RECORDED)
                             .putValues(
                                 "count",
                                 DataProto.Value.newBuilder().setLongVal(100).build()
@@ -410,7 +422,7 @@ class HealthConnectClientImplTest {
                     metadata =
                         Metadata(
                             id = "testUid",
-                            device = Device(),
+                            recordingMethod = Metadata.RECORDING_METHOD_ACTIVELY_RECORDED,
                         )
                 )
             )
@@ -738,39 +750,6 @@ class HealthConnectClientImplTest {
             .isEqualTo(
                 RequestProto.GetChangesRequest.newBuilder()
                     .setChangesToken("steps_changes_token")
-                    .build()
-            )
-    }
-
-    @Test
-    fun registerForDataNotifications() = runTest {
-        testBlocking {
-            healthConnectClient.registerForDataNotifications(
-                notificationIntentAction = "action",
-                recordTypes = listOf(HeartRateRecord::class, StepsRecord::class),
-            )
-        }
-
-        assertThat(fakeAhpServiceStub.lastRegisterForDataNotificationsRequest?.proto)
-            .isEqualTo(
-                RequestProto.RegisterForDataNotificationsRequest.newBuilder()
-                    .setNotificationIntentAction("action")
-                    .addDataTypes(HeartRateRecord::class.toDataType())
-                    .addDataTypes(StepsRecord::class.toDataType())
-                    .build()
-            )
-    }
-
-    @Test
-    fun unregisterFromDataNotifications() = runTest {
-        testBlocking {
-            healthConnectClient.unregisterFromDataNotifications(notificationIntentAction = "action")
-        }
-
-        assertThat(fakeAhpServiceStub.lastUnregisterFromDataNotificationsRequest?.proto)
-            .isEqualTo(
-                RequestProto.UnregisterFromDataNotificationsRequest.newBuilder()
-                    .setNotificationIntentAction("action")
                     .build()
             )
     }

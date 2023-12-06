@@ -22,19 +22,22 @@ import android.hardware.camera2.CameraCaptureSession
 import android.view.Surface
 import androidx.annotation.GuardedBy
 import androidx.annotation.RequiresApi
+import androidx.camera.camera2.pipe.CameraGraph
+import androidx.camera.camera2.pipe.CameraGraph.Flags.FinalizeSessionOnCloseBehavior
 import androidx.camera.camera2.pipe.CameraSurfaceManager
 import androidx.camera.camera2.pipe.StreamId
 import androidx.camera.camera2.pipe.core.Debug
 import androidx.camera.camera2.pipe.core.Log
+import androidx.camera.camera2.pipe.core.TimeSource
 import androidx.camera.camera2.pipe.core.TimestampNs
 import androidx.camera.camera2.pipe.core.Timestamps
 import androidx.camera.camera2.pipe.core.Timestamps.formatMs
 import androidx.camera.camera2.pipe.graph.GraphListener
 import androidx.camera.camera2.pipe.graph.GraphRequestProcessor
-import java.io.Closeable
 import java.util.Collections.synchronizedMap
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 internal val captureSessionDebugIds = atomic(0)
@@ -45,9 +48,9 @@ internal val captureSessionDebugIds = atomic(0)
  * it to the [GraphListener].
  *
  * After this object is created, it waits for:
- *  - A valid CameraDevice via [cameraDevice]
- *  - A valid map of Surfaces via [configureSurfaceMap]
- * Once these objects are available, it will create the [CameraCaptureSession].
+ * - A valid CameraDevice via [cameraDevice]
+ * - A valid map of Surfaces via [configureSurfaceMap] Once these objects are available, it will
+ *   create the [CameraCaptureSession].
  *
  * If at any time this object is put into a COSING or CLOSED state the session will either never be
  * created, or if the session has already been created, it will be de-referenced and ignored. This
@@ -56,11 +59,14 @@ internal val captureSessionDebugIds = atomic(0)
  *
  * This class is thread safe.
  */
+@RequiresApi(21)
 internal class CaptureSessionState(
     private val graphListener: GraphListener,
     private val captureSessionFactory: CaptureSessionFactory,
     private val captureSequenceProcessorFactory: Camera2CaptureSequenceProcessorFactory,
     private val cameraSurfaceManager: CameraSurfaceManager,
+    private val timeSource: TimeSource,
+    private val cameraGraphFlags: CameraGraph.Flags,
     private val scope: CoroutineScope
 ) : CameraCaptureSessionWrapper.StateCallback {
     private val debugId = captureSessionDebugIds.incrementAndGet()
@@ -74,16 +80,17 @@ internal class CaptureSessionState(
     private var _cameraDevice: CameraDeviceWrapper? = null
     var cameraDevice: CameraDeviceWrapper?
         get() = synchronized(lock) { _cameraDevice }
-        set(value) = synchronized(lock) {
-            if (state == State.CLOSING || state == State.CLOSED) {
-                return
-            }
+        set(value) =
+            synchronized(lock) {
+                if (state == State.CLOSING || state == State.CLOSED) {
+                    return
+                }
 
-            _cameraDevice = value
-            if (value != null) {
-                scope.launch { tryCreateCaptureSession() }
+                _cameraDevice = value
+                if (value != null) {
+                    scope.launch { tryCreateCaptureSession() }
+                }
             }
-        }
 
     @GuardedBy("lock")
     private var cameraCaptureSession: ConfiguredCameraCaptureSession? = null
@@ -106,10 +113,13 @@ internal class CaptureSessionState(
     }
 
     @GuardedBy("lock")
+    private var hasAttemptedCaptureSession = false
+
+    @GuardedBy("lock")
     private var _surfaceMap: Map<StreamId, Surface>? = null
 
     @GuardedBy("lock")
-    private val _surfaceTokenMap: MutableMap<Surface, Closeable> = mutableMapOf()
+    private val _surfaceTokenMap: MutableMap<Surface, AutoCloseable> = mutableMapOf()
     fun configureSurfaceMap(surfaces: Map<StreamId, Surface>) {
         synchronized(lock) {
             if (state == State.CLOSING || state == State.CLOSED) {
@@ -176,7 +186,7 @@ internal class CaptureSessionState(
             Log.debug { "$this Finalizing Session" }
             Debug.traceStart { "$this#onSessionFinalized" }
             disconnect()
-            finalizeSession()
+            finalizeSession(0L)
             Debug.traceStop()
         }
     }
@@ -195,12 +205,13 @@ internal class CaptureSessionState(
             }
 
             if (cameraCaptureSession == null && session != null) {
-                captureSession = ConfiguredCameraCaptureSession(
-                    session,
-                    GraphRequestProcessor.from(
-                        captureSequenceProcessorFactory.create(session, activeSurfaceMap)
+                captureSession =
+                    ConfiguredCameraCaptureSession(
+                        session,
+                        GraphRequestProcessor.from(
+                            captureSequenceProcessorFactory.create(session, activeSurfaceMap)
+                        )
                     )
-                )
                 cameraCaptureSession = captureSession
             } else {
                 captureSession = cameraCaptureSession
@@ -223,7 +234,7 @@ internal class CaptureSessionState(
         synchronized(lock) {
             captureSession?.let {
                 Log.info {
-                    val duration = Timestamps.now() - sessionCreatingTimestamp!!
+                    val duration = Timestamps.now(timeSource) - sessionCreatingTimestamp!!
                     "Configured $this in ${duration.formatMs()}"
                 }
 
@@ -237,7 +248,7 @@ internal class CaptureSessionState(
      * a closed state. This will not cancel repeating requests or abort captures.
      */
     fun disconnect() {
-        shutdown(false)
+        shutdown(abortAndStopRepeating = cameraGraphFlags.abortCapturesOnStop)
     }
 
     /**
@@ -259,6 +270,16 @@ internal class CaptureSessionState(
 
         val graphProcessor = configuredCaptureSession?.processor
         if (graphProcessor != null) {
+            // WARNING:
+            // This normally does NOT call close on the captureSession to avoid potentially slow
+            // reconfiguration during mode switch and shutdown. This avoids unintentional restarts
+            // by clearing the internal captureSession variable, clearing all repeating requests,
+            // and by aborting any pending single requests.
+            //
+            // The reason we do not call close is that the android camera HAL doesn't shut down
+            // cleanly unless the device is also closed. See b/135125484 for example.
+            //
+            // WARNING - DO NOT CALL session.close().
             Log.debug { "$this Shutdown" }
 
             Debug.traceStart { "$this#shutdown" }
@@ -269,38 +290,79 @@ internal class CaptureSessionState(
                 Debug.traceStart { "$this#stopRepeating" }
                 graphProcessor.stopRepeating()
                 Debug.traceStop()
-                Debug.traceStart { "$this#stopRepeating" }
+                Debug.traceStart { "$this#abortCaptures" }
                 graphProcessor.abortCaptures()
                 Debug.traceStop()
             }
 
-            // WARNING:
-            // This does NOT call close on the captureSession to avoid potentially slow
-            // reconfiguration during mode switch and shutdown. This avoids unintentional restarts
-            // by clearing the internal captureSession variable, clearing all repeating requests,
-            // and by aborting any pending single requests.
+            // There are rare, extraordinary circumstances where we might need to close the capture
+            // session. It is possible the app might explicitly wait for the captures to be
+            // completely stopped through signals from CameraSurfaceManager, and in which case
+            // closing the capture session would eventually release the Surfaces [1]. Additionally,
+            // on certain devices, we need to close the capture session, or else the camera device
+            // close call might stall indefinitely [2].
             //
-            // The reason we do not call close is that the android camera HAL doesn't shut down
-            // cleanly unless the device is also closed. See b/135125484 for example.
-            //
-            // WARNING - DO NOT CALL session.close().
-
+            // [1] b/277310425
+            // [2] b/277675483
+            if (cameraGraphFlags.quirkCloseCaptureSessionOnDisconnect) {
+                val captureSession = configuredCaptureSession?.session
+                checkNotNull(captureSession)
+                Debug.trace("$this CameraCaptureSessionWrapper#close") {
+                    Log.debug { "Closing capture session for $this" }
+                    captureSession.close()
+                }
+            }
             Debug.traceStop()
         }
 
+        var shouldFinalizeSession = false
+        var finalizeSessionDelayMs = 0L
         synchronized(lock) {
+            // If the CameraDevice is never opened, the session will never be created. For cleanup
+            // reasons, make sure the session is finalized after shutdown if the cameraDevice was
+            // never set.
+            if (state != State.CLOSED) {
+                if (_cameraDevice == null || !hasAttemptedCaptureSession) {
+                    shouldFinalizeSession = true
+                } else {
+                    when (cameraGraphFlags.quirkFinalizeSessionOnCloseBehavior) {
+                        FinalizeSessionOnCloseBehavior.IMMEDIATE -> {
+                            shouldFinalizeSession = true
+                        }
+
+                        FinalizeSessionOnCloseBehavior.TIMEOUT -> {
+                            shouldFinalizeSession = true
+                            finalizeSessionDelayMs = 2000L
+                        }
+                    }
+                }
+            }
             _cameraDevice = null
             state = State.CLOSED
         }
+
+        if (shouldFinalizeSession) {
+            finalizeSession(finalizeSessionDelayMs)
+        }
     }
 
-    private fun finalizeSession() {
-        val tokenList = synchronized(lock) {
-            val tokens = _surfaceTokenMap.values.toList()
-            _surfaceTokenMap.clear()
-            tokens
+    private fun finalizeSession(delayMs: Long = 0L) {
+        if (delayMs != 0L) {
+            scope.launch {
+                Log.debug { "Finalizing $this in $delayMs ms" }
+                delay(delayMs)
+                finalizeSession(0L)
+            }
+        } else {
+            Log.debug { "Finalizing $this" }
+            val tokenList =
+                synchronized(lock) {
+                    val tokens = _surfaceTokenMap.values.toList()
+                    _surfaceTokenMap.clear()
+                    tokens
+                }
+            tokenList.forEach { it.close() }
         }
-        tokenList.forEach { it.close() }
     }
 
     private fun finalizeOutputsIfAvailable(retryAllowed: Boolean = true) {
@@ -315,7 +377,7 @@ internal class CaptureSessionState(
 
         if (captureSession != null && pendingOutputs != null && pendingSurfaces != null) {
             Debug.traceStart { "$this#finalizeOutputConfigurations" }
-            val finalizedStartTime = Timestamps.now()
+            val finalizedStartTime = Timestamps.now(timeSource)
             for ((streamId, outputConfig) in pendingOutputs) {
                 // TODO: Consider adding support for experimental libraries on older devices.
 
@@ -334,7 +396,7 @@ internal class CaptureSessionState(
                 if (state == State.CREATED) {
                     activeSurfaceMap.putAll(pendingSurfaces)
                     Log.info {
-                        val finalizationTime = Timestamps.now() - finalizedStartTime
+                        val finalizationTime = Timestamps.now(timeSource) - finalizedStartTime
                         "Finalized ${pendingOutputs.map { it.key }} for $this in " +
                             finalizationTime.formatMs()
                     }
@@ -364,7 +426,8 @@ internal class CaptureSessionState(
             }
 
             state = State.CREATING
-            sessionCreatingTimestamp = Timestamps.now()
+            hasAttemptedCaptureSession = true
+            sessionCreatingTimestamp = Timestamps.now(timeSource)
         }
 
         // Create the capture session and return a Map of StreamId -> OutputConfiguration for any
@@ -373,11 +436,10 @@ internal class CaptureSessionState(
             "Creating CameraCaptureSession from ${device?.cameraId} using $this with $surfaces"
         }
 
-        val deferred = Debug.trace(
-            "CameraDevice-${device?.cameraId?.value}#createCaptureSession"
-        ) {
-            captureSessionFactory.create(device!!, surfaces!!, this)
-        }
+        val deferred =
+            Debug.trace("CameraDevice-${device?.cameraId?.value}#createCaptureSession") {
+                captureSessionFactory.create(device!!, surfaces!!, this)
+            }
 
         synchronized(lock) {
             if (state == State.CLOSING || state == State.CLOSED) {
@@ -395,9 +457,7 @@ internal class CaptureSessionState(
                 }
                 pendingOutputMap = deferred
 
-                val availableDeferredSurfaces = _surfaceMap?.filter {
-                    deferred.containsKey(it.key)
-                }
+                val availableDeferredSurfaces = _surfaceMap?.filter { deferred.containsKey(it.key) }
 
                 if (availableDeferredSurfaces != null &&
                     availableDeferredSurfaces.size == deferred.size

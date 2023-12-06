@@ -19,7 +19,6 @@ package androidx.room.processor
 import androidx.room.Query
 import androidx.room.SkipQueryVerification
 import androidx.room.Transaction
-import androidx.room.compiler.codegen.toJavaPoet
 import androidx.room.compiler.processing.XAnnotationBox
 import androidx.room.compiler.processing.XMethodElement
 import androidx.room.compiler.processing.XType
@@ -27,7 +26,7 @@ import androidx.room.ext.isNotError
 import androidx.room.parser.ParsedQuery
 import androidx.room.parser.QueryType
 import androidx.room.parser.SqlParser
-import androidx.room.processor.ProcessorErrors.cannotMapInfoSpecifiedColumn
+import androidx.room.processor.ProcessorErrors.cannotMapSpecifiedColumn
 import androidx.room.solver.TypeAdapterExtras
 import androidx.room.solver.query.result.PojoRowAdapter
 import androidx.room.verifier.ColumnInfo
@@ -134,9 +133,8 @@ private class InternalQueryProcessor(
             ParsedQuery.MISSING
         }
 
-        val returnTypeName = returnType.typeName
         context.checker.notUnbound(
-            returnTypeName, executableElement,
+            returnType, executableElement,
             ProcessorErrors.CANNOT_USE_UNBOUND_GENERICS_IN_QUERY_METHODS
         )
 
@@ -194,7 +192,10 @@ private class InternalQueryProcessor(
         context.checker.check(
             resultBinder.adapter != null,
             executableElement,
-            ProcessorErrors.cannotFindPreparedQueryResultAdapter(returnType.typeName, query.type)
+            ProcessorErrors.cannotFindPreparedQueryResultAdapter(
+                returnType.asTypeName().toString(context.codeLanguage),
+                query.type
+            )
         )
 
         val parameters = delegate.extractQueryParams(query)
@@ -207,6 +208,7 @@ private class InternalQueryProcessor(
         )
     }
 
+    @Suppress("DEPRECATION") // Due to MapInfo usage
     private fun getQueryMethod(
         delegate: MethodProcessorDelegate,
         returnType: XType,
@@ -220,7 +222,9 @@ private class InternalQueryProcessor(
         context.checker.check(
             resultBinder.adapter != null,
             executableElement,
-            ProcessorErrors.cannotFindQueryResultAdapter(returnType.typeName)
+            ProcessorErrors.cannotFindQueryResultAdapter(
+                returnType.asTypeName().toString(context.codeLanguage)
+            )
         )
 
         val inTransaction = executableElement.hasAnnotation(Transaction::class)
@@ -251,10 +255,12 @@ private class InternalQueryProcessor(
             val pojoMappings = mappings.filterIsInstance<PojoRowAdapter.PojoMapping>()
             val pojoUnusedFields = pojoMappings
                 .filter { it.unusedFields.isNotEmpty() }
-                .associate { it.pojo.typeName.toJavaPoet() to it.unusedFields }
+                .associate { it.pojo.typeName.toString(context.codeLanguage) to it.unusedFields }
             if (unusedColumns.isNotEmpty() || pojoUnusedFields.isNotEmpty()) {
                 val warningMsg = ProcessorErrors.cursorPojoMismatch(
-                    pojoTypeNames = pojoMappings.map { it.pojo.typeName.toJavaPoet() },
+                    pojoTypeNames = pojoMappings.map {
+                        it.pojo.typeName.toString(context.codeLanguage)
+                    },
                     unusedColumns = unusedColumns,
                     allColumns = columnNames,
                     pojoUnusedFields = pojoUnusedFields,
@@ -279,6 +285,7 @@ private class InternalQueryProcessor(
      * Parse @MapInfo annotation, validate its inputs and put information in the bag of extras,
      * it will be later used by the TypeAdapterStore.
      */
+    @Suppress("DEPRECATION") // Due to @MapInfo usage
     private fun processMapInfo(
         mapInfoAnnotation: XAnnotationBox<androidx.room.MapInfo>,
         query: ParsedQuery,
@@ -312,23 +319,26 @@ private class InternalQueryProcessor(
         )
 
         val resultColumns = query.resultInfo?.columns
+
         if (resultColumns != null) {
             context.checker.check(
                 keyColumn.isEmpty() || resultColumns.contains(keyColumn, keyTable),
                 queryExecutableElement
             ) {
-                cannotMapInfoSpecifiedColumn(
+                cannotMapSpecifiedColumn(
                     (if (keyTable != null) "$keyTable." else "") + keyColumn,
-                    resultColumns.map { it.name }
+                    resultColumns.map { it.name },
+                    androidx.room.MapInfo::class.java.simpleName
                 )
             }
             context.checker.check(
                 valueColumn.isEmpty() || resultColumns.contains(valueColumn, valueTable),
                 queryExecutableElement
             ) {
-                cannotMapInfoSpecifiedColumn(
+                cannotMapSpecifiedColumn(
                     (if (valueTable != null) "$valueTable." else "") + valueColumn,
-                    resultColumns.map { it.name }
+                    resultColumns.map { it.name },
+                    androidx.room.MapInfo::class.java.simpleName
                 )
             }
         }

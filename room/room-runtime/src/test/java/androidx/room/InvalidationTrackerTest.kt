@@ -19,12 +19,12 @@ import android.database.Cursor
 import android.database.sqlite.SQLiteException
 import androidx.arch.core.executor.ArchTaskExecutor
 import androidx.arch.core.executor.JunitTaskExecutorRule
+import androidx.kruth.assertThat
+import androidx.kruth.assertWithMessage
 import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.SupportSQLiteStatement
-import com.google.common.truth.Truth.assertThat
-import com.google.common.truth.Truth.assertWithMessage
 import java.lang.ref.ReferenceQueue
 import java.lang.ref.WeakReference
 import java.util.Locale
@@ -37,6 +37,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.fail
 import org.junit.After
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -177,6 +178,7 @@ class InvalidationTrackerTest {
         drainTasks()
     }
 
+    @Ignore // b/253058904
     @Test
     fun refreshCheckTasks() {
         whenever(mRoomDatabase.query(any<SimpleSQLiteQuery>(), isNull())).thenReturn(mock<Cursor>())

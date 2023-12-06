@@ -46,7 +46,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.requiredSize
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
@@ -60,6 +59,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.samples.StickyHeaderSample
@@ -80,6 +80,9 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -126,6 +129,7 @@ val LazyListDemos = listOf(
     ComposableDemo("List drag and drop") { LazyColumnDragAndDropDemo() },
     ComposableDemo("Grid drag and drop") { LazyGridDragAndDropDemo() },
     ComposableDemo("Staggered grid") { LazyStaggeredGridDemo() },
+    ComposableDemo("Animate item placement") { AnimateItemPlacementDemo() },
     PagingDemos
 )
 
@@ -155,8 +159,8 @@ private fun LazyColumnDemo() {
 @Preview
 @Composable
 private fun ListAddRemoveItemsDemo() {
-    var numItems by remember { mutableStateOf(0) }
-    var offset by remember { mutableStateOf(0) }
+    var numItems by remember { mutableIntStateOf(0) }
+    var offset by remember { mutableIntStateOf(0) }
     Column {
         Row {
             val buttonModifier = Modifier.padding(8.dp)
@@ -403,8 +407,8 @@ private fun LazyRowScope() {
 
 @Composable
 private fun LazyListArrangements() {
-    var count by remember { mutableStateOf(3) }
-    var arrangement by remember { mutableStateOf(6) }
+    var count by remember { mutableIntStateOf(3) }
+    var arrangement by remember { mutableIntStateOf(6) }
     Column {
         Row {
             Button(onClick = { count-- }) {
@@ -477,7 +481,7 @@ private fun ReverseLayoutAndRtlDemo() {
     Column {
         val scrollState = rememberScrollState()
         val lazyState = rememberLazyListState()
-        var count by remember { mutableStateOf(10) }
+        var count by remember { mutableIntStateOf(10) }
         var reverse by remember { mutableStateOf(false) }
         var rtl by remember { mutableStateOf(false) }
         var column by remember { mutableStateOf(true) }
@@ -631,7 +635,7 @@ private fun NestedLazyDemo() {
                 .background(Color.LightGray),
             contentAlignment = Alignment.Center
         ) {
-            var state by rememberSaveable { mutableStateOf(0) }
+            var state by rememberSaveable { mutableIntStateOf(0) }
             Button(onClick = { state++ }) {
                 Text("Index=$index State=$state")
             }
@@ -657,7 +661,7 @@ private fun LazyGridDemo() {
         GridCells.Fixed(3),
         GridCells.Adaptive(minSize = 60.dp)
     )
-    var currentMode by remember { mutableStateOf(0) }
+    var currentMode by remember { mutableIntStateOf(0) }
     Column {
         Button(
             modifier = Modifier.wrapContentSize(),
@@ -686,11 +690,14 @@ private fun LazyGridForMode(mode: GridCells) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
+@Preview
 @Composable
 private fun LazyGridWithSpacingDemo() {
     val columnModes = listOf(
         GridCells.Fixed(3),
         GridCells.Adaptive(minSize = 60.dp),
+        GridCells.FixedSize(50.dp),
         object : GridCells {
             // columns widths have ratio 1:1:2:3
             override fun Density.calculateCrossAxisCellSizes(
@@ -703,10 +710,10 @@ private fun LazyGridWithSpacingDemo() {
             }
         }
     )
-    var currentMode by remember { mutableStateOf(0) }
-    var horizontalSpacing by remember { mutableStateOf(8) }
+    var currentMode by remember { mutableIntStateOf(0) }
+    var horizontalSpacing by remember { mutableIntStateOf(8) }
     var horizontalSpacingExpanded by remember { mutableStateOf(false) }
-    var verticalSpacing by remember { mutableStateOf(8) }
+    var verticalSpacing by remember { mutableIntStateOf(8) }
     var verticalSpacingExpanded by remember { mutableStateOf(false) }
     Column {
         Row {
@@ -854,7 +861,7 @@ private fun ReorderWithCustomKeys() {
         }
         LazyColumn {
             item {
-                var counter by rememberSaveable { mutableStateOf(0) }
+                var counter by rememberSaveable { mutableIntStateOf(0) }
                 Button(onClick = { counter++ }) {
                     Text("Header has $counter")
                 }
@@ -863,7 +870,7 @@ private fun ReorderWithCustomKeys() {
                 items = names,
                 key = { it }
             ) {
-                var counter by rememberSaveable { mutableStateOf(0) }
+                var counter by rememberSaveable { mutableIntStateOf(0) }
                 Button(onClick = { counter++ }, modifier = Modifier.animateItemPlacement()) {
                     Text("$it has $counter")
                 }
@@ -956,7 +963,9 @@ private fun LazyStaggeredGridDemo() {
         mutableStateOf(List(100) { it })
     }
 
-    var count by remember { mutableStateOf(100) }
+    var count by remember { mutableIntStateOf(10) }
+    var reverseLayout by remember { mutableStateOf(false) }
+    var rtl by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -964,43 +973,135 @@ private fun LazyStaggeredGridDemo() {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Button(onClick = { count++ }) { Text(text = "++") }
+            Button(onClick = { reverseLayout = !reverseLayout }) {
+                Text("reverse")
+            }
+            Button(onClick = { rtl = !rtl }) {
+                Text(if (rtl) "rtl" else "ltr")
+            }
             Button(onClick = {
                 indices.value = indices.value.toMutableList().apply { shuffle() }
             }) { Text(text = "shuffle") }
             Button(onClick = { if (count != 0) count-- }) { Text(text = "--") }
         }
 
-        val state = rememberLazyStaggeredGridState()
+        val state = rememberLazyStaggeredGridState(initialFirstVisibleItemIndex = 29)
 
-        LazyVerticalStaggeredGrid(
-            columns = StaggeredGridCells.Fixed(3),
-            modifier = Modifier.fillMaxSize(),
-            state = state,
-            contentPadding = PaddingValues(vertical = 500.dp, horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            content = {
-                items(count) {
-                    var expanded by rememberSaveable { mutableStateOf(false) }
-                    val index = indices.value[it % indices.value.size]
-                    val color = colors[index]
-                    Box(
-                        modifier = Modifier
-                            .height(if (!expanded) heights[index] else heights[index] * 2)
-                            .border(2.dp, color, RoundedCornerShape(5.dp))
-                            .clickable {
-                                expanded = !expanded
-                            }
+        val layoutDirection = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
+        CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
+            LazyVerticalStaggeredGrid(
+                columns = StaggeredGridCells.FixedSize(100.dp),
+                modifier = Modifier.fillMaxSize(),
+                state = state,
+                contentPadding = PaddingValues(vertical = 30.dp, horizontal = 20.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalItemSpacing = 10.dp,
+                reverseLayout = reverseLayout,
+                content = {
+                    items(
+                        count,
+                        span = {
+                            if (it % 30 == 0)
+                                StaggeredGridItemSpan.FullLine
+                            else
+                                StaggeredGridItemSpan.SingleLane
+                        },
+                        key = { indices.value[it % indices.value.size] }
                     ) {
-                        Text(
-                            "$it",
-                            modifier = Modifier.align(Alignment.Center),
-                            color = color,
-                            fontSize = 36.sp
-                        )
+                        var expanded by remember { mutableStateOf(false) }
+                        val index = indices.value[it % indices.value.size]
+                        val color = colors[index]
+                        Box(
+                            modifier = Modifier
+                                .animateItemPlacement()
+                                .height(if (!expanded) heights[index] else heights[index] * 2)
+                                .border(2.dp, color, RoundedCornerShape(5.dp))
+                                .clickable {
+                                    expanded = !expanded
+                                }
+                        ) {
+                            Text(
+                                "$it",
+                                modifier = Modifier.align(Alignment.Center),
+                                color = color,
+                                fontSize = 36.sp
+                            )
+                        }
                     }
                 }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun AnimateItemPlacementDemo() {
+    val items = remember { mutableStateListOf<Int>().apply {
+        repeat(20) { add(it) }
+    } }
+    val selectedIndexes = remember { mutableStateMapOf<Int, Boolean>() }
+    var reverse by remember { mutableStateOf(false) }
+    Column {
+        Row {
+            Button(onClick = {
+                selectedIndexes.entries.reversed().forEach { entry ->
+                    if (entry.value) {
+                        items.remove(entry.key)
+                        items.add(items.size - 3, entry.key)
+                    }
+                }
+            }) {
+                Text("MoveToEnd")
             }
-        )
+            Button(onClick = {
+                selectedIndexes.clear()
+            }) {
+                Text("RmvSelected")
+            }
+            Button(onClick = {
+                reverse = !reverse
+            }) {
+                Text("Reverse=$reverse")
+            }
+        }
+        LazyColumn(
+            Modifier
+                .fillMaxWidth()
+                .weight(1f), reverseLayout = reverse) {
+            items(items, key = { it }) { item ->
+                val selected = selectedIndexes.getOrDefault(item, false)
+                val modifier = Modifier.animateItemPlacement()
+                var height by remember { mutableStateOf(40.dp) }
+                Row(
+                    modifier
+                        .padding(8.dp)
+                        .fillMaxWidth()
+                        .border(1.dp, Color.Black)
+                        .clickable {
+                            height = if (height == 40.dp) 120.dp else 40.dp
+                        },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(checked = selected, onCheckedChange = {
+                        selectedIndexes[item] = it
+                    })
+                    Spacer(
+                        Modifier
+                            .width(16.dp)
+                            .height(height))
+                    Text("Item $item")
+                }
+            }
+        }
+        var size by remember { mutableStateOf(40.dp) }
+        Box(
+            Modifier
+                .height(size)
+                .fillMaxWidth()
+                .border(1.dp, Color.DarkGray)
+                .clickable {
+                    size = if (size == 40.dp) 350.dp else 40.dp
+                })
     }
 }
