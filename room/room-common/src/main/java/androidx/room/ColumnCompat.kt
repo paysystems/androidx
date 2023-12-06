@@ -23,5 +23,6 @@ package androidx.room
 @Retention(AnnotationRetention.BINARY)
 public annotation class ColumnCompat(
     val type: String,
+    @get:Suppress("GetterSetterNames")
     val nonNull: Boolean = false,
 )
