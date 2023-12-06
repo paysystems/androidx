@@ -15,7 +15,10 @@
  */
 package androidx.constraintlayout.core.parser;
 
+import androidx.annotation.NonNull;
+
 import java.util.ArrayList;
+import java.util.Objects;
 
 public class CLContainer extends CLElement {
     ArrayList<CLElement> mElements = new ArrayList<>();
@@ -347,5 +350,36 @@ public class CLContainer extends CLElement {
             return element.content();
         }
         return null;
+    }
+
+    @NonNull
+    @Override
+    public CLContainer clone() {
+        CLContainer clone = (CLContainer) super.clone();
+        ArrayList<CLElement> clonedArray = new ArrayList<>(mElements.size());
+        for (CLElement element: mElements) {
+            CLElement elementClone = element.clone();
+            elementClone.setContainer(clone);
+            clonedArray.add(elementClone);
+        }
+        clone.mElements = clonedArray;
+        return clone;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+
+        if (!(obj instanceof CLContainer)) {
+            return false;
+        }
+        return this.mElements.equals(((CLContainer) obj).mElements);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(mElements, super.hashCode());
     }
 }

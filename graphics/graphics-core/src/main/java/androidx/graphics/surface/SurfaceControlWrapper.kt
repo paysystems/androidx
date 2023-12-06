@@ -23,76 +23,124 @@ import android.os.Build
 import android.view.Surface
 import android.view.SurfaceControl
 import androidx.annotation.RequiresApi
-import androidx.hardware.SyncFence
+import androidx.graphics.utils.JniVisible
+import androidx.hardware.SyncFenceV19
 import java.util.concurrent.Executor
 
+@JniVisible
 internal class JniBindings {
     companion object {
-        private external fun nLoadLibrary()
+        @JvmStatic
+        @JniVisible
         external fun nCreate(surfaceControl: Long, debugName: String): Long
+        @JvmStatic
+        @JniVisible
         external fun nCreateFromSurface(surface: Surface, debugName: String): Long
+        @JvmStatic
+        @JniVisible
         external fun nRelease(surfaceControl: Long)
-
+        @JvmStatic
+        @JniVisible
         external fun nTransactionCreate(): Long
+        @JvmStatic
+        @JniVisible
         external fun nTransactionDelete(surfaceTransaction: Long)
+        @JvmStatic
+        @JniVisible
         external fun nTransactionApply(surfaceTransaction: Long)
+        @JvmStatic
+        @JniVisible
         external fun nTransactionReparent(
             surfaceTransaction: Long,
             surfaceControl: Long,
             newParent: Long
         )
 
+        @JvmStatic
+        @JniVisible
         external fun nTransactionSetOnComplete(
             surfaceTransaction: Long,
             listener: SurfaceControlCompat.TransactionCompletedListener
         )
 
+        @JvmStatic
+        @JniVisible
         external fun nTransactionSetOnCommit(
             surfaceTransaction: Long,
             listener: SurfaceControlCompat.TransactionCommittedListener
         )
 
-        external fun nExtractFenceFd(
-            syncFence: SyncFence
+        @JvmStatic
+        @JniVisible
+        external fun nDupFenceFd(
+            syncFence: SyncFenceV19
         ): Int
 
+        @JvmStatic
+        @JniVisible
         external fun nSetBuffer(
             surfaceTransaction: Long,
             surfaceControl: Long,
-            hardwareBuffer: HardwareBuffer,
-            acquireFieldFd: SyncFence
+            hardwareBuffer: HardwareBuffer?,
+            acquireFieldFd: SyncFenceV19
         )
 
+        @JvmStatic
+        @JniVisible
+        external fun nSetGeometry(
+            surfaceTransaction: Long,
+            surfaceControl: Long,
+            bufferWidth: Int,
+            bufferHeight: Int,
+            dstWidth: Int,
+            dstHeight: Int,
+            transformation: Int
+        )
+
+        @JvmStatic
+        @JniVisible
         external fun nSetVisibility(
             surfaceTransaction: Long,
             surfaceControl: Long,
             visibility: Byte
         )
 
+        @JvmStatic
+        @JniVisible
         external fun nSetZOrder(surfaceTransaction: Long, surfaceControl: Long, zOrder: Int)
+        @JvmStatic
+        @JniVisible
         external fun nSetDamageRegion(
             surfaceTransaction: Long,
             surfaceControl: Long,
             rect: Rect?
         )
 
+        @JvmStatic
+        @JniVisible
         external fun nSetDesiredPresentTime(
             surfaceTransaction: Long,
             desiredPresentTime: Long
         )
 
+        @JvmStatic
+        @JniVisible
         external fun nSetBufferTransparency(
             surfaceTransaction: Long,
             surfaceControl: Long,
             transparency: Byte,
         )
 
+        @JvmStatic
+        @JniVisible
         external fun nSetBufferAlpha(
             surfaceTransaction: Long,
             surfaceControl: Long,
             alpha: Float
         )
 
+        @JvmStatic
+        @JniVisible
         external fun nSetCrop(
             surfaceTransaction: Long,
             surfaceControl: Long,
@@ -102,6 +150,8 @@ internal class JniBindings {
             bottom: Int
         )
 
+        @JvmStatic
+        @JniVisible
         external fun nSetPosition(
             surfaceTransaction: Long,
             surfaceControl: Long,
@@ -109,6 +159,8 @@ internal class JniBindings {
             y: Float
         )
 
+        @JvmStatic
+        @JniVisible
         external fun nSetScale(
             surfaceTransaction: Long,
             surfaceControl: Long,
@@ -116,15 +168,24 @@ internal class JniBindings {
             scaleY: Float
         )
 
+        @JvmStatic
+        @JniVisible
         external fun nSetBufferTransform(
             surfaceTransaction: Long,
             surfaceControl: Long,
             transformation: Int
         )
 
+        @JvmStatic
+        @JniVisible
+        external fun nGetDisplayOrientation(): String
+
+        @JvmStatic
+        @JniVisible
+        external fun nGetPreviousReleaseFenceFd(surfaceControl: Long, transactionStats: Long): Int
+
         init {
             System.loadLibrary("graphics-core")
-            nLoadLibrary()
         }
     }
 }
@@ -143,19 +204,23 @@ internal class JniBindings {
  * initially exposed for SurfaceControl.
  */
 @RequiresApi(Build.VERSION_CODES.Q)
-internal class SurfaceControlWrapper internal constructor(
-    surface: Surface,
-    debugName: String
-) {
-    private var mNativeSurfaceControl: Long = 0
+internal class SurfaceControlWrapper {
 
-    init {
-        mNativeSurfaceControl = JniBindings.nCreateFromSurface(surface, debugName)
-
+    constructor(surfaceControl: SurfaceControlWrapper, debugName: String) {
+        mNativeSurfaceControl = JniBindings.nCreate(surfaceControl.mNativeSurfaceControl, debugName)
         if (mNativeSurfaceControl == 0L) {
             throw IllegalArgumentException()
         }
     }
+
+    constructor(surface: Surface, debugName: String) {
+        mNativeSurfaceControl = JniBindings.nCreateFromSurface(surface, debugName)
+        if (mNativeSurfaceControl == 0L) {
+            throw IllegalArgumentException()
+        }
+    }
+
+    internal var mNativeSurfaceControl: Long = 0
 
     /**
      * Compatibility class for ASurfaceTransaction.
@@ -234,7 +299,7 @@ internal class SurfaceControlWrapper internal constructor(
 
         /**
          * Updates the [HardwareBuffer] displayed for the provided surfaceControl. Takes an
-         * optional [SyncFence] that is signalled when all pending work for the buffer
+         * optional [SyncFenceV19] that is signalled when all pending work for the buffer
          * is complete and the buffer can be safely read.
          *
          * The frameworks takes ownership of the syncFence passed and is responsible for closing
@@ -254,8 +319,8 @@ internal class SurfaceControlWrapper internal constructor(
         @JvmOverloads
         fun setBuffer(
             surfaceControl: SurfaceControlWrapper,
-            hardwareBuffer: HardwareBuffer,
-            syncFence: SyncFence = SyncFence(-1)
+            hardwareBuffer: HardwareBuffer?,
+            syncFence: SyncFenceV19 = SyncFenceV19(-1)
         ): Transaction {
             JniBindings.nSetBuffer(
                 mNativeSurfaceTransaction,
@@ -550,6 +615,26 @@ internal class SurfaceControlWrapper internal constructor(
             return this
         }
 
+        fun setGeometry(
+            surfaceControl: SurfaceControlWrapper,
+            width: Int,
+            height: Int,
+            dstWidth: Int,
+            dstHeight: Int,
+            transformation: Int
+        ): Transaction {
+            JniBindings.nSetGeometry(
+                mNativeSurfaceTransaction,
+                surfaceControl.mNativeSurfaceControl,
+                width,
+                height,
+                dstWidth,
+                dstHeight,
+                transformation
+            )
+            return this
+        }
+
         /**
          * Destroys the transaction object.
          */
@@ -616,11 +701,19 @@ internal class SurfaceControlWrapper internal constructor(
      * Requires a debug name.
      */
     class Builder {
-        private lateinit var mSurface: Surface
+        private var mSurface: Surface? = null
+        private var mSurfaceControl: SurfaceControlWrapper? = null
         private lateinit var mDebugName: String
 
         fun setParent(surface: Surface): Builder {
             mSurface = surface
+            mSurfaceControl = null
+            return this
+        }
+
+        fun setParent(surfaceControlWrapper: SurfaceControlWrapper): Builder {
+            mSurface = null
+            mSurfaceControl = surfaceControlWrapper
             return this
         }
 
@@ -634,7 +727,15 @@ internal class SurfaceControlWrapper internal constructor(
          * Builds the [SurfaceControlWrapper] object
          */
         fun build(): SurfaceControlWrapper {
-            return SurfaceControlWrapper(mSurface, mDebugName)
+            val surface = mSurface
+            val surfaceControl = mSurfaceControl
+            return if (surface != null) {
+                SurfaceControlWrapper(surface, mDebugName)
+            } else if (surfaceControl != null) {
+                SurfaceControlWrapper(surfaceControl, mDebugName)
+            } else {
+                throw IllegalStateException("")
+            }
         }
     }
 }

@@ -31,7 +31,9 @@ import androidx.appsearch.app.GenericDocument;
 import androidx.appsearch.app.InternalSetSchemaResponse;
 import androidx.appsearch.app.PackageIdentifier;
 import androidx.appsearch.app.VisibilityDocument;
+import androidx.appsearch.localstorage.AppSearchConfigImpl;
 import androidx.appsearch.localstorage.AppSearchImpl;
+import androidx.appsearch.localstorage.DefaultIcingOptionsConfig;
 import androidx.appsearch.localstorage.OptimizeStrategy;
 import androidx.appsearch.localstorage.UnlimitedLimitConfig;
 import androidx.appsearch.localstorage.util.PrefixUtil;
@@ -126,8 +128,10 @@ public class VisibilityStoreMigrationHelperFromV0Test {
 
         // Persist to disk and re-open the AppSearchImpl
         appSearchImplInV0.close();
-        AppSearchImpl appSearchImpl = AppSearchImpl.create(mFile, new UnlimitedLimitConfig(),
-                /*initStatsBuilder=*/ null, ALWAYS_OPTIMIZE,
+        AppSearchImpl appSearchImpl = AppSearchImpl.create(mFile,
+                new AppSearchConfigImpl(new UnlimitedLimitConfig(),
+                        new DefaultIcingOptionsConfig()), /*initStatsBuilder=*/ null,
+                ALWAYS_OPTIMIZE,
                 /*visibilityChecker=*/null);
 
         VisibilityDocument actualDocument1 = new VisibilityDocument(
@@ -159,6 +163,7 @@ public class VisibilityStoreMigrationHelperFromV0Test {
                         .build();
         assertThat(actualDocument1).isEqualTo(expectedDocument1);
         assertThat(actualDocument2).isEqualTo(expectedDocument2);
+        appSearchImpl.close();
     }
 
     /** Build AppSearchImpl with deprecated visibility schemas version 0.     */
@@ -191,8 +196,10 @@ public class VisibilityStoreMigrationHelperFromV0Test {
                         .build())
                 .build();
         // Set deprecated visibility schema version 0 into AppSearchImpl.
-        AppSearchImpl appSearchImpl = AppSearchImpl.create(mFile, new UnlimitedLimitConfig(),
-                /*initStatsBuilder=*/ null, ALWAYS_OPTIMIZE,
+        AppSearchImpl appSearchImpl = AppSearchImpl.create(mFile,
+                new AppSearchConfigImpl(new UnlimitedLimitConfig(),
+                        new DefaultIcingOptionsConfig()), /*initStatsBuilder=*/ null,
+                ALWAYS_OPTIMIZE,
                 /*visibilityChecker=*/null);
         InternalSetSchemaResponse internalSetSchemaResponse = appSearchImpl.setSchema(
                 VisibilityStore.VISIBILITY_PACKAGE_NAME,

@@ -33,6 +33,7 @@ private class ItemFoundInScroll(
 
 private val TargetDistance = 2500.dp
 private val BoundDistance = 1500.dp
+private val MinimumDistance = 50.dp
 
 private const val DEBUG = false
 private inline fun debugLog(generateMsg: () -> String) {
@@ -44,9 +45,8 @@ private inline fun debugLog(generateMsg: () -> String) {
 /**
  * Abstraction over animated scroll for using [animateScrollToItem] in different layouts.
  * todo(b/243786897): revisit this API and make it public
- **/
-internal interface LazyAnimateScrollScope {
-    val density: Density
+ */
+internal interface LazyLayoutAnimateScrollScope {
 
     val firstVisibleItemIndex: Int
 
@@ -56,30 +56,33 @@ internal interface LazyAnimateScrollScope {
 
     val itemCount: Int
 
-    fun getTargetItemOffset(index: Int): Int?
+    val averageItemSize: Int
+
+    fun getOffsetForItem(index: Int): Int?
 
     fun ScrollScope.snapToItem(index: Int, scrollOffset: Int)
 
     fun expectedDistanceTo(index: Int, targetScrollOffset: Int): Float
 
-    /** defines min number of items that forces scroll to snap if animation did not reach it */
-    val numOfItemsForTeleport: Int
-
     suspend fun scroll(block: suspend ScrollScope.() -> Unit)
 }
 
-internal suspend fun LazyAnimateScrollScope.animateScrollToItem(
+internal suspend fun LazyLayoutAnimateScrollScope.animateScrollToItem(
     index: Int,
     scrollOffset: Int,
+    numOfItemsForTeleport: Int,
+    density: Density
 ) {
     scroll {
         require(index >= 0f) { "Index should be non-negative ($index)" }
+
         try {
             val targetDistancePx = with(density) { TargetDistance.toPx() }
             val boundDistancePx = with(density) { BoundDistance.toPx() }
+            val minDistancePx = with(density) { MinimumDistance.toPx() }
             var loop = true
             var anim = AnimationState(0f)
-            val targetItemInitialOffset = getTargetItemOffset(index)
+            val targetItemInitialOffset = getOffsetForItem(index)
             if (targetItemInitialOffset != null) {
                 // It's already visible, just animate directly
                 throw ItemFoundInScroll(targetItemInitialOffset, anim)
@@ -118,7 +121,8 @@ internal suspend fun LazyAnimateScrollScope.animateScrollToItem(
             while (loop && itemCount > 0) {
                 val expectedDistance = expectedDistanceTo(index, scrollOffset)
                 val target = if (abs(expectedDistance) < targetDistancePx) {
-                    expectedDistance
+                    val absTargetPx = maxOf(abs(expectedDistance), minDistancePx)
+                    if (forward) absTargetPx else -absTargetPx
                 } else {
                     if (forward) targetDistancePx else -targetDistancePx
                 }
@@ -126,7 +130,7 @@ internal suspend fun LazyAnimateScrollScope.animateScrollToItem(
                 debugLog {
                     "Scrolling to index=$index offset=$scrollOffset from " +
                         "index=$firstVisibleItemIndex offset=$firstVisibleItemScrollOffset with " +
-                        " calculated target=$target"
+                        "calculated target=$target"
                 }
 
                 anim = anim.copy(value = 0f)
@@ -136,7 +140,7 @@ internal suspend fun LazyAnimateScrollScope.animateScrollToItem(
                     sequentialAnimation = (anim.velocity != 0f)
                 ) {
                     // If we haven't found the item yet, check if it's visible.
-                    var targetItemOffset = getTargetItemOffset(index)
+                    var targetItemOffset = getOffsetForItem(index)
 
                     if (targetItemOffset == null) {
                         // Springs can overshoot their target, clamp to the desired range
@@ -151,7 +155,7 @@ internal suspend fun LazyAnimateScrollScope.animateScrollToItem(
                         }
 
                         val consumed = scrollBy(delta)
-                        targetItemOffset = getTargetItemOffset(index)
+                        targetItemOffset = getOffsetForItem(index)
                         if (targetItemOffset != null) {
                             debugLog { "Found the item after performing scrollBy()" }
                         } else if (!isOvershot()) {
@@ -205,7 +209,11 @@ internal suspend fun LazyAnimateScrollScope.animateScrollToItem(
                     // We don't throw ItemFoundInScroll when we snap, because once we've snapped to
                     // the final position, there's no need to animate to it.
                     if (isOvershot()) {
-                        debugLog { "Overshot" }
+                        debugLog {
+                            "Overshot, " +
+                                "item $firstVisibleItemIndex at  $firstVisibleItemScrollOffset," +
+                                " target is $scrollOffset"
+                        }
                         snapToItem(index = index, scrollOffset = scrollOffset)
                         loop = false
                         cancelAnimation()
@@ -227,15 +235,20 @@ internal suspend fun LazyAnimateScrollScope.animateScrollToItem(
             debugLog {
                 "Seeking by $target at velocity ${itemFound.previousAnimation.velocity}"
             }
-            anim.animateTo(target, sequentialAnimation = (anim.velocity != 0f)) {
+            anim.animateTo(
+                target,
+                sequentialAnimation = (anim.velocity != 0f)
+            ) {
                 // Springs can overshoot their target, clamp to the desired range
                 val coercedValue = when {
                     target > 0 -> {
                         value.coerceAtMost(target)
                     }
+
                     target < 0 -> {
                         value.coerceAtLeast(target)
                     }
+
                     else -> {
                         debugLog { "WARNING: somehow ended up seeking 0px, this shouldn't happen" }
                         0f

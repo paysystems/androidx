@@ -34,9 +34,8 @@ dependencies {
 }
 
 androidx {
-    name = "AndroidX Health Connect Library Samples"
+    name = "Health Connect Samples"
     type = LibraryType.SAMPLES
-    mavenGroup = LibraryGroups.HEALTH_CONNECT
     inceptionYear = "2022"
     description = "Contains the sample code for the Androidx Health Connect Library"
 }

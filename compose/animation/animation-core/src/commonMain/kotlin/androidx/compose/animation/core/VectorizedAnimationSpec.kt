@@ -17,8 +17,8 @@
 package androidx.compose.animation.core
 
 import androidx.compose.animation.core.AnimationConstants.DefaultDurationMillis
-import kotlin.math.min
 import androidx.compose.animation.core.internal.JvmDefaultWithCompatibility
+import kotlin.math.min
 
 /**
  * [VectorizedAnimationSpec]s are stateless vector based animation specifications. They do
@@ -413,7 +413,12 @@ class VectorizedInfiniteRepeatableSpec<V : AnimationVector>(
     ): V = if (playTimeNanos + initialOffsetNanos > durationNanos) {
         // Start velocity of the 2nd and subsequent iteration will be the velocity at the end
         // of the first iteration, instead of the initial velocity.
-        getVelocityFromNanos(durationNanos - initialOffsetNanos, start, startVelocity, end)
+        animation.getVelocityFromNanos(
+            playTimeNanos = durationNanos - initialOffsetNanos,
+            initialValue = start,
+            targetValue = end,
+            initialVelocity = startVelocity
+        )
     } else {
         startVelocity
     }

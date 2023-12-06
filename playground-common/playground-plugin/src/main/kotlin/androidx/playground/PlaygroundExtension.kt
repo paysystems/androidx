@@ -16,11 +16,12 @@
 
 package androidx.playground
 
-import org.gradle.api.GradleException
-import org.gradle.api.initialization.Settings
+import androidx.build.SettingsParser
 import java.io.File
 import java.util.Properties
 import javax.inject.Inject
+import org.gradle.api.GradleException
+import org.gradle.api.initialization.Settings
 
 open class PlaygroundExtension @Inject constructor(
     private val settings: Settings

@@ -20,7 +20,6 @@ import androidx.annotation.Sampled
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
@@ -36,8 +35,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 
+@Preview
 @Sampled
 @Composable
 fun LinearProgressIndicatorSample() {
@@ -49,7 +50,6 @@ fun LinearProgressIndicatorSample() {
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         LinearProgressIndicator(
-            modifier = Modifier.semantics(mergeDescendants = true) {}.padding(10.dp),
             progress = animatedProgress,
         )
         Spacer(Modifier.requiredHeight(30.dp))
@@ -69,16 +69,16 @@ fun LinearProgressIndicatorSample() {
     }
 }
 
+@Preview
 @Sampled
 @Composable
 fun IndeterminateLinearProgressIndicatorSample() {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        LinearProgressIndicator(
-            modifier = Modifier.semantics(mergeDescendants = true) {}.padding(10.dp)
-        )
+        LinearProgressIndicator()
     }
 }
 
+@Preview
 @Sampled
 @Composable
 fun CircularProgressIndicatorSample() {
@@ -107,6 +107,7 @@ fun CircularProgressIndicatorSample() {
     }
 }
 
+@Preview
 @Sampled
 @Composable
 fun IndeterminateCircularProgressIndicatorSample() {

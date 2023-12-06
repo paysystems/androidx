@@ -21,8 +21,8 @@ import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.TextView
 import androidx.activity.test.R
-import androidx.lifecycle.ViewTreeLifecycleOwner
-import androidx.lifecycle.ViewTreeViewModelStoreOwner
+import androidx.lifecycle.findViewTreeLifecycleOwner
+import androidx.lifecycle.findViewTreeViewModelStoreOwner
 import androidx.savedstate.findViewTreeSavedStateRegistryOwner
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -31,12 +31,17 @@ import androidx.testutils.withActivity
 import androidx.testutils.withUse
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
+import leakcanary.DetectLeaksAfterTestSuccess
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @LargeTest
 @RunWith(AndroidJUnit4::class)
 class ContentViewTest {
+
+    @get:Rule
+    val rule = DetectLeaksAfterTestSuccess()
 
     @Test
     fun testLifecycleObserver() {
@@ -54,10 +59,10 @@ class ContentViewTest {
 
             withActivity {
                 assertWithMessage("inflated view has correct ViewTreeLifecycleOwner")
-                    .that(ViewTreeLifecycleOwner.get(inflatedTextView))
+                    .that(inflatedTextView.findViewTreeLifecycleOwner())
                     .isSameInstanceAs(this@withActivity)
                 assertWithMessage("inflated view has correct ViewTreeViewModelStoreOwner")
-                    .that(ViewTreeViewModelStoreOwner.get(inflatedTextView))
+                    .that(inflatedTextView.findViewTreeViewModelStoreOwner())
                     .isSameInstanceAs(this@withActivity)
                 assertWithMessage("inflated view has correct ViewTreeSavedStateRegistryOwner")
                     .that(inflatedTextView.findViewTreeSavedStateRegistryOwner())
@@ -94,8 +99,8 @@ class ContentViewTest {
                     }
 
                     override fun onViewAttachedToWindow(v: View) {
-                        attachedLifecycleOwner = ViewTreeLifecycleOwner.get(view)
-                        attachedViewModelStoreOwner = ViewTreeViewModelStoreOwner.get(view)
+                        attachedLifecycleOwner = view.findViewTreeLifecycleOwner()
+                        attachedViewModelStoreOwner = view.findViewTreeViewModelStoreOwner()
                         attachedSavedStateRegistryOwner = view.findViewTreeSavedStateRegistryOwner()
                     }
                 })

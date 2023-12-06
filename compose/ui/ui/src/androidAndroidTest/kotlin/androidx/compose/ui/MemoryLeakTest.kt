@@ -25,21 +25,33 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MonotonicFrameClock
+import androidx.compose.runtime.Recomposer
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.testutils.ComposeTestCase
 import androidx.compose.testutils.createAndroidComposeBenchmarkRunner
 import androidx.compose.ui.platform.AndroidUiDispatcher
+import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
+import androidx.test.filters.SdkSuppress
 import com.google.common.truth.Truth.assertThat
+import java.text.NumberFormat
+import java.util.Locale
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.text.NumberFormat
-import java.util.Locale
 
 @LargeTest
 @RunWith(AndroidJUnit4::class)
@@ -50,6 +62,7 @@ class MemoryLeakTest {
     val activityTestRule = androidx.test.rule.ActivityTestRule(ComponentActivity::class.java)
 
     @Test
+    @SdkSuppress(minSdkVersion = 22) // b/266743031
     fun disposeAndRemoveOwnerView_assertViewWasGarbageCollected() = runBlocking {
         class SimpleTestCase : ComposeTestCase {
             @Composable
@@ -79,21 +92,26 @@ class MemoryLeakTest {
                 activityTestRule.activity
             )
 
-            // Unfortunately we have to ignore the first run as it seems that even though the view
-            // gets properly garbage collected there are some data that remain allocated. Not sure
-            // what is causing this but could be some static variables.
-            loopAndVerifyMemory(iterations = 400, gcFrequency = 40, ignoreFirstRun = true) {
-                try {
-                    runner.createTestCase()
-                    runner.emitContent()
-                } finally {
-                    // This will remove the owner view from the hierarchy
-                    runner.disposeContent()
+            try {
+                // Unfortunately we have to ignore the first run as it seems that even though the view
+                // gets properly garbage collected there are some data that remain allocated. Not sure
+                // what is causing this but could be some static variables.
+                loopAndVerifyMemory(iterations = 400, gcFrequency = 40, ignoreFirstRun = true) {
+                    try {
+                        runner.createTestCase()
+                        runner.emitContent()
+                    } finally {
+                        // This will remove the owner view from the hierarchy
+                        runner.disposeContent()
+                    }
                 }
+            } finally {
+                runner.close()
             }
         }
     }
 
+    @SdkSuppress(minSdkVersion = 22) // b/266743031
     @Test
     fun disposeContent_assertNoLeak() = runBlocking(AndroidUiDispatcher.Main) {
         // We have to ignore the first run because `dispose` leaves the OwnerView in the
@@ -139,6 +157,58 @@ class MemoryLeakTest {
         Log.d("memoryCheckerTest", totalSum.toString())
     }
 
+    @OptIn(ExperimentalTestApi::class, ExperimentalCoroutinesApi::class)
+    @Test
+    fun recreateAndroidView_assertNoLeak() = runBlocking(AndroidUiDispatcher.Main) {
+        val immediateClock = object : MonotonicFrameClock {
+            override suspend fun <R> withFrameNanos(onFrame: (frameTimeNanos: Long) -> R): R {
+                yield()
+                return onFrame(0L)
+            }
+        }
+        val context = coroutineContext + immediateClock
+        val recomposer = Recomposer(context)
+
+        suspend fun doFrame() {
+            Snapshot.sendApplyNotifications()
+
+            var pendingCount = 0
+            while (recomposer.hasPendingWork) {
+                pendingCount++
+                yield()
+                if (pendingCount == 10) {
+                    error("Recomposer still pending work after 10 frames.")
+                }
+            }
+        }
+
+        var compose by mutableStateOf(false)
+        activityTestRule.activity.setContent(recomposer) {
+            if (compose) {
+                AndroidView(factory = {
+                    object : View(it) { val alloc = List(1024) { 0 } }
+                })
+            }
+        }
+        launch(context = context, start = CoroutineStart.UNDISPATCHED) {
+            recomposer.runRecomposeAndApplyChanges()
+        }
+        doFrame()
+
+        loopAndVerifyMemory(ignoreFirstRun = true, iterations = 400, gcFrequency = 40) {
+            // Add AndroidView into the composition
+            compose = true
+            doFrame()
+
+            // This removes the AndroidView
+            compose = false
+            doFrame()
+        }
+
+        recomposer.cancel()
+        recomposer.join()
+    }
+
     /**
      * Runs the given code in a loop for exactly [iterations] times and every [gcFrequency] it will
      * force garbage collection and check the allocated heap size.
@@ -149,7 +219,7 @@ class MemoryLeakTest {
         iterations: Int,
         gcFrequency: Int,
         ignoreFirstRun: Boolean = false,
-        operationToPerform: () -> Unit
+        operationToPerform: suspend () -> Unit
     ) {
         val rawStats = ArrayList<Long>(iterations / gcFrequency)
 

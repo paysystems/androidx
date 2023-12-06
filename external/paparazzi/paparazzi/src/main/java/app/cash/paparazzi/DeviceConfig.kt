@@ -47,13 +47,13 @@ import com.android.resources.ScreenSize
 import com.android.resources.TouchScreen
 import com.android.resources.UiMode
 import com.google.android.collect.Maps
-import org.xmlpull.v1.XmlPullParser
-import org.xmlpull.v1.XmlPullParserException
-import org.xmlpull.v1.XmlPullParserFactory
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
 import java.util.Properties
+import org.xmlpull.v1.XmlPullParser
+import org.xmlpull.v1.XmlPullParserException
+import org.xmlpull.v1.XmlPullParserFactory
 
 /**
  * Provides [FolderConfiguration] and [HardwareConfig] for various devices. Also provides utility
@@ -71,7 +71,7 @@ data class DeviceConfig(
   val density: Density = Density.XHIGH,
   val fontScale: Float = 1f,
   val layoutDirection: LayoutDirection = LayoutDirection.LTR,
-  val locale: String? = null,
+  val locale: String = "en",
   val ratio: ScreenRatio = ScreenRatio.NOTLONG,
   val size: ScreenSize = ScreenSize.NORMAL,
   val keyboard: Keyboard = Keyboard.NOKEY,
@@ -103,7 +103,7 @@ data class DeviceConfig(
         countryCodeQualifier = CountryCodeQualifier()
         layoutDirectionQualifier = LayoutDirectionQualifier(layoutDirection)
         networkCodeQualifier = NetworkCodeQualifier()
-        localeQualifier = LocaleQualifier.getQualifier(locale ?: LocaleQualifier.FAKE_VALUE)
+        localeQualifier = LocaleQualifier.getQualifier(locale)
         versionQualifier = VersionQualifier()
       }
 

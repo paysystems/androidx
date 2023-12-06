@@ -57,16 +57,6 @@ public class AppSearchCompilerTest {
     }
 
     @Test
-    public void testNonClass() {
-        Compilation compilation = compile(
-                "@Document\n"
-                        + "public interface Gift {}\n");
-
-        assertThat(compilation).hadErrorContaining(
-                "annotation on something other than a class");
-    }
-
-    @Test
     public void testPrivate() {
         Compilation compilation = compile(
                 "Wrapper",
@@ -102,7 +92,7 @@ public class AppSearchCompilerTest {
                         + "}\n");
 
         assertThat(compilation).hadErrorContaining(
-                "contains multiple fields annotated @Id");
+                "Duplicate member annotated with @Id");
     }
 
     @Test
@@ -176,7 +166,8 @@ public class AppSearchCompilerTest {
                         + "  }\n"
                         + "}\n");
         assertThat(specialFieldReassigned).hadErrorContaining(
-                "Non-annotated field overriding special annotated fields named: id");
+                "Property type must stay consistent when overriding annotated "
+                        + "members but changed from @Id -> @StringProperty");
 
         Compilation nonAnnotatedFieldHasSameName = compile(
                 "@Document\n"
@@ -198,28 +189,6 @@ public class AppSearchCompilerTest {
                         + "}\n");
         assertThat(nonAnnotatedFieldHasSameName).hadErrorContaining(
                 "Non-annotated field overriding special annotated fields named: id");
-
-        Compilation propertyCollision = compile(
-                "@Document\n"
-                        + "public class Gift {\n"
-                        + "  @Document.Namespace String namespace;\n"
-                        + "  @Document.Id String id;\n"
-                        + "  @Document.StringProperty String prop;\n"
-                        + "  Gift(String id, String namespace, String prop) {\n"
-                        + "    this.id = id;\n"
-                        + "    this.namespace = namespace;\n"
-                        + "    this.prop = prop;\n"
-                        + "  }\n"
-                        + "}\n"
-                        + "@Document\n"
-                        + "class CoolGift extends Gift {\n"
-                        + "  @Document.BooleanProperty Boolean prop;\n"
-                        + "  CoolGift(String id, String namespace, String prop) {\n"
-                        + "    super(id, namespace, prop);\n"
-                        + "  }\n"
-                        + "}\n");
-        assertThat(propertyCollision).hadErrorContaining(
-                "Class hierarchy contains multiple annotated fields named: prop");
 
         //error on collision
         Compilation idCollision = compile(
@@ -243,7 +212,7 @@ public class AppSearchCompilerTest {
                         + "  public boolean getBadId() { return badId; }\n"
                         + "}\n");
         assertThat(idCollision).hadErrorContaining(
-                "Class hierarchy contains multiple fields annotated @Id");
+                "Duplicate member annotated with @Id");
 
         Compilation nsCollision = compile(
                 "@Document\n"
@@ -264,7 +233,7 @@ public class AppSearchCompilerTest {
                         + "  }\n"
                         + "}\n");
         assertThat(nsCollision).hadErrorContaining(
-                "Class hierarchy contains multiple fields annotated @Namespace");
+                "Duplicate member annotated with @Namespace");
     }
 
     @Test
@@ -314,6 +283,79 @@ public class AppSearchCompilerTest {
     }
 
     @Test
+    public void testSuperClass_changeSchemaName() throws Exception {
+        Compilation compilation = compile(
+                "@Document(name=\"MyParent\")\n"
+                        + "class Parent {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.StringProperty String note;\n"
+                        + "  Parent(String id, String namespace, String note) {\n"
+                        + "    this.id = id;\n"
+                        + "    this.namespace = namespace;\n"
+                        + "    this.note = note;\n"
+                        + "  }\n"
+                        + "  public String getNote() { return note; }\n"
+                        + "}\n"
+                        + "\n"
+                        + "@Document(name=\"MyGift\")\n"
+                        + "class Gift extends Parent {\n"
+                        + "  @Document.StringProperty String sender;\n"
+                        + "  Gift(String id, String namespace, String sender) {\n"
+                        + "    super(id, namespace, \"note\");\n"
+                        + "    this.sender = sender;\n"
+                        + "  }\n"
+                        + "  public String getSender() { return sender; }\n"
+                        + "}\n");
+        assertThat(compilation).succeededWithoutWarnings();
+        checkResultContains(
+                /*className=*/"Gift.java",
+                /*content=*/"public static final String SCHEMA_NAME = \"MyGift\";");
+        checkEqualsGolden("Gift.java");
+    }
+
+    @Test
+    public void testSuperClass_multipleChangedSchemaNames() throws Exception {
+        Compilation compilation = compile(
+                "@Document(name=\"MyParent\")\n"
+                        + "class Parent {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.StringProperty String note;\n"
+                        + "  Parent(String id, String namespace, String note) {\n"
+                        + "    this.id = id;\n"
+                        + "    this.namespace = namespace;\n"
+                        + "    this.note = note;\n"
+                        + "  }\n"
+                        + "  public String getNote() { return note; }\n"
+                        + "}\n"
+                        + "\n"
+                        + "@Document(name=\"MyGift\")\n"
+                        + "class Gift extends Parent {\n"
+                        + "  @Document.StringProperty String sender;\n"
+                        + "  Gift(String id, String namespace, String sender) {\n"
+                        + "    super(id, namespace, \"note\");\n"
+                        + "    this.sender = sender;\n"
+                        + "  }\n"
+                        + "  public String getSender() { return sender; }\n"
+                        + "}\n"
+                        + "\n"
+                        + "@Document\n"
+                        + "class FooGift extends Gift {\n"
+                        + "  @Document.BooleanProperty boolean foo;\n"
+                        + "  FooGift(String id, String namespace, String note, boolean foo) {\n"
+                        + "    super(id, namespace, note);\n"
+                        + "    this.foo = foo;\n"
+                        + "  }\n"
+                        + "}\n");
+        assertThat(compilation).succeededWithoutWarnings();
+        checkResultContains(
+                /*className=*/"FooGift.java",
+                /*content=*/"public static final String SCHEMA_NAME = \"MyGift\";");
+        checkEqualsGolden("FooGift.java");
+    }
+
+    @Test
     public void testSuperClassPojoAncestor() throws Exception {
         // Try multiple levels of inheritance, nested, with properties, overriding properties
         Compilation compilation = compile(
@@ -356,6 +398,54 @@ public class AppSearchCompilerTest {
     }
 
     @Test
+    public void testSuperClassWithPrivateFields() throws Exception {
+        // Parents has private fields with public getter. Children should be able to extend
+        // Parents and inherit the public getters.
+        // TODO(b/262916926): we should be able to support inheriting classes not annotated with
+        //  @Document.
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "class Ancestor {\n"
+                        + "  @Document.Namespace private String mNamespace;\n"
+                        + "  @Document.Id private String mId;\n"
+                        + "  @Document.StringProperty private String mNote;\n"
+                        + "  Ancestor(String id, String namespace, String note) {\n"
+                        + "    this.mId = id;\n"
+                        + "    this.mNamespace = namespace;\n"
+                        + "    this.mNote = note;\n"
+                        + "  }\n"
+                        + "  public String getNamespace() { return mNamespace; }\n"
+                        + "  public String getId() { return mId; }\n"
+                        + "  public String getNote() { return mNote; }\n"
+                        + "}\n"
+                        + "@Document\n"
+                        + "class Parent extends Ancestor {\n"
+                        + "  @Document.StringProperty private String mReceiver;\n"
+                        + "  Parent(String id, String namespace, String note, String receiver) {\n"
+                        + "    super(id, namespace, note);\n"
+                        + "    this.mReceiver = receiver;\n"
+                        + "  }\n"
+                        + "  public String getReceiver() { return mReceiver; }\n"
+                        + "}\n"
+                        + "@Document\n"
+                        + "class Gift extends Parent {\n"
+                        + "  @Document.StringProperty private String mSender;\n"
+                        + "  Gift(String id, String namespace, String note, String receiver,\n"
+                        + "    String sender) {\n"
+                        + "    super(id, namespace, note, receiver);\n"
+                        + "    this.mSender = sender;\n"
+                        + "  }\n"
+                        + "  public String getSender() { return mSender; }\n"
+                        + "}\n");
+        assertThat(compilation).succeededWithoutWarnings();
+
+        checkResultContains(/*className=*/"Gift.java", /*content=*/"document.getNote()");
+        checkResultContains(/*className=*/"Gift.java", /*content=*/"document.getReceiver()");
+        checkResultContains(/*className=*/"Gift.java", /*content=*/"document.getSender()");
+        checkEqualsGolden("Gift.java");
+    }
+
+    @Test
     public void testManyCreationTimestamp() {
         Compilation compilation = compile(
                 "@Document\n"
@@ -367,7 +457,7 @@ public class AppSearchCompilerTest {
                         + "}\n");
 
         assertThat(compilation).hadErrorContaining(
-                "contains multiple fields annotated @CreationTimestampMillis");
+                "Duplicate member annotated with @CreationTimestampMillis");
     }
 
     @Test
@@ -393,7 +483,7 @@ public class AppSearchCompilerTest {
                         + "}\n");
 
         assertThat(compilation).hadErrorContaining(
-                "contains multiple fields annotated @Namespace");
+                "Duplicate member annotated with @Namespace");
     }
 
     @Test
@@ -408,7 +498,7 @@ public class AppSearchCompilerTest {
                         + "}\n");
 
         assertThat(compilation).hadErrorContaining(
-                "contains multiple fields annotated @TtlMillis");
+                "Duplicate member annotated with @TtlMillis");
     }
 
     @Test
@@ -423,21 +513,44 @@ public class AppSearchCompilerTest {
                         + "}\n");
 
         assertThat(compilation).hadErrorContaining(
-                "contains multiple fields annotated @Score");
+                "Duplicate member annotated with @Score");
     }
 
     @Test
-    public void testPropertyOnFieldForNonAutoValueClass() {
+    public void testClassSpecialValues() throws Exception {
         Compilation compilation = compile(
                 "@Document\n"
                         + "public class Gift {\n"
-                        + "  @Document.Namespace String namespace;\n"
-                        + "  @Document.Id String id;\n"
-                        + "  @Document.LongProperty private int getPrice() { return 0; }\n"
+                        + "    @Document.Namespace\n"
+                        + "    String mNamespace;\n"
+                        + "    @Document.Id\n"
+                        + "    String mId;\n"
+                        + "    @Document.CreationTimestampMillis\n"
+                        + "    Long mCreationTimestampMillis;\n"
+                        + "    @Document.Score\n"
+                        + "    Integer mScore;\n"
+                        + "    @Document.TtlMillis\n"
+                        + "    private Long mTtlMillis;\n"
+                        + "    public Long getTtlMillis() {\n"
+                        + "        return mTtlMillis;\n"
+                        + "    }   \n"
+                        + "    public void setTtlMillis(Long ttlMillis) {\n"
+                        + "        mTtlMillis = ttlMillis;\n"
+                        + "    }   \n"
+                        + "    @Document.StringProperty\n"
+                        + "    String mString;\n"
                         + "}\n");
 
-        assertThat(compilation).hadErrorContaining(
-                "AppSearch annotation is not applicable to methods for Non-AutoValue class");
+        checkResultContains(/*className=*/"Gift.java",
+                /*content=*/"builder.setCreationTimestampMillis((document.mCreationTimestampMillis "
+                        + "!= null) ? document.mCreationTimestampMillis.longValue() : 0L)");
+        checkResultContains(/*className=*/"Gift.java",
+                /*content=*/"builder.setTtlMillis((document.getTtlMillis() != null) ? document"
+                        + ".getTtlMillis().longValue() : 0L)");
+        checkResultContains(/*className=*/"Gift.java",
+                /*content=*/"builder.setScore((document.mScore != null) ? document.mScore.intValue"
+                        + "() : 0)");
+        checkEqualsGolden("Gift.java");
     }
 
     @Test
@@ -577,7 +690,7 @@ public class AppSearchCompilerTest {
                 "Failed to find any suitable creation methods to build class "
                         + "\"com.example.appsearch.Gift\"");
         assertThat(compilation).hadWarningContainingMatch(
-                "Field cannot be written .* failed to find a suitable setter for field \"price\"");
+                "Field cannot be written .* failed to find a suitable setter for \"price\"");
         assertThat(compilation).hadWarningContaining(
                 "Cannot use this creation method to construct the class: This method doesn't have "
                         + "parameters for the following fields: [price]");
@@ -599,7 +712,7 @@ public class AppSearchCompilerTest {
                 "Failed to find any suitable creation methods to build class "
                         + "\"com.example.appsearch.Gift\"");
         assertThat(compilation).hadWarningContainingMatch(
-                "Field cannot be written .* failed to find a suitable setter for field \"price\"");
+                "Field cannot be written .* failed to find a suitable setter for \"price\"");
         assertThat(compilation).hadWarningContaining(
                 "Setter cannot be used: private visibility");
         assertThat(compilation).hadWarningContaining(
@@ -623,7 +736,7 @@ public class AppSearchCompilerTest {
                 "Failed to find any suitable creation methods to build class "
                         + "\"com.example.appsearch.Gift\"");
         assertThat(compilation).hadWarningContainingMatch(
-                "Field cannot be written .* failed to find a suitable setter for field \"price\"");
+                "Field cannot be written .* failed to find a suitable setter for \"price\"");
         assertThat(compilation).hadWarningContaining(
                 "Setter cannot be used: takes 0 parameters instead of 1");
         assertThat(compilation).hadWarningContaining(
@@ -937,8 +1050,36 @@ public class AppSearchCompilerTest {
                         + "public class Gift {\n"
                         + "  @Document.Namespace String namespace;\n"
                         + "  @Document.Id String id;\n"
-                        + "  @Document.StringProperty(tokenizerType=0) String tokNone;\n"
-                        + "  @Document.StringProperty(tokenizerType=1) String tokPlain;\n"
+                        + "\n"
+                        // NONE index type will generate a NONE tokenizerType type.
+                        + "  @Document.StringProperty(tokenizerType=0, indexingType=0) "
+                        + "  String tokNoneInvalid;\n"
+                        + "  @Document.StringProperty(tokenizerType=1, indexingType=0) "
+                        + "  String tokPlainInvalid;\n"
+                        + "  @Document.StringProperty(tokenizerType=2, indexingType=0) "
+                        + "  String tokVerbatimInvalid;\n"
+                        + "  @Document.StringProperty(tokenizerType=3, indexingType=0) "
+                        + "  String tokRfc822Invalid;\n"
+                        + "\n"
+                        // Indexing type exact.
+                        + "  @Document.StringProperty(tokenizerType=0, indexingType=1) "
+                        + "  String tokNone;\n"
+                        + "  @Document.StringProperty(tokenizerType=1, indexingType=1) "
+                        + "  String tokPlain;\n"
+                        + "  @Document.StringProperty(tokenizerType=2, indexingType=1) "
+                        + "  String tokVerbatim;\n"
+                        + "  @Document.StringProperty(tokenizerType=3, indexingType=1) "
+                        + "  String tokRfc822;\n"
+                        + "\n"
+                        // Indexing type prefix.
+                        + "  @Document.StringProperty(tokenizerType=0, indexingType=2) "
+                        + "  String tokNonePrefix;\n"
+                        + "  @Document.StringProperty(tokenizerType=1, indexingType=2) "
+                        + "  String tokPlainPrefix;\n"
+                        + "  @Document.StringProperty(tokenizerType=2, indexingType=2) "
+                        + "  String tokVerbatimPrefix;\n"
+                        + "  @Document.StringProperty(tokenizerType=3, indexingType=2) "
+                        + "  String tokRfc822Prefix;\n"
                         + "}\n");
 
         assertThat(compilation).succeededWithoutWarnings();
@@ -999,6 +1140,80 @@ public class AppSearchCompilerTest {
     }
 
     @Test
+    public void testLongPropertyIndexingType() throws Exception {
+        // AppSearchSchema requires Android and is not available in this desktop test, so we cheat
+        // by using the integer constants directly.
+        Compilation compilation = compile(
+                "import java.util.*;\n"
+                        + "@Document\n"
+                        + "public class Gift {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.LongProperty Long defaultIndexNone;\n"
+                        + "  @Document.LongProperty(indexingType=0) Long indexNone;\n"
+                        + "  @Document.LongProperty(indexingType=1) Integer boxInt;\n"
+                        + "  @Document.LongProperty(indexingType=1) int unboxInt;\n"
+                        + "  @Document.LongProperty(indexingType=1) Long boxLong;\n"
+                        + "  @Document.LongProperty(indexingType=1) long unboxLong;\n"
+                        + "  @Document.LongProperty(indexingType=1) Integer[] arrBoxInt;\n"
+                        + "  @Document.LongProperty(indexingType=1) int[] arrUnboxInt;\n"
+                        + "  @Document.LongProperty(indexingType=1) Long[] arrBoxLong;\n"
+                        + "  @Document.LongProperty(indexingType=1) long[] arrUnboxLong;\n"
+                        + "}\n");
+
+        assertThat(compilation).succeededWithoutWarnings();
+        checkEqualsGolden("Gift.java");
+    }
+
+    @Test
+    public void testInvalidLongPropertyIndexingType() throws Exception {
+        // AppSearchSchema requires Android and is not available in this desktop test, so we cheat
+        // by using the integer constants directly.
+        Compilation compilation = compile(
+                "import java.util.*;\n"
+                        + "@Document\n"
+                        + "public class Gift {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.LongProperty(indexingType=100) Long invalidProperty;\n"
+                        + "}\n");
+
+        assertThat(compilation).hadErrorContaining("Unknown indexing type 100");
+    }
+
+    @Test
+    public void testStringPropertyJoinableType() throws Exception {
+        Compilation compilation = compile(
+                "import java.util.*;\n"
+                        + "@Document\n"
+                        + "public class Gift {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.StringProperty(joinableValueType=1)\n"
+                        + "  String object;\n"
+                        + "}\n");
+
+        assertThat(compilation).succeededWithoutWarnings();
+        checkEqualsGolden("Gift.java");
+    }
+
+    @Test
+    public void testRepeatedPropertyJoinableType_throwsError() throws Exception {
+        Compilation compilation = compile(
+                "import java.util.*;\n"
+                        + "@Document\n"
+                        + "public class Gift {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.StringProperty(joinableValueType=1)\n"
+                        + "  List<String> object;\n"
+                        + "}\n");
+
+        assertThat(compilation).hadErrorContaining(
+                "Joinable value type 1 not allowed on repeated properties.");
+    }
+
+    @Test
     public void testPropertyName() throws Exception {
         Compilation compilation = compile(
                 "import java.util.*;\n"
@@ -1046,7 +1261,6 @@ public class AppSearchCompilerTest {
                         + "  @BooleanProperty Boolean[] arrBoxBoolean;\n"   // 2a
                         + "  @BooleanProperty boolean[] arrUnboxBoolean;\n" // 2b
                         + "  @BytesProperty byte[][] arrUnboxByteArr;\n"  // 2b
-                        + "  @BytesProperty Byte[] boxByteArr;\n"         // 2a
                         + "  @StringProperty String[] arrString;\n"        // 2b
                         + "  @DocumentProperty Gift[] arrGift;\n"            // 2c
                         + "\n"
@@ -1082,8 +1296,8 @@ public class AppSearchCompilerTest {
                         + "}\n");
 
         assertThat(compilation).hadErrorContaining(
-                "Property Annotation androidx.appsearch.annotation.Document.BooleanProperty "
-                        + "doesn't accept the data type of property field arrString");
+                "@BooleanProperty must only be placed on a getter/field of type or array or "
+                        + "collection of boolean|java.lang.Boolean");
     }
 
     @Test
@@ -1094,10 +1308,11 @@ public class AppSearchCompilerTest {
                         + "public class Gift {\n"
                         + "  @Namespace String namespace;\n"
                         + "  @Id String id;\n"
-                        + "  @BytesProperty Collection<Byte[]> collectBoxByteArr;\n" // 1x
+                        + "  @BytesProperty Collection<Byte[]> collectBoxByteArr;\n"
                         + "}\n");
         assertThat(compilation).hadErrorContaining(
-                "Unhandled out property type (1x): java.util.Collection<java.lang.Byte[]>");
+                "@BytesProperty must only be placed on a getter/field of type or array or "
+                        + "collection of byte[]");
 
         compilation = compile(
                 "import java.util.*;\n"
@@ -1105,10 +1320,11 @@ public class AppSearchCompilerTest {
                         + "public class Gift {\n"
                         + "  @Namespace String namespace;\n"
                         + "  @Id String id;\n"
-                        + "  @BytesProperty Collection<Byte> collectByte;\n" // 1x
+                        + "  @BytesProperty Collection<Byte> collectByte;\n"
                         + "}\n");
         assertThat(compilation).hadErrorContaining(
-                "Unhandled out property type (1x): java.util.Collection<java.lang.Byte>");
+                "@BytesProperty must only be placed on a getter/field of type or array or "
+                        + "collection of byte[]");
 
         compilation = compile(
                 "import java.util.*;\n"
@@ -1116,10 +1332,11 @@ public class AppSearchCompilerTest {
                         + "public class Gift {\n"
                         + "  @Namespace String namespace;\n"
                         + "  @Id String id;\n"
-                        + "  @BytesProperty Byte[][] arrBoxByteArr;\n" // 2x
+                        + "  @BytesProperty Byte[][] arrBoxByteArr;\n"
                         + "}\n");
         assertThat(compilation).hadErrorContaining(
-                "Unhandled out property type (2x): java.lang.Byte[][]");
+                "@BytesProperty must only be placed on a getter/field of type or array or "
+                        + "collection of byte[]");
     }
 
     @Test
@@ -1311,6 +1528,1167 @@ public class AppSearchCompilerTest {
 
         assertThat(compilation).succeededWithoutWarnings();
         checkEqualsGolden("Gift.java");
+    }
+
+    @Test
+    public void testMultipleNesting() throws Exception {
+        Compilation compilation = compile(
+                "import java.util.*;\n"
+                        + "@Document\n"
+                        + "public class Gift {\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.DocumentProperty Middle middleContentA;\n"
+                        + "  @Document.DocumentProperty Middle middleContentB;\n"
+                        + "}\n"
+                        + "\n"
+                        + "@Document\n"
+                        + "class Middle {\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.DocumentProperty Inner innerContentA;\n"
+                        + "  @Document.DocumentProperty Inner innerContentB;\n"
+                        + "}\n"
+                        + "@Document\n"
+                        + "class Inner {\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.StringProperty String contents;\n"
+                        + "}\n");
+
+        assertThat(compilation).succeededWithoutWarnings();
+        checkEqualsGolden("Gift.java");
+
+        // Check that Gift contains Middle, Middle contains Inner, and Inner returns empty
+        checkResultContains(/* className= */ "Gift.java",
+                /* content= */ "classSet.add(Middle.class);\n    return classSet;");
+        checkResultContains(/* className= */ "Middle.java",
+                /* content= */ "classSet.add(Inner.class);\n    return classSet;");
+        checkResultContains(/* className= */ "Inner.java",
+                /* content= */ "return Collections.emptyList();");
+    }
+
+    @Test
+    public void testPolymorphism() throws Exception {
+        // Gift should automatically get "note2" via Java's "extends" semantics, but "note1" need
+        // to be manually provided so that Parent1 can be a parent of Gift.
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "class Parent1 {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.StringProperty String note1;\n"
+                        + "}\n"
+                        + "@Document\n"
+                        + "class Parent2 {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.StringProperty String note2;\n"
+                        + "}\n"
+                        + "@Document(name = \"Gift\", parent = {Parent1.class, Parent2.class})\n"
+                        + "class Gift extends Parent2 {\n"
+                        + "  @Document.StringProperty String sender;\n"
+                        + "  @Document.StringProperty String note1;\n"
+                        + "}\n");
+        assertThat(compilation).succeededWithoutWarnings();
+
+        checkResultContains("Gift.java", "addParentType($$__AppSearch__Parent1.SCHEMA_NAME)");
+        checkResultContains("Gift.java", "addParentType($$__AppSearch__Parent2.SCHEMA_NAME)");
+
+        checkEqualsGolden("Gift.java");
+    }
+
+    @Test
+    public void testPolymorphismOverrideExtendedProperty() throws Exception {
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "class Parent1 {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.StringProperty String note1;\n"
+                        + "}\n"
+                        + "@Document\n"
+                        + "class Parent2 {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.StringProperty(indexingType=2) String note2;\n"
+                        + "}\n"
+                        + "@Document(name = \"Gift\", parent = {Parent1.class, Parent2.class})\n"
+                        + "class Gift extends Parent2 {\n"
+                        + "  @Document.StringProperty String sender;\n"
+                        + "  @Document.StringProperty String note1;\n"
+                        + "  @Document.StringProperty(indexingType=1) String note2;\n"
+                        + "}\n");
+        assertThat(compilation).succeededWithoutWarnings();
+
+        // Should expect the indexingType of note2 from Gift is 1, which is
+        // INDEXING_TYPE_EXACT_TERMS, instead of 2.
+        checkResultContains("Gift.java",
+                "setIndexingType(AppSearchSchema.StringPropertyConfig.INDEXING_TYPE_EXACT_TERMS)");
+
+        checkEqualsGolden("Gift.java");
+    }
+
+    @Test
+    public void testPolymorphismOverrideExtendedPropertyInvalid() throws Exception {
+        // Overridden properties cannot change the names.
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "class Parent1 {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.StringProperty String note1;\n"
+                        + "}\n"
+                        + "@Document\n"
+                        + "class Parent2 {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.StringProperty(name=\"note2\", indexingType=2) String "
+                        + "note2;\n"
+                        + "}\n"
+                        + "@Document(name = \"Gift\", parent = {Parent1.class, Parent2.class})\n"
+                        + "class Gift extends Parent2 {\n"
+                        + "  @Document.StringProperty String sender;\n"
+                        + "  @Document.StringProperty String note1;\n"
+                        + "  @Document.StringProperty(name=\"note2_new\", indexingType=1) String "
+                        + "note2;\n"
+                        + "}\n");
+        assertThat(compilation).hadErrorContaining(
+                "Property name within the annotation must stay consistent when "
+                        + "overriding annotated members but changed from 'note2' -> 'note2_new'");
+
+        // Overridden properties cannot change the types.
+        compilation = compile(
+                "@Document\n"
+                        + "class Parent1 {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.StringProperty String note1;\n"
+                        + "}\n"
+                        + "@Document\n"
+                        + "class Parent2 {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.StringProperty String note2;\n"
+                        + "}\n"
+                        + "@Document(name = \"Gift\", parent = {Parent1.class, Parent2.class})\n"
+                        + "class Gift extends Parent2 {\n"
+                        + "  @Document.StringProperty String sender;\n"
+                        + "  @Document.StringProperty String note1;\n"
+                        + "  @LongProperty Long note2;\n"
+                        + "}\n");
+        assertThat(compilation).hadErrorContaining(
+                "Property type must stay consistent when overriding annotated "
+                        + "members but changed from @StringProperty -> @LongProperty");
+    }
+
+    @Test
+    public void testPolymorphismWithNestedType() throws Exception {
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "class Parent1 {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.StringProperty String note1;\n"
+                        + "}\n"
+                        + "@Document\n"
+                        + "class Parent2 {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.StringProperty String note2;\n"
+                        + "}\n"
+                        + "@Document(name = \"Gift\", parent = {Parent1.class, Parent2.class})\n"
+                        + "class Gift extends Parent2 {\n"
+                        + "  @Document.StringProperty String sender;\n"
+                        + "  @Document.StringProperty String note1;\n"
+                        + "  @Document.DocumentProperty Inner innerContent;\n"
+                        + "}\n"
+                        + "@Document\n"
+                        + "class Inner {\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.StringProperty String contents;\n"
+                        + "}\n");
+        assertThat(compilation).succeededWithoutWarnings();
+
+        // Should see that both the parent types and nested types are added to the generated
+        // getDependencyDocumentClasses method in Gift.
+        checkResultContains("Gift.java", "classSet.add(Parent1.class)");
+        checkResultContains("Gift.java", "classSet.add(Parent2.class)");
+        checkResultContains("Gift.java", "classSet.add(Inner.class)");
+
+        checkEqualsGolden("Gift.java");
+    }
+
+    @Test
+    public void testPolymorphismDuplicatedParents() throws Exception {
+        // Should see that every parent can only be added once.
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "class Parent1 {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.StringProperty String note1;\n"
+                        + "}\n"
+                        + "@Document\n"
+                        + "class Parent2 {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.StringProperty String note2;\n"
+                        + "}\n"
+                        + "@Document(name = \"Gift\", parent = {Parent1.class, Parent2.class, "
+                        + "Parent1.class})\n"
+                        + "class Gift extends Parent2 {\n"
+                        + "  @Document.StringProperty String sender;\n"
+                        + "  @Document.StringProperty String note1;\n"
+                        + "}\n");
+        assertThat(compilation).succeededWithoutWarnings();
+        checkEqualsGolden("Gift.java");
+    }
+
+    @Test
+    public void testPolymorphismChildTypeWithoutName() throws Exception {
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "class Parent {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.StringProperty String note;\n"
+                        + "}\n"
+                        + "@Document(parent = Parent.class)\n"
+                        + "class Gift extends Parent {\n"
+                        + "  @Document.StringProperty String sender;\n"
+                        + "}\n");
+        assertThat(compilation).hadErrorContaining(
+                "All @Document classes with a parent must explicitly provide a name");
+    }
+
+    @Test
+    public void testAnnotationOnClassGetter() throws Exception {
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "public class Gift {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.LongProperty public int getPrice() { return 0; }\n"
+                        + "  public void setPrice(int price) {}\n"
+                        + "}\n");
+
+        assertThat(compilation).succeededWithoutWarnings();
+        checkResultContains("Gift.java",
+                "new AppSearchSchema.LongPropertyConfig.Builder(\"price\")");
+        checkResultContains("Gift.java", "document.setPrice(getPriceConv)");
+        checkResultContains("Gift.java", "document.getPrice()");
+        checkEqualsGolden("Gift.java");
+    }
+
+    @Test
+    public void testAnnotationOnClassGetterUsingFactory() throws IOException {
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "public class Gift {\n"
+                        + "  private Gift() {}\n"
+                        + "  public static Gift create(String id, String namespace, int price) {\n"
+                        + "    return new Gift();\n"
+                        + "  }\n"
+                        + "  @Document.Namespace public String getNamespace() { return \"hi\"; }\n"
+                        + "  @Document.Id public String getId() { return \"0\"; }\n"
+                        + "  @Document.LongProperty public int getPrice() { return 0; }\n"
+                        + "}\n");
+
+        assertThat(compilation).succeededWithoutWarnings();
+        checkResultContains("Gift.java",
+                "new AppSearchSchema.LongPropertyConfig.Builder(\"price\")");
+        checkResultContains("Gift.java", "Gift.create(getIdConv, getNamespaceConv, getPriceConv)");
+        checkResultContains("Gift.java", "document.getPrice()");
+        checkEqualsGolden("Gift.java");
+    }
+
+    @Test
+    public void testAnnotationOnInterfaceGetter() throws Exception {
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "public interface Gift {\n"
+                        + "  public static Gift create(String id, String namespace) {\n"
+                        + "    return new GiftImpl(id, namespace);\n"
+                        + "  }\n"
+                        + "  @Document.Namespace public String getNamespace();\n"
+                        + "  @Document.Id public String getId();\n"
+                        + "  @Document.LongProperty public int getPrice();\n"
+                        + "  public void setPrice(int price);\n"
+                        + "}\n"
+                        + "class GiftImpl implements Gift{\n"
+                        + "  public GiftImpl(String id, String namespace) {\n"
+                        + "    this.id = id;\n"
+                        + "    this.namespace = namespace;\n"
+                        + "  }\n"
+                        + "  private String namespace;\n"
+                        + "  private String id;\n"
+                        + "  private int price;\n"
+                        + "  public String getNamespace() { return namespace; }\n"
+                        + "  public String getId() { return id; }\n"
+                        + "  public int getPrice() { return price; }\n"
+                        + "  public void setPrice(int price) { this.price = price; }\n"
+                        + "}\n");
+
+        assertThat(compilation).succeededWithoutWarnings();
+        checkResultContains("Gift.java",
+                "new AppSearchSchema.LongPropertyConfig.Builder(\"price\")");
+        checkResultContains("Gift.java", "Gift.create(getIdConv, getNamespaceConv)");
+        checkResultContains("Gift.java", "document.setPrice(getPriceConv)");
+        checkResultContains("Gift.java", "document.getPrice()");
+        checkEqualsGolden("Gift.java");
+    }
+
+    @Test
+    public void testAnnotationOnGetterWithoutFactory() throws Exception {
+        // An interface without any factory method is not able to initialize, as interfaces do
+        // not have constructors.
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "public interface Gift {\n"
+                        + "  @Document.Namespace public String getNamespace();\n"
+                        + "  @Document.Id public String getId();\n"
+                        + "  @Document.LongProperty public int getPrice();\n"
+                        + "  public void setPrice(int price);\n"
+                        + "}\n");
+
+        assertThat(compilation).hadErrorContaining("Failed to find any suitable creation methods");
+    }
+
+    @Test
+    public void testAnnotationOnGetterWithoutSetter() throws Exception {
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "public interface Gift {\n"
+                        + "  public static Gift create(String id, String namespace) {\n"
+                        + "    return new GiftImpl(id, namespace);\n"
+                        + "  }\n"
+                        + "  @Document.Namespace public String getNamespace();\n"
+                        + "  @Document.Id public String getId();\n"
+                        + "  @Document.LongProperty public int getPrice();\n"
+                        + "}\n"
+                        + "class GiftImpl implements Gift{\n"
+                        + "  public GiftImpl(String id, String namespace) {\n"
+                        + "    this.id = id;\n"
+                        + "    this.namespace = namespace;\n"
+                        + "  }\n"
+                        + "  private String namespace;\n"
+                        + "  private String id;\n"
+                        + "  private int price;\n"
+                        + "  public String getNamespace() { return namespace; }\n"
+                        + "  public String getId() { return id; }\n"
+                        + "  public int getPrice() { return price; }\n"
+                        + "}\n");
+
+        assertThat(compilation).hadWarningContaining(
+                "Element cannot be written directly because it is an annotated getter");
+    }
+
+    @Test
+    public void testInterfaceImplementingParents() throws Exception {
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "interface Root {\n"
+                        + "  @Document.Namespace public String getNamespace();\n"
+                        + "  @Document.Id public String getId();\n"
+                        + "  public static Root create(String id, String namespace) {\n"
+                        + "    return new GiftImpl();\n"
+                        + "  }\n"
+                        + "}\n"
+                        + "@Document(name=\"Parent1\", parent=Root.class)\n"
+                        + "interface Parent1 extends Root {\n"
+                        + "  @Document.StringProperty public String getStr1();\n"
+                        + "  public static Parent1 create(String id, String namespace, String "
+                        + "str1) {\n"
+                        + "    return new GiftImpl();\n"
+                        + "  }"
+                        + "}\n"
+                        + "@Document(name=\"Parent2\", parent=Root.class)\n"
+                        + "interface Parent2 extends Root {\n"
+                        + "  @Document.StringProperty public String getStr2();\n"
+                        + "  public static Parent2 create(String id, String namespace, String "
+                        + "str2) {\n"
+                        + "    return new GiftImpl();\n"
+                        + "  }\n"
+                        + "}\n"
+                        + "@Document(name=\"Gift\", parent={Parent1.class, Parent2.class})\n"
+                        + "public interface Gift extends Parent1, Parent2 {\n"
+                        + "  public static Gift create(String id, String namespace, String str1, "
+                        + "String str2, int price) {\n"
+                        + "    return new GiftImpl();\n"
+                        + "  }\n"
+                        + "  @Document.LongProperty public int getPrice();\n"
+                        + "}\n"
+                        + "class GiftImpl implements Gift{\n"
+                        + "  public GiftImpl() {}\n"
+                        + "  public String getNamespace() { return \"namespace\"; }\n"
+                        + "  public String getId() { return \"id\"; }\n"
+                        + "  public String getStr1() { return \"str1\"; }\n"
+                        + "  public String getStr2() { return \"str2\"; }\n"
+                        + "  public int getPrice() { return 0; }\n"
+                        + "}\n");
+        assertThat(compilation).succeededWithoutWarnings();
+        checkResultContains("Gift.java",
+                "new AppSearchSchema.StringPropertyConfig.Builder(\"str1\")");
+        checkResultContains("Gift.java",
+                "new AppSearchSchema.StringPropertyConfig.Builder(\"str2\")");
+        checkResultContains("Gift.java",
+                "new AppSearchSchema.LongPropertyConfig.Builder(\"price\")");
+        checkResultContains("Gift.java",
+                "Gift.create(getIdConv, getNamespaceConv, getStr1Conv, getStr2Conv, getPriceConv)");
+        checkResultContains("Gift.java", "document.getStr1()");
+        checkResultContains("Gift.java", "document.getStr2()");
+        checkResultContains("Gift.java", "document.getPrice()");
+        checkEqualsGolden("Gift.java");
+    }
+
+    @Test
+    public void testSameNameGetterAndFieldAnnotatingGetter() throws Exception {
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "public class Gift {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.LongProperty public int getPrice() { return 0; }\n"
+                        + "  public int price;\n"
+                        + "  public void setPrice(int price) {}\n"
+                        + "}\n");
+        assertThat(compilation).succeededWithoutWarnings();
+        checkResultContains("Gift.java",
+                "new AppSearchSchema.LongPropertyConfig.Builder(\"price\")");
+        checkResultContains("Gift.java", "document.setPrice(getPriceConv)");
+        checkResultContains("Gift.java", "document.getPrice()");
+        checkEqualsGolden("Gift.java");
+    }
+
+    @Test
+    public void testSameNameGetterAndFieldAnnotatingField() throws Exception {
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "public class Gift {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.LongProperty public int price;\n"
+                        + "  public int getPrice() { return 0; }\n"
+                        + "  public void setPrice(int price) {}\n"
+                        + "}\n");
+        assertThat(compilation).succeededWithoutWarnings();
+        checkResultContains("Gift.java",
+                "new AppSearchSchema.LongPropertyConfig.Builder(\"price\")");
+        checkResultContains("Gift.java", "document.price = priceConv");
+        checkResultContains("Gift.java",
+                "builder.setPropertyLong(\"price\", document.price)");
+        checkEqualsGolden("Gift.java");
+    }
+
+    @Test
+    public void testSameNameGetterAndFieldAnnotatingBoth() throws Exception {
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "public class Gift {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.LongProperty(name=\"price1\")\n"
+                        + "  public int getPrice() { return 0; }\n"
+                        + "  public void setPrice(int price) {}\n"
+                        + "  @Document.LongProperty(name=\"price2\")\n"
+                        + "  public int price;\n"
+                        + "}\n");
+        assertThat(compilation).hadErrorContaining(
+                "Normalized name \"price\" is already taken up by pre-existing "
+                        + "int Gift#getPrice(). "
+                        + "Please rename this getter/field to something else.");
+    }
+
+    @Test
+    public void testSameNameGetterAndFieldAnnotatingBothButGetterIsPrivate() throws Exception {
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "public class Gift {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.LongProperty(name=\"price1\")\n"
+                        + "  private int getPrice() { return 0; }\n"
+                        + "  public void setPrice(int price) {}\n"
+                        + "  @Document.LongProperty(name=\"price2\")\n"
+                        + "  public int price;\n"
+                        + "}\n");
+        assertThat(compilation).hadErrorContaining(
+                "Failed to find a suitable getter for element \"getPrice\"");
+        assertThat(compilation).hadWarningContaining(
+                "Getter cannot be used: private visibility");
+    }
+
+    @Test
+    public void testNameNormalization() throws Exception {
+        // getMPrice should correspond to a field named "mPrice"
+        // mPrice should correspond to a field named "price"
+        // isSold should correspond to a field named "sold"
+        // mx should correspond to a field named "mx"
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "public class Gift {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.LongProperty\n"
+                        + "  public int getMPrice() { return 0; }\n"
+                        + "  public void setMPrice(int price) {}\n"
+                        + "  @Document.LongProperty\n"
+                        + "  public int mPrice;\n"
+                        + "  @Document.BooleanProperty\n"
+                        + "  public boolean isSold() { return false; }\n"
+                        + "  public void setSold(boolean sold) {}\n"
+                        + "  @Document.LongProperty\n"
+                        + "  public int mx() { return 0; }\n"
+                        + "  public void setMx(int x) {}\n"
+                        + "}\n");
+        assertThat(compilation).succeededWithoutWarnings();
+
+        checkResultContains("Gift.java",
+                "new AppSearchSchema.LongPropertyConfig.Builder(\"mPrice\")");
+        checkResultContains("Gift.java",
+                "new AppSearchSchema.LongPropertyConfig.Builder(\"price\")");
+        checkResultContains("Gift.java",
+                "new AppSearchSchema.BooleanPropertyConfig.Builder(\"sold\")");
+        checkResultContains("Gift.java",
+                "new AppSearchSchema.LongPropertyConfig.Builder(\"mx\")");
+
+        checkResultContains("Gift.java", "document.setMPrice(getMPriceConv)");
+        checkResultContains("Gift.java", "document.mPrice = mPriceConv");
+        checkResultContains("Gift.java", "document.setSold(isSoldConv)");
+        checkResultContains("Gift.java", "document.setMx(mxConv)");
+
+        checkResultContains("Gift.java",
+                "builder.setPropertyLong(\"mPrice\", document.getMPrice())");
+        checkResultContains("Gift.java",
+                "builder.setPropertyLong(\"price\", document.mPrice)");
+        checkResultContains("Gift.java",
+                "builder.setPropertyBoolean(\"sold\", document.isSold())");
+        checkResultContains("Gift.java",
+                "builder.setPropertyLong(\"mx\", document.mx())");
+
+        checkEqualsGolden("Gift.java");
+    }
+
+    @Test
+    public void testGetterWithParameterCannotBeUsed() throws Exception {
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "public class Gift {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.LongProperty\n"
+                        + "  public int getPrice(int price) { return 0; }\n"
+                        + "  public void setPrice(int price) {}\n"
+                        + "}\n");
+        assertThat(compilation).hadErrorContaining(
+                "Failed to find a suitable getter for element \"getPrice\"");
+        assertThat(compilation).hadWarningContaining(
+                "Getter cannot be used: should take no parameters");
+    }
+
+    @Test
+    public void testPrivateGetterCannotBeUsed() throws Exception {
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "public class Gift {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.LongProperty\n"
+                        + "  private int getPrice() { return 0; }\n"
+                        + "  public void setPrice(int price) {}\n"
+                        + "}\n");
+        assertThat(compilation).hadErrorContaining(
+                "Failed to find a suitable getter for element \"getPrice\"");
+        assertThat(compilation).hadWarningContaining(
+                "Getter cannot be used: private visibility");
+    }
+
+    @Test
+    public void testOverloadedGetterIsOk() throws Exception {
+        // Overloaded getter should be ok because annotation processor will find the correct getter
+        // that can be used.
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "public class Gift {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  public int getPrice(int price) { return 0; }\n"
+                        + "  @Document.LongProperty\n"
+                        + "  public int getPrice() { return 0; }\n"
+                        + "  public void setPrice(int price) {}\n"
+                        + "}\n");
+        assertThat(compilation).succeededWithoutWarnings();
+        checkResultContains("Gift.java",
+                "new AppSearchSchema.LongPropertyConfig.Builder(\"price\")");
+        checkResultContains("Gift.java", "document.setPrice(getPriceConv)");
+        checkResultContains("Gift.java", "document.getPrice()");
+        checkEqualsGolden("Gift.java");
+    }
+
+    @Test
+    public void testGetterWithWrongReturnType() throws Exception {
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "public class Gift {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.StringProperty\n"
+                        + "  public int getPrice() { return 0; }\n"
+                        + "  public void setPrice(int price) {}\n"
+                        + "}\n");
+        assertThat(compilation).hadErrorContaining(
+                "@StringProperty must only be placed on a getter/field of type or array or "
+                        + "collection of java.lang.String");
+    }
+
+    public void testCyclicalSchema() throws Exception {
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "public class Gift {\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.DocumentProperty Letter letter;\n"
+                        + "}\n"
+                        + "\n"
+                        + "@Document\n"
+                        + "class Letter {\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.DocumentProperty Gift gift;\n"
+                        + "}\n");
+
+        assertThat(compilation).succeededWithoutWarnings();
+        checkEqualsGolden("Gift.java");
+
+        checkResultContains("Gift.java",
+                "classSet.add(Letter.class);\n    return classSet;");
+        checkResultContains("Letter.java",
+                "classSet.add(Gift.class);\n    return classSet;");
+    }
+
+    @Test
+    public void testCreationByBuilder() throws Exception {
+        // Once @Document.BuilderProducer is found, AppSearch compiler will no longer consider other
+        // creation method, so "create" will not be used.
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "public interface Gift {\n"
+                        + "  @Document.Namespace public String getNamespace();\n"
+                        + "  @Document.Id public String getId();\n"
+                        + "  @Document.LongProperty public int getPrice();\n"
+                        + "  public static Gift create(String id, String namespace, int price) {\n"
+                        + "    return new GiftImpl(id, namespace, price);\n"
+                        + "  }\n"
+                        + "  @Document.BuilderProducer static GiftBuilder getBuilder() {\n"
+                        + "    return new GiftBuilder();\n"
+                        + "  }\n"
+                        + "}\n"
+                        + "class GiftImpl implements Gift {\n"
+                        + "  public GiftImpl(String id, String namespace, int price) {\n"
+                        + "    this.id = id;\n"
+                        + "    this.namespace = namespace;\n"
+                        + "    this.price = price;\n"
+                        + "  }\n"
+                        + "  private String namespace;\n"
+                        + "  private String id;\n"
+                        + "  private int price;\n"
+                        + "  public String getNamespace() { return namespace; }\n"
+                        + "  public String getId() { return id; }\n"
+                        + "  public int getPrice() { return price; }\n"
+                        + "}\n"
+                        + "class GiftBuilder {\n"
+                        + "  private String namespace;\n"
+                        + "  private String id;\n"
+                        + "  private int price;\n"
+                        + "  public GiftBuilder setNamespace(String namespace) {\n"
+                        + "    this.namespace = namespace;\n"
+                        + "    return this;\n"
+                        + "  }\n"
+                        + "  public GiftBuilder setId(String id) {\n"
+                        + "    this.id = id;\n"
+                        + "    return this;\n"
+                        + "  }\n"
+                        + "  public GiftBuilder setPrice(int price) {\n"
+                        + "    this.price = price;\n"
+                        + "    return this;\n"
+                        + "  }\n"
+                        + "  public Gift build() {\n"
+                        + "    return new GiftImpl(this.id, this.namespace, this.price);\n"
+                        + "  }\n"
+                        + "}\n");
+        assertThat(compilation).succeededWithoutWarnings();
+        checkResultContains("Gift.java",
+                "GiftBuilder builder = Gift.getBuilder()");
+        checkResultContains("Gift.java", "builder.setNamespace(getNamespaceConv)");
+        checkResultContains("Gift.java", "builder.setId(getIdConv)");
+        checkResultContains("Gift.java", "builder.setPrice(getPriceConv)");
+        checkResultContains("Gift.java", "builder.build()");
+        checkEqualsGolden("Gift.java");
+    }
+
+    @Test
+    public void testCreationByBuilderWithParameter() throws Exception {
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "public interface Gift {\n"
+                        + "  @Document.Namespace public String getNamespace();\n"
+                        + "  @Document.Id public String getId();\n"
+                        + "  @Document.LongProperty public int getPrice();\n"
+                        + "  @Document.BuilderProducer static GiftBuilder getBuilder(int price) {\n"
+                        + "    return new GiftBuilder().setPrice(price);\n"
+                        + "  }\n"
+                        + "}\n"
+                        + "class GiftImpl implements Gift{\n"
+                        + "  public GiftImpl(String id, String namespace, int price) {\n"
+                        + "    this.id = id;\n"
+                        + "    this.namespace = namespace;\n"
+                        + "    this.price = price;\n"
+                        + "  }\n"
+                        + "  private String namespace;\n"
+                        + "  private String id;\n"
+                        + "  private int price;\n"
+                        + "  public String getNamespace() { return namespace; }\n"
+                        + "  public String getId() { return id; }\n"
+                        + "  public int getPrice() { return price; }\n"
+                        + "}\n"
+                        + "class GiftBuilder {\n"
+                        + "  private String namespace;\n"
+                        + "  private String id;\n"
+                        + "  private int price;\n"
+                        + "  public GiftBuilder setNamespace(String namespace) {\n"
+                        + "    this.namespace = namespace;\n"
+                        + "    return this;\n"
+                        + "  }\n"
+                        + "  public GiftBuilder setId(String id) {\n"
+                        + "    this.id = id;\n"
+                        + "    return this;\n"
+                        + "  }\n"
+                        + "  public GiftBuilder setPrice(int price) {\n"
+                        + "    this.price = price;\n"
+                        + "    return this;\n"
+                        + "  }\n"
+                        + "  public Gift build() {\n"
+                        + "    return new GiftImpl(this.id, this.namespace, this.price);\n"
+                        + "  }\n"
+                        + "}\n");
+        assertThat(compilation).succeededWithoutWarnings();
+        checkResultContains("Gift.java",
+                "GiftBuilder builder = Gift.getBuilder(getPriceConv)");
+        checkResultContains("Gift.java", "builder.setNamespace(getNamespaceConv)");
+        checkResultContains("Gift.java", "builder.setId(getIdConv)");
+        checkResultContains("Gift.java", "builder.build()");
+        checkEqualsGolden("Gift.java");
+    }
+
+    @Test
+    public void testCreationByBuilderAnnotatingBuilderClass() throws Exception {
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "public interface Gift {\n"
+                        + "  @Document.Namespace public String getNamespace();\n"
+                        + "  @Document.Id public String getId();\n"
+                        + "  @Document.LongProperty public int getPrice();\n"
+                        + "  @Document.BuilderProducer\n"
+                        + "  class GiftBuilder {\n"
+                        + "    private String namespace;\n"
+                        + "    private String id;\n"
+                        + "    private int price;\n"
+                        + "    public GiftBuilder setNamespace(String namespace) {\n"
+                        + "      this.namespace = namespace;\n"
+                        + "      return this;\n"
+                        + "    }\n"
+                        + "    public GiftBuilder setId(String id) {\n"
+                        + "      this.id = id;\n"
+                        + "      return this;\n"
+                        + "    }\n"
+                        + "    public GiftBuilder setPrice(int price) {\n"
+                        + "      this.price = price;\n"
+                        + "      return this;\n"
+                        + "    }\n"
+                        + "    public Gift build() {\n"
+                        + "      return new GiftImpl(this.id, this.namespace, this.price);\n"
+                        + "    }\n"
+                        + "  }\n"
+                        + "}\n"
+                        + "class GiftImpl implements Gift {\n"
+                        + "  public GiftImpl(String id, String namespace, int price) {\n"
+                        + "    this.id = id;\n"
+                        + "    this.namespace = namespace;\n"
+                        + "    this.price = price;\n"
+                        + "  }\n"
+                        + "  private String namespace;\n"
+                        + "  private String id;\n"
+                        + "  private int price;\n"
+                        + "  public String getNamespace() { return namespace; }\n"
+                        + "  public String getId() { return id; }\n"
+                        + "  public int getPrice() { return price; }\n"
+                        + "}\n");
+        assertThat(compilation).succeededWithoutWarnings();
+        checkResultContains("Gift.java",
+                "Gift.GiftBuilder builder = new Gift.GiftBuilder()");
+        checkResultContains("Gift.java", "builder.setNamespace(getNamespaceConv)");
+        checkResultContains("Gift.java", "builder.setId(getIdConv)");
+        checkResultContains("Gift.java", "builder.setPrice(getPriceConv)");
+        checkResultContains("Gift.java", "builder.build()");
+        checkEqualsGolden("Gift.java");
+    }
+
+    @Test
+    public void testCreationByBuilderWithParameterAnnotatingBuilderClass() throws Exception {
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "public interface Gift {\n"
+                        + "  @Document.Namespace public String getNamespace();\n"
+                        + "  @Document.Id public String getId();\n"
+                        + "  @Document.LongProperty public int getPrice();\n"
+                        + "  @Document.BuilderProducer\n"
+                        + "  class GiftBuilder {\n"
+                        + "    private String namespace;\n"
+                        + "    private String id;\n"
+                        + "    private int price;\n"
+                        + "    public GiftBuilder(int price) {\n"
+                        + "      this.price = price;\n"
+                        + "    }\n"
+                        + "    public GiftBuilder setNamespace(String namespace) {\n"
+                        + "      this.namespace = namespace;\n"
+                        + "      return this;\n"
+                        + "    }\n"
+                        + "    public GiftBuilder setId(String id) {\n"
+                        + "      this.id = id;\n"
+                        + "      return this;\n"
+                        + "    }\n"
+                        + "    public Gift build() {\n"
+                        + "      return new GiftImpl(this.id, this.namespace, this.price);\n"
+                        + "    }\n"
+                        + "  }\n"
+                        + "}\n"
+                        + "class GiftImpl implements Gift {\n"
+                        + "  public GiftImpl(String id, String namespace, int price) {\n"
+                        + "    this.id = id;\n"
+                        + "    this.namespace = namespace;\n"
+                        + "    this.price = price;\n"
+                        + "  }\n"
+                        + "  private String namespace;\n"
+                        + "  private String id;\n"
+                        + "  private int price;\n"
+                        + "  public String getNamespace() { return namespace; }\n"
+                        + "  public String getId() { return id; }\n"
+                        + "  public int getPrice() { return price; }\n"
+                        + "}\n");
+        assertThat(compilation).succeededWithoutWarnings();
+        checkResultContains("Gift.java",
+                "Gift.GiftBuilder builder = new Gift.GiftBuilder(getPriceConv)");
+        checkResultContains("Gift.java", "builder.setNamespace(getNamespaceConv)");
+        checkResultContains("Gift.java", "builder.setId(getIdConv)");
+        checkResultContains("Gift.java", "builder.build()");
+        checkEqualsGolden("Gift.java");
+    }
+
+    @Test
+    public void testCreationByBuilderOnly() throws Exception {
+        // Once a builder producer is provided, AppSearch will only use the builder pattern, even
+        // if another creation method is available.
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "public class Gift {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.LongProperty int price;\n"
+                        + "  @Document.BuilderProducer static GiftBuilder getBuilder() {\n"
+                        + "    return new GiftBuilder();\n"
+                        + "  }\n"
+                        + "}\n"
+                        + "class GiftBuilder {\n"
+                        + "  private String namespace;\n"
+                        + "  private String id;\n"
+                        + "  private int price;\n"
+                        + "  public GiftBuilder setNamespace(String namespace) {\n"
+                        + "    this.namespace = namespace;\n"
+                        + "    return this;\n"
+                        + "  }\n"
+                        + "  public GiftBuilder setId(String id) {\n"
+                        + "    this.id = id;\n"
+                        + "    return this;\n"
+                        + "  }\n"
+                        + "  public GiftBuilder setPrice(int price) {\n"
+                        + "    this.price = price;\n"
+                        + "    return this;\n"
+                        + "  }\n"
+                        + "  public Gift build() {\n"
+                        + "    return new Gift();\n"
+                        + "  }\n"
+                        + "}\n");
+        assertThat(compilation).succeededWithoutWarnings();
+        checkResultContains("Gift.java", "GiftBuilder builder = Gift.getBuilder()");
+        checkResultContains("Gift.java", "builder.setNamespace(namespaceConv)");
+        checkResultContains("Gift.java", "builder.setId(idConv)");
+        checkResultContains("Gift.java", "builder.setPrice(priceConv)");
+        checkResultContains("Gift.java", "builder.build()");
+        checkEqualsGolden("Gift.java");
+    }
+
+    @Test
+    public void testCreationByBuilderWithAutoValue() throws IOException {
+        Compilation compilation = compile(
+                "import com.google.auto.value.AutoValue;\n"
+                        + "import com.google.auto.value.AutoValue.*;\n"
+                        + "@Document\n"
+                        + "@AutoValue\n"
+                        + "public abstract class Gift {\n"
+                        + "  @CopyAnnotations @Document.Id abstract String id();\n"
+                        + "  @CopyAnnotations @Document.Namespace abstract String namespace();\n"
+                        + "  @CopyAnnotations @Document.LongProperty abstract int price();\n"
+                        + "  @Document.BuilderProducer static GiftBuilder getBuilder() {\n"
+                        + "    return new GiftBuilder();\n"
+                        + "  }\n"
+                        + "}\n"
+                        + "class GiftBuilder {\n"
+                        + "  private String namespace;\n"
+                        + "  private String id;\n"
+                        + "  private int price;\n"
+                        + "  public GiftBuilder setNamespace(String namespace) {\n"
+                        + "    this.namespace = namespace;\n"
+                        + "    return this;\n"
+                        + "  }\n"
+                        + "  public GiftBuilder setId(String id) {\n"
+                        + "    this.id = id;\n"
+                        + "    return this;\n"
+                        + "  }\n"
+                        + "  public GiftBuilder setPrice(int price) {\n"
+                        + "    this.price = price;\n"
+                        + "    return this;\n"
+                        + "  }\n"
+                        + "  public Gift build() {\n"
+                        + "    return new AutoValue_Gift(id, namespace, price);\n"
+                        + "  }\n"
+                        + "}\n");
+
+        assertThat(compilation).succeededWithoutWarnings();
+        checkResultContains("AutoValue_Gift.java", "GiftBuilder builder = Gift.getBuilder()");
+        checkResultContains("AutoValue_Gift.java", "builder.setNamespace(namespaceConv)");
+        checkResultContains("AutoValue_Gift.java", "builder.setId(idConv)");
+        checkResultContains("AutoValue_Gift.java", "builder.setPrice(priceConv)");
+        checkResultContains("AutoValue_Gift.java", "builder.build()");
+        checkEqualsGolden("AutoValue_Gift.java");
+    }
+
+    @Test
+    public void testCreationByBuilderErrors() throws Exception {
+        // Cannot have multiple builder producer
+        Compilation compilation = compile(
+                "@Document\n"
+                        + "public interface Gift {\n"
+                        + "  @Document.Namespace public String getNamespace();\n"
+                        + "  @Document.Id public String getId();\n"
+                        + "  @Document.BuilderProducer static GiftBuilder getBuilder1() {\n"
+                        + "    return new GiftBuilder();\n"
+                        + "  }\n"
+                        + "  @Document.BuilderProducer static GiftBuilder getBuilder2() {\n"
+                        + "    return new GiftBuilder();\n"
+                        + "  }\n"
+                        + "}\n"
+                        + "class GiftImpl implements Gift{\n"
+                        + "  public GiftImpl(String id, String namespace) {\n"
+                        + "    this.id = id;\n"
+                        + "    this.namespace = namespace;\n"
+                        + "  }\n"
+                        + "  private String namespace;\n"
+                        + "  private String id;\n"
+                        + "  public String getNamespace() { return namespace; }\n"
+                        + "  public String getId() { return id; }\n"
+                        + "}\n"
+                        + "class GiftBuilder {\n"
+                        + "  private String namespace;\n"
+                        + "  private String id;\n"
+                        + "  public GiftBuilder setNamespace(String namespace) {\n"
+                        + "    this.namespace = namespace;\n"
+                        + "    return this;\n"
+                        + "  }\n"
+                        + "  public GiftBuilder setId(String id) {\n"
+                        + "    this.id = id;\n"
+                        + "    return this;\n"
+                        + "  }\n"
+                        + "  public Gift build() {\n"
+                        + "    return new GiftImpl(this.id, this.namespace);\n"
+                        + "  }\n"
+                        + "}\n");
+        assertThat(compilation).hadErrorContaining("Found duplicated builder producer");
+
+        // Builder producer method must be static
+        compilation = compile(
+                "@Document\n"
+                        + "public interface Gift {\n"
+                        + "  @Document.Namespace public String getNamespace();\n"
+                        + "  @Document.Id public String getId();\n"
+                        + "  @Document.BuilderProducer GiftBuilder getBuilder() {\n"
+                        + "    return new GiftBuilder();\n"
+                        + "  }\n"
+                        + "}\n"
+                        + "class GiftImpl implements Gift{\n"
+                        + "  public GiftImpl(String id, String namespace) {\n"
+                        + "    this.id = id;\n"
+                        + "    this.namespace = namespace;\n"
+                        + "  }\n"
+                        + "  private String namespace;\n"
+                        + "  private String id;\n"
+                        + "  public String getNamespace() { return namespace; }\n"
+                        + "  public String getId() { return id; }\n"
+                        + "}\n"
+                        + "class GiftBuilder {\n"
+                        + "  private String namespace;\n"
+                        + "  private String id;\n"
+                        + "  public GiftBuilder setNamespace(String namespace) {\n"
+                        + "    this.namespace = namespace;\n"
+                        + "    return this;\n"
+                        + "  }\n"
+                        + "  public GiftBuilder setId(String id) {\n"
+                        + "    this.id = id;\n"
+                        + "    return this;\n"
+                        + "  }\n"
+                        + "  public Gift build() {\n"
+                        + "    return new GiftImpl(this.id, this.namespace);\n"
+                        + "  }\n"
+                        + "}\n");
+        assertThat(compilation).hadErrorContaining("Builder producer must be static");
+
+        // Builder producer class must be static
+        compilation = compile(
+                "@Document\n"
+                        + "public class Gift {\n"
+                        + "  public Gift(String id, String namespace) {\n"
+                        + "    this.id = id;\n"
+                        + "    this.namespace = namespace;\n"
+                        + "  }\n"
+                        + "  @Document.Namespace public String namespace;\n"
+                        + "  @Document.Id public String id;\n"
+                        + "  @Document.BuilderProducer\n"
+                        + "  class Builder {\n"
+                        + "    private String namespace;\n"
+                        + "    private String id;\n"
+                        + "    public Builder setNamespace(String namespace) {\n"
+                        + "      this.namespace = namespace;\n"
+                        + "      return this;\n"
+                        + "    }\n"
+                        + "    public Builder setId(String id) {\n"
+                        + "      this.id = id;\n"
+                        + "      return this;\n"
+                        + "    }\n"
+                        + "    public Gift build() {\n"
+                        + "      return new Gift(this.id, this.namespace);\n"
+                        + "    }\n"
+                        + "  }\n"
+                        + "}\n");
+        assertThat(compilation).hadErrorContaining("Builder producer must be static");
+
+        // Builder producer method cannot be private
+        compilation = compile(
+                "@Document\n"
+                        + "public interface Gift {\n"
+                        + "  @Document.Namespace public String getNamespace();\n"
+                        + "  @Document.Id public String getId();\n"
+                        + "  @Document.BuilderProducer private static GiftBuilder getBuilder() {\n"
+                        + "    return new GiftBuilder();\n"
+                        + "  }\n"
+                        + "}\n"
+                        + "class GiftImpl implements Gift{\n"
+                        + "  public GiftImpl(String id, String namespace) {\n"
+                        + "    this.id = id;\n"
+                        + "    this.namespace = namespace;\n"
+                        + "  }\n"
+                        + "  private String namespace;\n"
+                        + "  private String id;\n"
+                        + "  public String getNamespace() { return namespace; }\n"
+                        + "  public String getId() { return id; }\n"
+                        + "}\n"
+                        + "class GiftBuilder {\n"
+                        + "  private String namespace;\n"
+                        + "  private String id;\n"
+                        + "  public GiftBuilder setNamespace(String namespace) {\n"
+                        + "    this.namespace = namespace;\n"
+                        + "    return this;\n"
+                        + "  }\n"
+                        + "  public GiftBuilder setId(String id) {\n"
+                        + "    this.id = id;\n"
+                        + "    return this;\n"
+                        + "  }\n"
+                        + "  public Gift build() {\n"
+                        + "    return new GiftImpl(this.id, this.namespace);\n"
+                        + "  }\n"
+                        + "}\n");
+        assertThat(compilation).hadErrorContaining("Builder producer cannot be private");
+
+        // Builder producer class cannot be private
+        compilation = compile(
+                "@Document\n"
+                        + "public class Gift {\n"
+                        + "  public Gift(String id, String namespace) {\n"
+                        + "    this.id = id;\n"
+                        + "    this.namespace = namespace;\n"
+                        + "  }\n"
+                        + "  @Document.Namespace public String namespace;\n"
+                        + "  @Document.Id public String id;\n"
+                        + "  @Document.BuilderProducer\n"
+                        + "  private static class Builder {\n"
+                        + "    private String namespace;\n"
+                        + "    private String id;\n"
+                        + "    public Builder setNamespace(String namespace) {\n"
+                        + "      this.namespace = namespace;\n"
+                        + "      return this;\n"
+                        + "    }\n"
+                        + "    public Builder setId(String id) {\n"
+                        + "      this.id = id;\n"
+                        + "      return this;\n"
+                        + "    }\n"
+                        + "    public Gift build() {\n"
+                        + "      return new Gift(this.id, this.namespace);\n"
+                        + "    }\n"
+                        + "  }\n"
+                        + "}\n");
+        assertThat(compilation).hadErrorContaining("Builder producer cannot be private");
+
+        // Builder producer must be a method or a class.
+        compilation = compile(
+                "@Document\n"
+                        + "public class Gift {\n"
+                        + "  @Document.Namespace public String namespace;\n"
+                        + "  @Document.Id public String id;\n"
+                        + "  @Document.BuilderProducer int getBuilder;\n"
+                        + "}\n");
+        assertThat(compilation).hadErrorContaining(
+                "annotation type not applicable to this kind of declaration");
+
+        // Missing a setter in the builder
+        compilation = compile(
+                "@Document\n"
+                        + "public class Gift {\n"
+                        + "  @Document.Namespace String namespace;\n"
+                        + "  @Document.Id String id;\n"
+                        + "  @Document.LongProperty int price;\n"
+                        + "  @Document.BuilderProducer static GiftBuilder getBuilder() {\n"
+                        + "    return new GiftBuilder();\n"
+                        + "  }\n"
+                        + "}\n"
+                        + "class GiftBuilder {\n"
+                        + "  private String namespace;\n"
+                        + "  private String id;\n"
+                        + "  private int price;\n"
+                        + "  public GiftBuilder setNamespace(String namespace) {\n"
+                        + "    this.namespace = namespace;\n"
+                        + "    return this;\n"
+                        + "  }\n"
+                        + "  public GiftBuilder setId(String id) {\n"
+                        + "    this.id = id;\n"
+                        + "    return this;\n"
+                        + "  }\n"
+                        + "  public Gift build() {\n"
+                        + "    return new Gift();\n"
+                        + "  }\n"
+                        + "}\n");
+        assertThat(compilation).hadWarningContaining(
+                "Element cannot be written directly because a builder producer is provided, and "
+                        + "we failed to find a suitable setter");
     }
 
     private Compilation compile(String classBody) {

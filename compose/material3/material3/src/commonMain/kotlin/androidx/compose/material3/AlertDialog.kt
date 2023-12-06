@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material3.tokens.DialogTokens
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -33,6 +32,8 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.fastForEach
+import androidx.compose.ui.util.fastForEachIndexed
 import kotlin.math.max
 
 @Composable
@@ -57,9 +58,7 @@ internal fun AlertDialogContent(
         tonalElevation = tonalElevation,
     ) {
         Column(
-            modifier = Modifier
-                .sizeIn(minWidth = MinWidth, maxWidth = MaxWidth)
-                .padding(DialogPadding)
+            modifier = Modifier.padding(DialogPadding)
         ) {
             icon?.let {
                 CompositionLocalProvider(LocalContentColor provides iconContentColor) {
@@ -152,7 +151,9 @@ internal fun AlertDialogFlowRow(
             if (sequences.isNotEmpty()) {
                 crossAxisSpace += crossAxisSpacing.roundToPx()
             }
-            sequences += currentSequence.toList()
+            // Ensures that confirming actions appear above dismissive actions.
+            @Suppress("ListIterator")
+            sequences.add(0, currentSequence.toList())
             crossAxisSizes += currentCrossAxisSize
             crossAxisPositions += crossAxisSpace
 
@@ -164,7 +165,7 @@ internal fun AlertDialogFlowRow(
             currentCrossAxisSize = 0
         }
 
-        for (measurable in measurables) {
+        measurables.fastForEach { measurable ->
             // Ask the child for its preferred size.
             val placeable = measurable.measure(constraints)
 
@@ -191,19 +192,18 @@ internal fun AlertDialogFlowRow(
         val layoutHeight = crossAxisLayoutSize
 
         layout(layoutWidth, layoutHeight) {
-            sequences.forEachIndexed { i, placeables ->
+            sequences.fastForEachIndexed { i, placeables ->
                 val childrenMainAxisSizes = IntArray(placeables.size) { j ->
                     placeables[j].width +
                         if (j < placeables.lastIndex) mainAxisSpacing.roundToPx() else 0
                 }
-                val arrangement = Arrangement.Bottom
-                // TODO(soboleva): rtl support
-                // Handle vertical direction
+                val arrangement = Arrangement.End
                 val mainAxisPositions = IntArray(childrenMainAxisSizes.size) { 0 }
                 with(arrangement) {
-                    arrange(mainAxisLayoutSize, childrenMainAxisSizes, mainAxisPositions)
+                    arrange(mainAxisLayoutSize, childrenMainAxisSizes,
+                        layoutDirection, mainAxisPositions)
                 }
-                placeables.forEachIndexed { j, placeable ->
+                placeables.fastForEachIndexed { j, placeable ->
                     placeable.place(
                         x = mainAxisPositions[j],
                         y = crossAxisPositions[i]
@@ -214,11 +214,11 @@ internal fun AlertDialogFlowRow(
     }
 }
 
+internal val DialogMinWidth = 280.dp
+internal val DialogMaxWidth = 560.dp
+
 // Paddings for each of the dialog's parts.
 private val DialogPadding = PaddingValues(all = 24.dp)
 private val IconPadding = PaddingValues(bottom = 16.dp)
 private val TitlePadding = PaddingValues(bottom = 16.dp)
 private val TextPadding = PaddingValues(bottom = 24.dp)
-
-private val MinWidth = 280.dp
-private val MaxWidth = 560.dp

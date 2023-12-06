@@ -1,3 +1,7 @@
 // Baseline format: 1.0
-RemovedMethod: androidx.wear.watchface.style.UserStyleSetting.ComplicationSlotsUserStyleSetting.ComplicationSlotOverlay#ComplicationSlotOverlay(int, Boolean, androidx.wear.watchface.complications.ComplicationSlotBounds, Integer):
-    Removed constructor androidx.wear.watchface.style.UserStyleSetting.ComplicationSlotsUserStyleSetting.ComplicationSlotOverlay(int,Boolean,androidx.wear.watchface.complications.ComplicationSlotBounds,Integer)
+AddedMethod: androidx.wear.watchface.style.UserStyleSetting.ComplicationSlotsUserStyleSetting.ComplicationSlotOverlay#isEnabled():
+    Added method androidx.wear.watchface.style.UserStyleSetting.ComplicationSlotsUserStyleSetting.ComplicationSlotOverlay.isEnabled()
+
+
+RemovedMethod: androidx.wear.watchface.style.UserStyleSetting.ComplicationSlotsUserStyleSetting.ComplicationSlotOverlay#getEnabled():
+    Removed method androidx.wear.watchface.style.UserStyleSetting.ComplicationSlotsUserStyleSetting.ComplicationSlotOverlay.getEnabled()

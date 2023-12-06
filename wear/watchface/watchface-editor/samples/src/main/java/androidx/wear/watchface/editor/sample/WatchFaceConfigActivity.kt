@@ -16,7 +16,6 @@
 
 package androidx.wear.watchface.editor.sample
 
-import android.annotation.SuppressLint
 import android.view.View
 import android.view.accessibility.AccessibilityEvent
 import androidx.annotation.RestrictTo
@@ -31,15 +30,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-/** @hide */
 @RestrictTo(LIBRARY)
 internal interface FragmentController {
     /** Show the [ConfigFragment] which lets the user select what they want to configure. */
     fun showConfigFragment()
 
     /**
-     * Show the [ComplicationConfigFragment] which lets the user select the complication
-     * they want to configure.
+     * Show the [ComplicationConfigFragment] which lets the user select the complication they want
+     * to configure.
      */
     fun showComplicationConfigSelectionFragment()
 
@@ -82,7 +80,6 @@ class WatchFaceConfigActivity : FragmentActivity() {
             init(
                 editorSession,
                 object : FragmentController {
-                    @SuppressLint("SyntheticAccessor")
                     override fun showConfigFragment() {
                         showFragment(
                             ConfigFragment.newInstance(
@@ -95,12 +92,10 @@ class WatchFaceConfigActivity : FragmentActivity() {
                         )
                     }
 
-                    @SuppressLint("SyntheticAccessor")
                     override fun showComplicationConfigSelectionFragment() {
                         showFragment(ComplicationConfigFragment())
                     }
 
-                    @SuppressLint("SyntheticAccessor")
                     override fun showStyleConfigFragment(
                         settingId: String,
                         styleSchema: UserStyleSchema,
@@ -112,13 +107,12 @@ class WatchFaceConfigActivity : FragmentActivity() {
                     }
 
                     /**
-                     * Displays a config screen which allows the user to select the data source for the
-                     * complication.
+                     * Displays a config screen which allows the user to select the data source for
+                     * the complication.
                      */
                     @SuppressWarnings("deprecation")
-                    override suspend fun showComplicationConfig(
-                        complicationSlotId: Int
-                    ) = editorSession.openComplicationDataSourceChooser(complicationSlotId)
+                    override suspend fun showComplicationConfig(complicationSlotId: Int) =
+                        editorSession.openComplicationDataSourceChooser(complicationSlotId)
                 }
             )
         }
@@ -127,8 +121,7 @@ class WatchFaceConfigActivity : FragmentActivity() {
     private fun focusCurrentFragment() {
         val curFragment = supportFragmentManager.findFragmentById(android.R.id.content)
         if (curFragment != null) {
-            curFragment.view?.importantForAccessibility =
-                View.IMPORTANT_FOR_ACCESSIBILITY_YES
+            curFragment.view?.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
         }
 
         // Clear focus on the old fragment that is behind the new one, and announce the new title.
@@ -149,21 +142,17 @@ class WatchFaceConfigActivity : FragmentActivity() {
             .commit()
     }
 
-    private fun init(
-        editorSession: EditorSession,
-        fragmentController: FragmentController
-    ) {
+    private fun init(editorSession: EditorSession, fragmentController: FragmentController) {
         this.editorSession = editorSession
         this.fragmentController = fragmentController
 
-        supportFragmentManager
-            .addOnBackStackChangedListener {
-                if (supportFragmentManager.backStackEntryCount == 0) {
-                    finish()
-                } else {
-                    focusCurrentFragment()
-                }
+        supportFragmentManager.addOnBackStackChangedListener {
+            if (supportFragmentManager.backStackEntryCount == 0) {
+                finish()
+            } else {
+                focusCurrentFragment()
             }
+        }
 
         var topLevelOptionCount = editorSession.userStyleSchema.rootUserStyleSettings.size
         val hasBackgroundComplication = editorSession.backgroundComplicationSlotId != null
@@ -184,8 +173,7 @@ class WatchFaceConfigActivity : FragmentActivity() {
 
             // For a single complication go directly to the complication data source selector.
             numComplications == 1 -> {
-                val onlyComplication =
-                    editorSession.complicationSlotsState.value.entries.first()
+                val onlyComplication = editorSession.complicationSlotsState.value.entries.first()
                 coroutineScope.launch {
                     val chosenComplicationProvider =
                         fragmentController.showComplicationConfig(onlyComplication.key)
@@ -199,8 +187,7 @@ class WatchFaceConfigActivity : FragmentActivity() {
             // For a single style, go select the option.
             editorSession.userStyleSchema.rootUserStyleSettings.size == 1 -> {
                 // There should only be a single userStyle setting if we get here.
-                val onlyStyleSetting =
-                    editorSession.userStyleSchema.rootUserStyleSettings.first()
+                val onlyStyleSetting = editorSession.userStyleSchema.rootUserStyleSettings.first()
                 fragmentController.showStyleConfigFragment(
                     onlyStyleSetting.id.value,
                     editorSession.userStyleSchema,

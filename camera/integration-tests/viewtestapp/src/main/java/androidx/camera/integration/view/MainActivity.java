@@ -49,12 +49,23 @@ public class MainActivity extends AppCompatActivity {
     private static final String PREVIEW_VIEW_FRAGMENT = "PreviewView";
     private static final String COMPOSE_UI_FRAGMENT = "ComposeUi";
 
-    private static final String[] REQUIRED_PERMISSIONS =
-            new String[]{
+    private static final String[] REQUIRED_PERMISSIONS;
+    static {
+        // From Android T, skips the permission check of WRITE_EXTERNAL_STORAGE since it won't be
+        // granted any more.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            REQUIRED_PERMISSIONS = new String[]{
+                    Manifest.permission.CAMERA,
+                    Manifest.permission.RECORD_AUDIO
+            };
+        } else {
+            REQUIRED_PERMISSIONS = new String[]{
                     Manifest.permission.CAMERA,
                     Manifest.permission.RECORD_AUDIO,
                     Manifest.permission.WRITE_EXTERNAL_STORAGE
             };
+        }
+    }
     private static final int REQUEST_CODE_PERMISSIONS = 10;
 
     // Possible values for this intent key are the name values of LensFacing encoded as
@@ -65,6 +76,11 @@ public class MainActivity extends AppCompatActivity {
     // Possible values for this intent key: "preview_test_case" or "default_test_case".
     public static final String INTENT_EXTRA_E2E_TEST_CASE = "e2e_test_case";
     public static final String PREVIEW_TEST_CASE = "preview_test_case";
+
+    // Launch the activity with the specified scale type.
+    public static final String INTENT_EXTRA_SCALE_TYPE = "scale_type";
+    // The default scale type is FILL_CENTER.
+    public static final int DEFAULT_SCALE_TYPE_ID = 1;
 
     /** Intent extra representing type of camera implementation. */
     public static final String INTENT_EXTRA_CAMERA_IMPLEMENTATION = "camera_implementation";
@@ -87,12 +103,7 @@ public class MainActivity extends AppCompatActivity {
         // Get extra option for checking whether it needs to be implemented with PreviewView
         Bundle bundle = getIntent().getExtras();
         if (bundle != null) {
-            final String viewTypeString = bundle.getString(INTENT_FRAGMENT_TYPE);
-            if (PREVIEW_VIEW_FRAGMENT.equalsIgnoreCase(viewTypeString)) {
-                mFragmentType = FragmentType.PREVIEW_VIEW;
-            } else if (COMPOSE_UI_FRAGMENT.equalsIgnoreCase(viewTypeString)) {
-                mFragmentType = FragmentType.COMPOSE_UI;
-            }
+            parseFragmentType(bundle);
             // Update the app UI according to the e2e test case.
             String testItem = bundle.getString(INTENT_EXTRA_E2E_TEST_CASE);
             if (testItem != null) {
@@ -174,6 +185,9 @@ public class MainActivity extends AppCompatActivity {
             case R.id.mlkit:
                 mFragmentType = FragmentType.MLKIT;
                 break;
+            case R.id.effects:
+                mFragmentType = FragmentType.EFFECTS;
+                break;
         }
         startFragment();
         return true;
@@ -187,6 +201,15 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         return true;
+    }
+
+    private void parseFragmentType(@NonNull Bundle bundle) {
+        final String viewTypeString = bundle.getString(INTENT_FRAGMENT_TYPE);
+        if (PREVIEW_VIEW_FRAGMENT.equalsIgnoreCase(viewTypeString)) {
+            mFragmentType = FragmentType.PREVIEW_VIEW;
+        } else if (COMPOSE_UI_FRAGMENT.equalsIgnoreCase(viewTypeString)) {
+            mFragmentType = FragmentType.COMPOSE_UI;
+        }
     }
 
     private void startFragment() {
@@ -205,6 +228,9 @@ public class MainActivity extends AppCompatActivity {
                 break;
             case MLKIT:
                 startFragment(R.string.mlkit, new MlKitFragment());
+                break;
+            case EFFECTS:
+                startFragment(R.string.effects, new EffectsFragment());
                 break;
         }
     }
@@ -227,6 +253,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private enum FragmentType {
-        PREVIEW_VIEW, CAMERA_CONTROLLER, TRANSFORM, COMPOSE_UI, MLKIT
+        PREVIEW_VIEW, CAMERA_CONTROLLER, TRANSFORM, COMPOSE_UI, MLKIT, EFFECTS
     }
 }

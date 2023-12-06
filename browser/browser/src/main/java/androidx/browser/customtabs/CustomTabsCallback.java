@@ -67,7 +67,6 @@ public class CustomTabsCallback {
      * Key for the extra included in {@link #onRelationshipValidationResult} {@code extras}
      * containing whether the verification was performed while the device was online. This may be
      * missing in cases verification was short cut.
-     * @hide
      */
     @RestrictTo(RestrictTo.Scope.LIBRARY)
     public static final String ONLINE_EXTRAS_KEY = "online";
@@ -161,12 +160,12 @@ public class CustomTabsCallback {
             boolean result, @Nullable Bundle extras) {}
 
     /**
-     * To be called when CCT is resized in its height. This is applicable when users resize a CCT
-     * launched with {@link CustomTabsIntent#ACTIVITY_HEIGHT_ADJUSTABLE} for the {@link
-     * CustomTabsIntent#ActivityResizeBehavior}.
+     * Called when the tab is resized.
      *
-     * @param size The updated size in height.
+     * @param height The updated height in px.
+     * @param width The updated width in px.
      * @param extras Reserved for future use.
      */
-    public void onActivityResized(@Dimension(unit = PX) int size, @NonNull Bundle extras) {}
+    public void onActivityResized(@Dimension(unit = PX) int height,
+            @Dimension(unit = PX) int width, @NonNull Bundle extras) {}
 }

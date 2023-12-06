@@ -23,8 +23,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.LinearGradientShader
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.PaintingStyle
@@ -37,19 +39,21 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.SweepGradientShader
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
 import androidx.test.filters.SmallTest
+import kotlin.math.roundToInt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
-import kotlin.math.roundToInt
 
 @SmallTest
 @RunWith(AndroidJUnit4::class)
@@ -1691,6 +1695,130 @@ class DrawScopeTest {
         )
     }
 
+    @Test
+    fun testDrawScopeRetargeting() {
+        val width = 30
+        val height = 20
+
+        val pictureWidth = 20
+        val pictureHeight = 10
+
+        val bitmap = ImageBitmap(width, height)
+        val bitmapCanvas = Canvas(bitmap)
+        val density = Density(2.0f, 3.0f)
+        val drawScope: DrawScope = CanvasDrawScope()
+        drawScope.draw(
+            density,
+            LayoutDirection.Ltr,
+            bitmapCanvas,
+            Size(width.toFloat(), height.toFloat())
+        ) {
+            assertEquals(density.density, this.density)
+            assertEquals(density.fontScale, this.fontScale)
+            assertEquals(LayoutDirection.Ltr, this.layoutDirection)
+            assertEquals(width.toFloat(), this.size.width)
+            assertEquals(height.toFloat(), this.size.height)
+            drawIntoCanvas { canvas -> assertTrue(bitmapCanvas === canvas) }
+
+            drawRect(color = Color.Red)
+
+            val picture = android.graphics.Picture()
+            val pictureCanvas = Canvas(picture.beginRecording(pictureWidth, pictureHeight))
+            val pictureDensity = Density(5.0f, 10f)
+            draw(
+                pictureDensity,
+                LayoutDirection.Rtl,
+                pictureCanvas,
+                Size(pictureWidth.toFloat(), pictureHeight.toFloat())
+            ) {
+                // Verify that while retargeting the draw scope, the parameters match that of the
+                // new configuration
+                assertEquals(pictureDensity.density, this.density)
+                assertEquals(pictureDensity.fontScale, this.fontScale)
+                assertEquals(LayoutDirection.Rtl, this.layoutDirection)
+                assertEquals(pictureWidth.toFloat(), this.size.width)
+                assertEquals(pictureHeight.toFloat(), this.size.height)
+                drawIntoCanvas { canvas -> assertTrue(pictureCanvas === canvas) }
+
+                drawRect(color = Color.Blue)
+            }
+            picture.endRecording()
+            drawIntoCanvas { canvas -> canvas.nativeCanvas.drawPicture(picture) }
+
+            // Verify that the draw scope configuration is reset outside of the retargeting of the
+            // canvas
+            assertEquals(density.density, this.density)
+            assertEquals(density.fontScale, this.fontScale)
+            assertEquals(LayoutDirection.Ltr, this.layoutDirection)
+            assertEquals(width.toFloat(), this.size.width)
+            assertEquals(height.toFloat(), this.size.height)
+            drawIntoCanvas { canvas -> assertTrue(bitmapCanvas === canvas) }
+        }
+
+        with(bitmap.toPixelMap()) {
+            assertEquals(Color.Blue, this[0, 0])
+            assertEquals(Color.Blue, this[pictureWidth - 1, 0])
+            assertEquals(Color.Blue, this[0, pictureHeight - 1])
+            assertEquals(Color.Blue, this[pictureWidth - 1, pictureHeight - 1])
+            assertEquals(Color.Blue, this[pictureWidth / 2, pictureHeight / 2])
+
+            assertEquals(Color.Red, this[pictureWidth + 1, 0])
+            assertEquals(Color.Red, this[width - 1, 0])
+            assertEquals(Color.Red, this[pictureWidth + 1, pictureHeight])
+            assertEquals(Color.Red, this[pictureWidth + 1, pictureHeight + 1])
+            assertEquals(Color.Red, this[pictureWidth, pictureHeight + 1])
+            assertEquals(Color.Red, this[0, height - 1])
+            assertEquals(Color.Red, this[0, pictureHeight + 1])
+            assertEquals(Color.Red, this[width - 1, height - 1])
+        }
+    }
+
+    @Test
+    fun testBrushResetOnSubsequentDrawWithAlphaBitmap() {
+        val width = 200
+        val height = 200
+        val brush = Brush.horizontalGradient(
+            listOf(Color.Transparent, Color.Blue, Color.Transparent)
+        )
+        val maskBitmap = ImageBitmap(width / 2, height / 2, ImageBitmapConfig.Alpha8)
+        val maskCanvas = Canvas(maskBitmap)
+        maskCanvas.drawRect(
+            Rect(0f, 0f, width.toFloat(), height.toFloat()),
+            Paint().apply { color = Color.Green }
+        )
+        val colorFilter = ColorFilter.tint(Color.Red)
+        testDrawScopeAndCanvasAreEquivalent(
+            width,
+            height,
+            {
+                // Drawing an ImageBitmap after drawing a brush should unset the
+                // previously configured brush
+                drawRect(brush)
+                inset(width / 4f, height / 4f) {
+                    drawImage(maskBitmap, colorFilter = colorFilter)
+                }
+            },
+            { canvas ->
+                val paint = Paint().apply {
+                    brush.applyTo(Size(width.toFloat(), height.toFloat()), this, 1f)
+                }
+                canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+                canvas.save()
+                canvas.translate(width / 4f, height / 4f)
+                canvas.drawImageRect(
+                    maskBitmap,
+                    srcOffset = IntOffset.Zero,
+                    srcSize = IntSize(width, height),
+                    dstOffset = IntOffset.Zero,
+                    dstSize = IntSize(width, height),
+                    Paint().apply {
+                        this.colorFilter = colorFilter
+                    })
+                canvas.restore()
+            }
+        )
+    }
+
     private inline fun testDrawTransformDefault(block: WrappedDrawTransform.() -> Unit) {
         val width = 100
         val height = 150
@@ -1783,8 +1911,19 @@ class DrawScopeTest {
                 set(value) {
                     drawScope.drawContext.size = value
                 }
-            override val canvas: Canvas
+            override var canvas: Canvas
                 get() = drawScope.drawContext.canvas
+                set(value) {
+                    drawScope.drawContext.canvas = value
+                }
+
+            override var layoutDirection: LayoutDirection
+                get() = drawScope.drawContext.layoutDirection
+                set(value) { drawScope.drawContext.layoutDirection = value }
+            override var density: Density
+                get() = drawScope.drawContext.density
+                set(value) { drawScope.drawContext.density = value }
+
             override val transform: DrawTransform =
                 WrappedDrawTransform(drawScope.drawContext.transform)
         }

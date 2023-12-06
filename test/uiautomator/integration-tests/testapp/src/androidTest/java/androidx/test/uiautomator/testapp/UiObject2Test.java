@@ -16,6 +16,8 @@
 
 package androidx.test.uiautomator.testapp;
 
+import static android.os.Build.VERSION.SDK_INT;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -26,15 +28,22 @@ import static org.junit.Assert.assertTrue;
 
 import android.graphics.Point;
 import android.graphics.Rect;
+import android.view.Display;
 import android.view.ViewConfiguration;
+import android.view.accessibility.AccessibilityEvent;
 
+import androidx.annotation.NonNull;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.SdkSuppress;
 import androidx.test.uiautomator.By;
+import androidx.test.uiautomator.BySelector;
 import androidx.test.uiautomator.Direction;
+import androidx.test.uiautomator.EventCondition;
 import androidx.test.uiautomator.UiObject2;
 import androidx.test.uiautomator.Until;
 
+import org.junit.Assume;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.HashSet;
@@ -44,7 +53,6 @@ import java.util.Set;
 public class UiObject2Test extends BaseTest {
     private static final int TIMEOUT_MS = 10_000;
     private static final int SPEED_MS = 100;
-    private static final int SCROLL_MARGIN = 50;
 
     @Test
     public void testClear() {
@@ -55,7 +63,8 @@ public class UiObject2Test extends BaseTest {
         assertEquals("sample_text", object.getText());
         object.clear();
         // Verify the text field does not have txt after clear()
-        assertNull(object.getText());
+        BySelector emptyText = By.res(TEST_APP, "edit_text").text("");
+        assertTrue(mDevice.wait(Until.hasObject(emptyText), TIMEOUT_MS));
     }
 
     @Test
@@ -98,7 +107,7 @@ public class UiObject2Test extends BaseTest {
         // Short click with a time duration as a parameter (`click(long duration)`).
         UiObject2 button4 = mDevice.findObject(By.res(TEST_APP, "button4"));
         assertEquals("text4", button4.getText());
-        button4.click((long) (ViewConfiguration.getLongPressTimeout() / 1.5));
+        button4.click(50L);
         button4.wait(Until.textEquals("text4_clicked"), TIMEOUT_MS);
         assertEquals("text4_clicked", button4.getText());
 
@@ -117,8 +126,7 @@ public class UiObject2Test extends BaseTest {
         // Short click with two parameters (`click(Point point, long duration)`).
         UiObject2 button6 = mDevice.findObject(By.res(TEST_APP, "button6"));
         assertEquals("text6", button6.getText());
-        button6.click(getPointInsideBounds(button6),
-                (long) (ViewConfiguration.getLongPressTimeout() / 1.5));
+        button6.click(getPointInsideBounds(button6), 50L);
         button6.wait(Until.textEquals("text6_clicked"), TIMEOUT_MS);
         assertEquals("text6_clicked", button6.getText());
 
@@ -203,9 +211,9 @@ public class UiObject2Test extends BaseTest {
         // Get the same textView object via different methods.
         UiObject2 textView1 = mDevice.findObject(By.res(TEST_APP, "example_id"));
         UiObject2 textView2 = mDevice.findObject(By.text("TextView with an id"));
-        assertTrue(textView1.equals(textView2));
+        assertEquals(textView1, textView2);
         UiObject2 linearLayout = mDevice.findObject(By.res(TEST_APP, "nested_elements"));
-        assertFalse(textView1.equals(linearLayout));
+        assertNotEquals(textView1, linearLayout);
     }
 
     @Test
@@ -260,7 +268,7 @@ public class UiObject2Test extends BaseTest {
         UiObject2 nestedObject = mDevice.findObject(By.res(TEST_APP, "nested_elements"));
         List<UiObject2> children = nestedObject.getChildren();
         assertEquals(2, children.size());
-        Set<String> childrenClassNames = new HashSet<String>();
+        Set<String> childrenClassNames = new HashSet<>();
         childrenClassNames.add(children.get(0).getClassName());
         childrenClassNames.add(children.get(1).getClassName());
         assertTrue(childrenClassNames.contains("android.widget.TextView"));
@@ -323,6 +331,26 @@ public class UiObject2Test extends BaseTest {
 
         UiObject2 nullTextObject = mDevice.findObject(By.res(TEST_APP, "nested_elements"));
         assertNull(nullTextObject.getText());
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = 26)
+    public void testGetHint() {
+        launchTestActivity(HintTestActivity.class);
+
+        UiObject2 hintNotSetObj = mDevice.findObject(By.res(TEST_APP, "hint_not_set"));
+        UiObject2 hintSetObj = mDevice.findObject(By.res(TEST_APP, "hint_set"));
+
+        assertNull(hintNotSetObj.getHint());
+        assertEquals("sample_hint", hintSetObj.getHint());
+    }
+
+    @Test
+    public void testGetDisplayId() {
+        launchTestActivity(MainActivity.class);
+
+        UiObject2 button = mDevice.findObject(By.res(TEST_APP, "button"));
+        assertEquals(Display.DEFAULT_DISPLAY, button.getDisplayId());
     }
 
     @Test
@@ -398,6 +426,7 @@ public class UiObject2Test extends BaseTest {
         UiObject2 checkBox = mDevice.findObject(By.res(TEST_APP, "check_box"));
         assertFalse(checkBox.isChecked());
         checkBox.click();
+        checkBox.wait(Until.checked(true), TIMEOUT_MS);
         assertTrue(checkBox.isChecked());
     }
 
@@ -442,6 +471,7 @@ public class UiObject2Test extends BaseTest {
         assertFalse(textView.isFocused());
         UiObject2 button = mDevice.findObject(By.res(TEST_APP, "button"));
         button.click();
+        textView.wait(Until.focused(true), TIMEOUT_MS);
         assertTrue(textView.isFocused());
     }
 
@@ -473,9 +503,11 @@ public class UiObject2Test extends BaseTest {
     public void testIsSelected() {
         launchTestActivity(IsSelectedTestActivity.class);
 
+        UiObject2 textView = mDevice.findObject(By.res(TEST_APP, "selected_target"));
+        assertFalse(textView.isSelected());
         UiObject2 button = mDevice.findObject(By.res(TEST_APP, "selected_button"));
         button.click();
-        UiObject2 textView = mDevice.findObject(By.res(TEST_APP, "selected_target"));
+        textView.wait(Until.selected(true), TIMEOUT_MS);
         assertTrue(textView.isSelected());
     }
 
@@ -498,7 +530,7 @@ public class UiObject2Test extends BaseTest {
 
         UiObject2 pinchArea = mDevice.findObject(By.res(TEST_APP, "pinch_area"));
         UiObject2 scaleText = pinchArea.findObject(By.res(TEST_APP, "scale_factor"));
-        pinchArea.pinchClose(1f);
+        pinchArea.pinchClose(0.75f);
         scaleText.wait(Until.textNotEquals("1.0f"), TIMEOUT_MS);
         float scaleValueAfterPinch = Float.parseFloat(scaleText.getText());
         assertTrue(String.format("Expected scale value to be less than 1f after pinchClose(), "
@@ -549,7 +581,6 @@ public class UiObject2Test extends BaseTest {
         launchTestActivity(SwipeTestActivity.class);
 
         UiObject2 swipeRegion = mDevice.findObject(By.res(TEST_APP, "swipe_region"));
-        swipeRegion.setGestureMargin(SCROLL_MARGIN);
 
         swipeRegion.swipe(Direction.LEFT, 0.9f);
         assertTrue(swipeRegion.wait(Until.textEquals("swipe_left"), TIMEOUT_MS));
@@ -590,7 +621,7 @@ public class UiObject2Test extends BaseTest {
                 IllegalStateException.class,
                 () -> textView.getText()
         );
-        assertEquals("This object has already been recycled", e.getMessage());
+        assertEquals("This object has already been recycled.", e.getMessage());
     }
 
     @Test
@@ -598,22 +629,14 @@ public class UiObject2Test extends BaseTest {
         launchTestActivity(VerticalScrollTestActivity.class);
         assertTrue(mDevice.hasObject(By.res(TEST_APP, "top_text"))); // Initially at top.
 
-        // Scroll down to bottom (20000px) in increments of 5000px.
+        // Scroll down to bottom where is two-screen-height distant from the top.
         UiObject2 scrollView = mDevice.findObject(By.res(TEST_APP, "scroll_view"));
-        scrollView.setGestureMargin(SCROLL_MARGIN); // Avoid touching too close to the edges.
+
         Rect bounds = scrollView.getVisibleBounds();
-        float percent = 5_000f / (bounds.height() - 2 * SCROLL_MARGIN);
-        // Scroll to an element 5000px from the top.
+        float percent =
+                (float) (mDevice.getDisplayHeight() * 2 / (bounds.height() - 100));
         scrollView.scroll(Direction.DOWN, percent);
-        assertTrue(mDevice.hasObject(By.res(TEST_APP, "from_top_5000")));
-        // Scroll to an element 10000px from the top.
-        scrollView.scroll(Direction.DOWN, percent);
-        assertTrue(mDevice.hasObject(By.res(TEST_APP, "from_top_10000")));
-        // Scroll to an element 15000px from the top.
-        scrollView.scroll(Direction.DOWN, percent);
-        assertTrue(mDevice.hasObject(By.res(TEST_APP, "from_top_15000")));
-        // Scroll to the bottom element 20000px from the top.
-        scrollView.scroll(Direction.DOWN, percent);
+
         assertTrue(mDevice.hasObject(By.res(TEST_APP, "bottom_text")));
     }
 
@@ -624,7 +647,6 @@ public class UiObject2Test extends BaseTest {
 
         // Scroll until end (scroll method returns false).
         UiObject2 scrollView = mDevice.findObject(By.res(TEST_APP, "scroll_view"));
-        scrollView.setGestureMargin(SCROLL_MARGIN); // Avoid touching too close to the edges.
         while (scrollView.scroll(Direction.DOWN, 1.0f)) {
             // Continue until bottom.
         }
@@ -632,12 +654,87 @@ public class UiObject2Test extends BaseTest {
     }
 
     @Test
+    public void testScrollUntil_conditionSatisfied() {
+        Assume.assumeFalse(SDK_INT == 26); // b/272346700
+        launchTestActivity(VerticalScrollTestActivity.class);
+        assertTrue(mDevice.hasObject(By.res(TEST_APP, "top_text"))); // Initially at top.
+        assertFalse(mDevice.hasObject(By.res(TEST_APP, "bottom_text")));
+
+        // Scroll until end
+        UiObject2 scrollView = mDevice.findObject(By.res(TEST_APP, "scroll_view"));
+        assertNotNull(scrollView.scrollUntil(Direction.DOWN,
+                Until.findObject(By.res(TEST_APP, "bottom_text"))));
+        assertTrue(mDevice.hasObject(By.res(TEST_APP, "bottom_text")));
+    }
+
+    @Test
+    public void testScrollUntil_conditionNotSatisfied() {
+        launchTestActivity(VerticalScrollTestActivity.class);
+        assertTrue(mDevice.hasObject(By.res(TEST_APP, "top_text"))); // Initially at top.
+        assertFalse(mDevice.hasObject(By.res(TEST_APP, "bottom_text")));
+
+        UiObject2 scrollView = mDevice.findObject(By.res(TEST_APP, "scroll_view"));
+        // fail to find text that doesn't exist.
+        assertNull(scrollView.scrollUntil(Direction.DOWN,
+                Until.findObject(By.res(TEST_APP, "nonexistent_text"))));
+        // We still scroll to the end.
+        assertTrue(mDevice.hasObject(By.res(TEST_APP, "bottom_text")));
+    }
+
+    @Test
+    public void testScrollUntil_eventConditionSatisfied() {
+        launchTestActivity(VerticalScrollTestActivity.class);
+        assertTrue(mDevice.hasObject(By.res(TEST_APP, "top_text"))); // Initially at top.
+        assertFalse(mDevice.hasObject(By.res(TEST_APP, "bottom_text")));
+
+        UiObject2 scrollView = mDevice.findObject(By.res(TEST_APP, "scroll_view"));
+        // Scroll to the end.
+        assertTrue(scrollView.scrollUntil(Direction.DOWN, Until.scrollFinished(Direction.DOWN)));
+        assertTrue(mDevice.hasObject(By.res(TEST_APP, "bottom_text")));
+    }
+
+    @Test
+    public void testScrollUntil_eventConditionNotSatisfied() {
+        launchTestActivity(VerticalScrollTestActivity.class);
+        assertTrue(mDevice.hasObject(By.res(TEST_APP, "top_text"))); // Initially at top.
+        assertFalse(mDevice.hasObject(By.res(TEST_APP, "bottom_text")));
+
+        UiObject2 scrollView = mDevice.findObject(By.res(TEST_APP, "scroll_view"));
+        // Scroll for the event condition that doesn't occur.
+        Integer result = scrollView.scrollUntil(Direction.DOWN,
+                new EventCondition<Integer>() {
+                    private Integer mResult = null;
+                    @Override
+                    public Integer getResult() {
+                        return mResult;
+                    }
+
+                    @Override
+                    public boolean accept(AccessibilityEvent event) {
+                        if (event.getEventType() == AccessibilityEvent.TYPE_VIEW_LONG_CLICKED) {
+                            mResult = event.getEventType();
+                            return true;
+                        }
+                        return false;
+                    }
+
+                    @NonNull
+                    @Override
+                    public String toString() {
+                        return "EventCondition[LONG_CLICK]";
+                    }
+                });
+        assertNull(result);
+        // We still scroll to the end when event condition never occurs.
+        assertTrue(mDevice.hasObject(By.res(TEST_APP, "bottom_text")));
+    }
+
+    @Ignore // b/266617335
+    @Test
     public void testFling_direction() {
         launchTestActivity(FlingTestActivity.class);
 
-        // Avoid touching too close to the edges.
         UiObject2 flingRegion = mDevice.findObject(By.res(TEST_APP, "fling_region"));
-        flingRegion.setGestureMargin(SCROLL_MARGIN);
 
         // No fling yet.
         assertEquals("no_fling", flingRegion.getText());
@@ -648,13 +745,12 @@ public class UiObject2Test extends BaseTest {
         assertTrue(flingRegion.wait(Until.textEquals("fling_left"), TIMEOUT_MS));
     }
 
+    @Ignore // b/281821418
     @Test
     public void testFling_directionAndSpeed() {
         launchTestActivity(FlingTestActivity.class);
 
-        // Avoid touching too close to the edges.
         UiObject2 flingRegion = mDevice.findObject(By.res(TEST_APP, "fling_region"));
-        flingRegion.setGestureMargin(SCROLL_MARGIN);
 
         // No fling yet.
         assertEquals("no_fling", flingRegion.getText());
@@ -681,6 +777,7 @@ public class UiObject2Test extends BaseTest {
                 () -> flingRegion.fling(Direction.DOWN, speed));
     }
 
+    @Ignore // b/267208902
     @Test
     public void testSetGestureMargin() {
         launchTestActivity(PinchTestActivity.class);
@@ -688,13 +785,15 @@ public class UiObject2Test extends BaseTest {
         UiObject2 pinchArea = mDevice.findObject(By.res(TEST_APP, "pinch_area"));
         UiObject2 scaleText = pinchArea.findObject(By.res(TEST_APP, "scale_factor"));
 
+        Rect pinchAreaBounds = pinchArea.getVisibleBounds();
+
         // Set the gesture's margins to a large number (greater than the width or height of the UI
         // object's visible bounds).
         // The gesture's bounds cannot form a rectangle and no action can be performed.
-        pinchArea.setGestureMargin(1_000);
+        pinchArea.setGestureMargin(Math.max(pinchAreaBounds.height(), pinchAreaBounds.width()) * 2);
         pinchArea.pinchClose(1f);
         scaleText.wait(Until.textNotEquals("1.0f"), TIMEOUT_MS);
-        float scaleValueAfterPinch = Float.valueOf(scaleText.getText());
+        float scaleValueAfterPinch = Float.parseFloat(scaleText.getText());
         assertEquals(String.format("Expected scale value to be equal to 1f after pinchClose(), "
                 + "but got [%f]", scaleValueAfterPinch), 1f, scaleValueAfterPinch, 0f);
 
@@ -704,11 +803,12 @@ public class UiObject2Test extends BaseTest {
         pinchArea.setGestureMargin(1);
         pinchArea.pinchClose(1f);
         scaleText.wait(Until.textNotEquals("1.0f"), TIMEOUT_MS);
-        scaleValueAfterPinch = Float.valueOf(scaleText.getText());
+        scaleValueAfterPinch = Float.parseFloat(scaleText.getText());
         assertTrue(String.format("Expected scale value to be less than 1f after pinchClose(), "
                 + "but got [%f]", scaleValueAfterPinch), scaleValueAfterPinch < 1f);
     }
 
+    @Ignore // b/266617335
     @Test
     public void testSetGestureMargins() {
         launchTestActivity(PinchTestActivity.class);
@@ -716,13 +816,16 @@ public class UiObject2Test extends BaseTest {
         UiObject2 pinchArea = mDevice.findObject(By.res(TEST_APP, "pinch_area"));
         UiObject2 scaleText = pinchArea.findObject(By.res(TEST_APP, "scale_factor"));
 
+        Rect pinchAreaBounds = pinchArea.getVisibleBounds();
+
         // Set the gesture's margins to large numbers (greater than the width or height of the UI
         // object's visible bounds).
         // The gesture's bounds cannot form a rectangle and no action can be performed.
-        pinchArea.setGestureMargins(1, 1, 1_000, 1_000);
+        pinchArea.setGestureMargins(1, 1, pinchAreaBounds.width() * 2,
+                pinchAreaBounds.height() * 2);
         pinchArea.pinchClose(1f);
         scaleText.wait(Until.textNotEquals("1.0f"), TIMEOUT_MS);
-        float scaleValueAfterPinch = Float.valueOf(scaleText.getText());
+        float scaleValueAfterPinch = Float.parseFloat(scaleText.getText());
         assertEquals(String.format("Expected scale value to be equal to 1f after pinchClose(), "
                 + "but got [%f]", scaleValueAfterPinch), 1f, scaleValueAfterPinch, 0f);
 
@@ -732,7 +835,7 @@ public class UiObject2Test extends BaseTest {
         pinchArea.setGestureMargins(1, 1, 1, 1);
         pinchArea.pinchClose(1f);
         scaleText.wait(Until.textNotEquals("1.0f"), TIMEOUT_MS);
-        scaleValueAfterPinch = Float.valueOf(scaleText.getText());
+        scaleValueAfterPinch = Float.parseFloat(scaleText.getText());
         assertTrue(String.format("Expected scale value to be less than 1f after pinchClose(), "
                 + "but got [%f]", scaleValueAfterPinch), scaleValueAfterPinch < 1f);
     }
@@ -746,7 +849,8 @@ public class UiObject2Test extends BaseTest {
         assertEquals("sample_text", object.getText());
         object.setText("new_text");
         // Verify the text field has "new_text" after setText()
-        assertEquals("new_text", object.getText());
+        BySelector updatedText = By.res(TEST_APP, "edit_text").text("new_text");
+        assertTrue(mDevice.wait(Until.hasObject(updatedText), TIMEOUT_MS));
     }
 
     /* Helper method to get a point inside the object. */
