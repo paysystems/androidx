@@ -1113,8 +1113,9 @@ abstract class RoomDatabase {
             this.allowDestructiveMigrationOnDowngrade = true
         }
 
+        @Suppress("BuilderSetStyle")
         open fun skipTablesCreation() = apply {
-            createTables = false
+            this.createTables = false
         }
 
         /**

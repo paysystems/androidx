@@ -13,23 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package androidx.room;
-
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+package androidx.room
 
 /**
  * Adds compatibility with legacy table scheme.
  * If ColumnCompat is specified then Room will use it on the entity's scheme validation.
- * */
-@Target({ElementType.FIELD, ElementType.METHOD})
-@Retention(RetentionPolicy.CLASS)
-public @interface ColumnCompat {
-
-    String type() default "";
-
-    boolean nonNull() default false;
-}
+ */
+@Target(AnnotationTarget.FIELD, AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.BINARY)
+public annotation class ColumnCompat(
+    val type: String,
+    @get:Suppress("GetterSetterNames")
+    val nonNull: Boolean = false,
+)

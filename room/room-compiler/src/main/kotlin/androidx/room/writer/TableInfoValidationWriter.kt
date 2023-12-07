@@ -64,8 +64,8 @@ class TableInfoValidationWriter(val entity: Entity) : ValidationWriter() {
                         RoomTypeNames.TABLE_INFO_COLUMN,
                         "%S, %S, %L, %L, %S, %T.%L",
                         field.columnName, // name
-                        field.affinity?.name ?: SQLTypeAffinity.TEXT.name, // type
-                        field.nonNull, // nonNull
+                        field.compatColumn?.type ?: field.affinity?.name ?: SQLTypeAffinity.TEXT.name, // type
+                        field.compatColumn?.nonNull ?: field.nonNull, // nonNull
                         entity.primaryKey.fields.indexOf(field) + 1, // pkeyPos
                         field.defaultValue, // defaultValue
                         RoomTypeNames.TABLE_INFO, CREATED_FROM_ENTITY // createdFrom
