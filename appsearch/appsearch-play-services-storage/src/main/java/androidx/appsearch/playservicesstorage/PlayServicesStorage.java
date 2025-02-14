@@ -18,7 +18,7 @@ package androidx.appsearch.playservicesstorage;
 
 import android.content.Context;
 
-import androidx.annotation.NonNull;
+import androidx.appsearch.app.AppSearchEnvironmentFactory;
 import androidx.appsearch.app.AppSearchSession;
 import androidx.appsearch.app.GlobalSearchSession;
 import androidx.appsearch.playservicesstorage.util.AppSearchTaskFutures;
@@ -26,9 +26,15 @@ import androidx.core.util.Preconditions;
 
 import com.google.android.gms.appsearch.AppSearch;
 import com.google.android.gms.appsearch.AppSearchClient;
+import com.google.android.gms.appsearch.AppSearchOptions;
 import com.google.android.gms.appsearch.GlobalSearchClient;
 import com.google.android.gms.tasks.Task;
 import com.google.common.util.concurrent.ListenableFuture;
+
+import org.jspecify.annotations.NonNull;
+
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 
 /**
  * An AppSearch storage system which stores data in the central AppSearch service in Google
@@ -43,24 +49,48 @@ public final class PlayServicesStorage {
     public static final class SearchContext {
         final Context mContext;
         final String mDatabaseName;
+        final Executor mExecutor;
 
-        SearchContext(@NonNull Context context, @NonNull String databaseName) {
+        SearchContext(@NonNull Context context, @NonNull String databaseName,
+                @NonNull Executor executor) {
             mContext = Preconditions.checkNotNull(context);
             mDatabaseName = Preconditions.checkNotNull(databaseName);
+            mExecutor = Preconditions.checkNotNull(executor);
+        }
+
+        /**
+         * Returns the {@link Context} associated with the {@link AppSearchSession}
+         */
+        public @NonNull Context getContext() {
+            return mContext;
         }
 
         /**
          * Returns the name of the database to create or open.
          */
-        @NonNull
-        public String getDatabaseName() {
+        public @NonNull String getDatabaseName() {
             return mDatabaseName;
+        }
+
+        /**
+         * Returns the worker executor associated with {@link AppSearchSession}.
+         *
+         * <p>If an executor is not provided to {@link Builder}, the AppSearch default executor will
+         * be returned. You should never cast the executor to
+         * {@link java.util.concurrent.ExecutorService} and call
+         * {@link ExecutorService#shutdownNow()}. It will cancel the futures it's returned. And
+         * since {@link Executor#execute} won't return anything, we will hang forever waiting for
+         * the execution.
+         */
+        public @NonNull Executor getWorkerExecutor() {
+            return mExecutor;
         }
 
         /** Builder for {@link SearchContext} objects. */
         public static final class Builder {
             private final Context mContext;
             private final String mDatabaseName;
+            private Executor mExecutor;
 
             /**
              * Creates a {@link SearchContext.Builder} instance.
@@ -77,6 +107,7 @@ public final class PlayServicesStorage {
              * using {@link
              * androidx.appsearch.app.SetSchemaRequest.Builder#setSchemaTypeVisibilityForPackage}).
              *
+             * @param context The context used as the parent of the created SearchContext
              * @param databaseName The name of the database.
              * @throws IllegalArgumentException if the databaseName contains {@code '/'}.
              */
@@ -89,10 +120,24 @@ public final class PlayServicesStorage {
                 mDatabaseName = databaseName;
             }
 
+            /**
+             * Sets the worker executor associated with {@link AppSearchSession}.
+             *
+             * <p>If an executor is not provided, the AppSearch default executor will be used.
+             *
+             * @param executor the worker executor used to run heavy background tasks.
+             */
+            public @NonNull Builder setWorkerExecutor(@NonNull Executor executor) {
+                mExecutor = Preconditions.checkNotNull(executor);
+                return this;
+            }
+
             /** Builds a {@link SearchContext} instance. */
-            @NonNull
-            public SearchContext build() {
-                return new SearchContext(mContext, mDatabaseName);
+            public @NonNull SearchContext build() {
+                if (mExecutor == null) {
+                    mExecutor = EXECUTOR;
+                }
+                return new SearchContext(mContext, mDatabaseName, mExecutor);
             }
         }
     }
@@ -100,26 +145,72 @@ public final class PlayServicesStorage {
     /** Contains information relevant to creating a global search session. */
     public static final class GlobalSearchContext {
         final Context mContext;
+        final Executor mExecutor;
 
-        GlobalSearchContext(@NonNull Context context) {
+        GlobalSearchContext(@NonNull Context context, Executor executor) {
             mContext = Preconditions.checkNotNull(context);
+            mExecutor = Preconditions.checkNotNull(executor);
+        }
+
+        /**
+         * Returns the {@link Context} associated with the {@link GlobalSearchSession}
+         */
+        public @NonNull Context getContext() {
+            return mContext;
+        }
+
+        /**
+         * Returns the worker executor associated with {@link GlobalSearchSession}.
+         *
+         * <p>If an executor is not provided to {@link Builder}, the AppSearch default executor will
+         * be returned. You should never cast the executor to
+         * {@link java.util.concurrent.ExecutorService} and call
+         * {@link ExecutorService#shutdownNow()}. It will cancel the futures it's returned. And
+         * since {@link Executor#execute} won't return anything, we will hang forever waiting for
+         * the execution.
+         */
+        public @NonNull Executor getWorkerExecutor() {
+            return mExecutor;
         }
 
         /** Builder for {@link GlobalSearchContext} objects. */
         public static final class Builder {
             private final Context mContext;
+            private Executor mExecutor;
 
             public Builder(@NonNull Context context) {
                 mContext = Preconditions.checkNotNull(context);
             }
 
+            /**
+             * Sets the worker executor associated with {@link GlobalSearchSession}.
+             *
+             * <p>If an executor is not provided, the AppSearch default executor will be used.
+             *
+             * @param executor the worker executor used to run heavy background tasks.
+             */
+            public @NonNull Builder setWorkerExecutor(@NonNull Executor executor) {
+                Preconditions.checkNotNull(executor);
+                mExecutor = executor;
+                return this;
+            }
+
             /** Builds a {@link GlobalSearchContext} instance. */
-            @NonNull
-            public GlobalSearchContext build() {
-                return new GlobalSearchContext(mContext);
+            public @NonNull GlobalSearchContext build() {
+                if (mExecutor == null) {
+                    mExecutor = EXECUTOR;
+                }
+                return new GlobalSearchContext(mContext, mExecutor);
             }
         }
     }
+
+    // Never call Executor.shutdownNow(), it will cancel the futures it's returned. And since
+    // execute() won't return anything, we will hang forever waiting for the execution.
+    // AppSearch multi-thread execution is guarded by Read & Write Lock in AppSearchImpl, all
+    // mutate requests will need to gain write lock and query requests need to gain read lock.
+    static final Executor EXECUTOR = AppSearchEnvironmentFactory.getEnvironmentInstance()
+            .createCachedThreadPoolExecutor();
 
     /**
      * Opens a new {@link AppSearchSession} on this storage.
@@ -127,15 +218,18 @@ public final class PlayServicesStorage {
      * @param context The {@link SearchContext} contains all information to create a new
      *                {@link AppSearchSession}
      */
-    @NonNull
-    public static ListenableFuture<AppSearchSession> createSearchSessionAsync(
+    public static @NonNull ListenableFuture<AppSearchSession> createSearchSessionAsync(
             @NonNull SearchContext context) {
         Preconditions.checkNotNull(context);
         Task<AppSearchClient> appSearchClientTask = AppSearch
-                .createAppSearchClient(context.mContext);
+                .createAppSearchClient(context.mContext, new AppSearchOptions.Builder()
+                        .setWorkerExecutor(context.mExecutor)
+                        .build());
         return AppSearchTaskFutures.toListenableFuture(
                 appSearchClientTask,
-                task -> new SearchSessionImpl(task, new FeaturesImpl(), context.mDatabaseName));
+                task -> new SearchSessionImpl(task, new FeaturesImpl(), context.mDatabaseName,
+                        context.mExecutor),
+                context.mExecutor);
     }
 
     /**
@@ -144,14 +238,16 @@ public final class PlayServicesStorage {
      * @param context The {@link GlobalSearchContext} contains all information to create a new
      *                {@link GlobalSearchSession}
      */
-    @NonNull
-    public static ListenableFuture<GlobalSearchSession> createGlobalSearchSessionAsync(
+    public static @NonNull ListenableFuture<GlobalSearchSession> createGlobalSearchSessionAsync(
             @NonNull GlobalSearchContext context) {
         Preconditions.checkNotNull(context);
         Task<GlobalSearchClient> globalSearchClientTask = AppSearch
-                .createGlobalSearchClient(context.mContext);
+                .createGlobalSearchClient(context.mContext, new AppSearchOptions.Builder()
+                        .setWorkerExecutor(context.mExecutor)
+                        .build());
         return AppSearchTaskFutures.toListenableFuture(
                 globalSearchClientTask,
-                task -> new GlobalSearchSessionImpl(task, new FeaturesImpl()));
+                task -> new GlobalSearchSessionImpl(task, new FeaturesImpl(), context.mExecutor),
+                context.mExecutor);
     }
 }

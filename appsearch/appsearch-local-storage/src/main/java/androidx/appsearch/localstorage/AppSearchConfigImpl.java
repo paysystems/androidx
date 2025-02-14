@@ -13,11 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// @exportToFramework:copyToPath(testing/testutils/src/android/app/appsearch/testutil/external/AppSearchConfigImpl.java)
+// @exportToFramework:copyToPath(../../../cts/tests/appsearch/testutils/src/android/app/appsearch/testutil/external/AppSearchConfigImpl.java)
 package androidx.appsearch.localstorage;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.RestrictTo;
+
+import com.google.android.icing.proto.PersistType;
+
+import org.jspecify.annotations.NonNull;
 
 /**
  * An implementation of AppSearchConfig that returns configurations based what is specified in
@@ -28,18 +31,28 @@ public class AppSearchConfigImpl implements AppSearchConfig {
     private final LimitConfig mLimitConfig;
     private final IcingOptionsConfig mIcingOptionsConfig;
     private final boolean mStoreParentInfoAsSyntheticProperty;
+    private final boolean mShouldRetrieveParentInfo;
+    private final boolean mPersistToDiskRecoveryProof;
 
     public AppSearchConfigImpl(@NonNull LimitConfig limitConfig,
             @NonNull IcingOptionsConfig icingOptionsConfig) {
-        this(limitConfig, icingOptionsConfig, false);
+        this(limitConfig,
+                icingOptionsConfig,
+                /* storeParentInfoAsSyntheticProperty= */ false,
+                /* shouldRetrieveParentInfo= */ false,
+                /* persistToDiskRecoveryProof= */false);
     }
 
     public AppSearchConfigImpl(@NonNull LimitConfig limitConfig,
             @NonNull IcingOptionsConfig icingOptionsConfig,
-            boolean storeParentInfoAsSyntheticProperty) {
+            boolean storeParentInfoAsSyntheticProperty,
+            boolean shouldRetrieveParentInfo,
+            boolean persistToDiskRecoveryProof) {
         mLimitConfig = limitConfig;
         mIcingOptionsConfig = icingOptionsConfig;
         mStoreParentInfoAsSyntheticProperty = storeParentInfoAsSyntheticProperty;
+        mShouldRetrieveParentInfo = shouldRetrieveParentInfo;
+        mPersistToDiskRecoveryProof = persistToDiskRecoveryProof;
     }
 
     @Override
@@ -108,13 +121,28 @@ public class AppSearchConfigImpl implements AppSearchConfig {
     }
 
     @Override
+    public boolean getUseNewQualifiedIdJoinIndex() {
+        return mIcingOptionsConfig.getUseNewQualifiedIdJoinIndex();
+    }
+
+    @Override
+    public boolean getBuildPropertyExistenceMetadataHits() {
+        return mIcingOptionsConfig.getBuildPropertyExistenceMetadataHits();
+    }
+
+    @Override
     public int getMaxDocumentSizeBytes() {
         return mLimitConfig.getMaxDocumentSizeBytes();
     }
 
     @Override
-    public int getMaxDocumentCount() {
-        return mLimitConfig.getMaxDocumentCount();
+    public int getPerPackageDocumentCountLimit() {
+        return mLimitConfig.getPerPackageDocumentCountLimit();
+    }
+
+    @Override
+    public int getDocumentCountLimitStartThreshold() {
+        return mLimitConfig.getDocumentCountLimitStartThreshold();
     }
 
     @Override
@@ -123,7 +151,33 @@ public class AppSearchConfigImpl implements AppSearchConfig {
     }
 
     @Override
+    public int getMaxOpenBlobCount() {
+        return mLimitConfig.getMaxOpenBlobCount();
+    }
+
+    @Override
     public boolean shouldStoreParentInfoAsSyntheticProperty() {
         return mStoreParentInfoAsSyntheticProperty;
+    }
+
+    @Override
+    public boolean shouldRetrieveParentInfo() {
+        return mShouldRetrieveParentInfo;
+    }
+
+    @Override
+    public long getOrphanBlobTimeToLiveMs() {
+        return mIcingOptionsConfig.getOrphanBlobTimeToLiveMs();
+    }
+
+    @Override
+    public @NonNull String getIcuDataFileAbsolutePath() {
+        return mIcingOptionsConfig.getIcuDataFileAbsolutePath();
+    }
+
+    @Override
+    public PersistType. @NonNull Code getLightweightPersistType() {
+        return mPersistToDiskRecoveryProof ?
+                PersistType.Code.RECOVERY_PROOF : PersistType.Code.LITE;
     }
 }

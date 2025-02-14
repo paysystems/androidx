@@ -40,8 +40,6 @@ import android.os.Build;
 import android.view.View;
 import android.view.ViewGroup;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.test.annotation.UiThreadTest;
 import androidx.test.filters.LargeTest;
 import androidx.test.filters.SdkSuppress;
@@ -49,10 +47,11 @@ import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.testutils.AnimationDurationScaleRule;
 import androidx.transition.test.R;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-
 
 @LargeTest
 public class FadeTest extends BaseTest {
@@ -146,7 +145,7 @@ public class FadeTest extends BaseTest {
         verify(listenerOut, timeout(3000)).onTransitionPause(any(Transition.class));
         verify(listenerIn, timeout(3000)).onTransitionStart(any(Transition.class));
         assertThat(valuesOut[1], allOf(greaterThan(0f), lessThan(1f)));
-        if (Build.VERSION.SDK_INT >= 19 && fadeOut.mInitialAlpha >= 0) {
+        if (fadeOut.mInitialAlpha >= 0) {
             // These won't match on API levels 18 and below due to lack of Animator pause.
             assertEquals(valuesOut[1], valuesIn[0], 0.01f);
         }
@@ -182,7 +181,7 @@ public class FadeTest extends BaseTest {
         verify(listenerIn, timeout(3000)).onTransitionPause(any(Transition.class));
         verify(listenerOut, timeout(3000)).onTransitionStart(any(Transition.class));
         assertThat(valuesIn[1], allOf(greaterThan(0f), lessThan(1f)));
-        if (Build.VERSION.SDK_INT >= 19 && fadeIn.mInitialAlpha >= 0) {
+        if (fadeIn.mInitialAlpha >= 0) {
             // These won't match on API levels 18 and below due to lack of Animator pause.
             assertEquals(valuesIn[1], valuesOut[0], 0.01f);
         }
@@ -519,11 +518,10 @@ public class FadeTest extends BaseTest {
             mAlphaValues = alphaValues;
         }
 
-        @Nullable
         @Override
-        public Animator createAnimator(@NonNull ViewGroup sceneRoot,
-                @Nullable final TransitionValues startValues,
-                @Nullable final TransitionValues endValues) {
+        public @Nullable Animator createAnimator(@NonNull ViewGroup sceneRoot,
+                final @Nullable TransitionValues startValues,
+                final @Nullable TransitionValues endValues) {
             final Animator animator = super.createAnimator(sceneRoot, startValues, endValues);
             if (animator instanceof ObjectAnimator) {
                 ((ObjectAnimator) animator).addUpdateListener(

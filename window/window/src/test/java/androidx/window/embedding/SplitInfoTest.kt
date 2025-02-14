@@ -18,22 +18,30 @@ package androidx.window.embedding
 
 import android.app.Activity
 import android.os.Binder
-import android.os.IBinder
-import androidx.window.embedding.EmbeddingAdapter.Companion.INVALID_ACTIVITY_STACK_TOKEN
+import androidx.window.WindowSdkExtensionsRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.mockito.kotlin.mock
 
 /** Unit tests for [SplitInfo] */
 class SplitInfoTest {
 
+    @get:Rule val testRule = WindowSdkExtensionsRule()
+
+    @Before
+    fun setUp() {
+        testRule.overrideExtensionVersion(3)
+    }
+
     @Test
     fun testSplitInfoContainsActivityFirstStack() {
         val activity = mock<Activity>()
         val firstStack = createTestActivityStack(listOf(activity))
         val secondStack = createTestActivityStack(emptyList())
-        val attributes = SplitAttributes()
+        val attributes = SplitAttributes.Builder().build()
         val token = Binder()
         val info = SplitInfo(firstStack, secondStack, attributes, token)
 
@@ -45,7 +53,7 @@ class SplitInfoTest {
         val activity = mock<Activity>()
         val firstStack = createTestActivityStack(emptyList())
         val secondStack = createTestActivityStack(listOf(activity))
-        val attributes = SplitAttributes()
+        val attributes = SplitAttributes.Builder().build()
         val token = Binder()
         val info = SplitInfo(firstStack, secondStack, attributes, token)
 
@@ -57,7 +65,7 @@ class SplitInfoTest {
         val activity = mock<Activity>()
         val firstStack = createTestActivityStack(emptyList())
         val secondStack = createTestActivityStack(listOf(activity))
-        val attributes = SplitAttributes()
+        val attributes = SplitAttributes.Builder().build()
         val token = Binder()
         val firstInfo = SplitInfo(firstStack, secondStack, attributes, token)
         val secondInfo = SplitInfo(firstStack, secondStack, attributes, token)
@@ -71,7 +79,7 @@ class SplitInfoTest {
         val activity = mock<Activity>()
         val firstStack = createTestActivityStack(emptyList())
         val secondStack = createTestActivityStack(listOf(activity))
-        val attributes = SplitAttributes()
+        val attributes = SplitAttributes.Builder().build()
         val token = Binder()
         val splitInfo = SplitInfo(firstStack, secondStack, attributes, token)
 
@@ -85,7 +93,7 @@ class SplitInfoTest {
         val activity = mock<Activity>()
         val firstStack = createTestActivityStack(emptyList())
         val secondStack = createTestActivityStack(listOf(activity))
-        val attributes = SplitAttributes()
+        val attributes = SplitAttributes.Builder().build()
         val token = Binder()
         val splitInfoString = SplitInfo(firstStack, secondStack, attributes, token).toString()
 
@@ -97,7 +105,6 @@ class SplitInfoTest {
 
     private fun createTestActivityStack(
         activitiesInProcess: List<Activity>,
-        isEmpty: Boolean = false,
-        token: IBinder = INVALID_ACTIVITY_STACK_TOKEN,
-    ): ActivityStack = ActivityStack(activitiesInProcess, isEmpty, token)
+        isEmpty: Boolean = false
+    ): ActivityStack = ActivityStack(activitiesInProcess, isEmpty)
 }

@@ -27,10 +27,10 @@ import static java.lang.Math.max;
 import android.content.Context;
 import android.text.TextUtils;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.RestrictTo;
 import androidx.annotation.VisibleForTesting;
 import androidx.work.Configuration;
+import androidx.work.Constraints;
 import androidx.work.Logger;
 import androidx.work.RunnableScheduler;
 import androidx.work.WorkInfo;
@@ -49,12 +49,14 @@ import androidx.work.impl.model.WorkSpec;
 import androidx.work.impl.utils.ProcessUtils;
 import androidx.work.impl.utils.taskexecutor.TaskExecutor;
 
+import kotlinx.coroutines.Job;
+
+import org.jspecify.annotations.NonNull;
+
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-
-import kotlinx.coroutines.Job;
 
 /**
  * A greedy {@link Scheduler} that schedules unconstrained, non-timed work.  It intentionally does
@@ -78,7 +80,7 @@ public class GreedyScheduler implements Scheduler, OnConstraintsStateChangedList
     private DelayedWorkTracker mDelayedWorkTracker;
     private boolean mRegisteredExecutionListener;
     private final Object mLock = new Object();
-    private final StartStopTokens mStartStopTokens = new StartStopTokens();
+    private final StartStopTokens mStartStopTokens = StartStopTokens.create();
     private final Processor mProcessor;
     private final WorkLauncher mWorkLauncher;
 
@@ -123,7 +125,7 @@ public class GreedyScheduler implements Scheduler, OnConstraintsStateChangedList
     }
 
     @Override
-    public void schedule(@NonNull WorkSpec... workSpecs) {
+    public void schedule(WorkSpec @NonNull ... workSpecs) {
         if (mInDefaultProcess == null) {
             checkDefaultProcess();
         }
@@ -158,11 +160,12 @@ public class GreedyScheduler implements Scheduler, OnConstraintsStateChangedList
                         mDelayedWorkTracker.schedule(workSpec, nextRunTime);
                     }
                 } else if (workSpec.hasConstraints()) {
-                    if (SDK_INT >= 23 && workSpec.constraints.requiresDeviceIdle()) {
+                    Constraints constraints = workSpec.constraints;
+                    if (SDK_INT >= 23 && constraints.requiresDeviceIdle()) {
                         // Ignore requests that have an idle mode constraint.
                         Logger.get().debug(TAG,
                                 "Ignoring " + workSpec + ". Requires device idle.");
-                    } else if (SDK_INT >= 24 && workSpec.constraints.hasContentUriTriggers()) {
+                    } else if (SDK_INT >= 24 && constraints.hasContentUriTriggers()) {
                         // Ignore requests that have content uri triggers.
                         Logger.get().debug(TAG,
                                 "Ignoring " + workSpec + ". Requires ContentUri triggers.");

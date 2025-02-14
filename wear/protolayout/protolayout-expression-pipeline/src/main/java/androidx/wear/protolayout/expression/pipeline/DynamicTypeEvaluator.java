@@ -21,13 +21,10 @@ import static java.util.Collections.emptyMap;
 import android.annotation.SuppressLint;
 import android.icu.util.ULocale;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.annotation.RestrictTo;
 import androidx.annotation.RestrictTo.Scope;
 import androidx.annotation.VisibleForTesting;
 import androidx.collection.ArrayMap;
-import androidx.wear.protolayout.expression.DynamicBuilders;
 import androidx.wear.protolayout.expression.PlatformDataKey;
 import androidx.wear.protolayout.expression.pipeline.BoolNodes.ComparisonFloatNode;
 import androidx.wear.protolayout.expression.pipeline.BoolNodes.ComparisonInt32Node;
@@ -41,6 +38,7 @@ import androidx.wear.protolayout.expression.pipeline.ColorNodes.FixedColorNode;
 import androidx.wear.protolayout.expression.pipeline.ColorNodes.StateColorSourceNode;
 import androidx.wear.protolayout.expression.pipeline.DurationNodes.BetweenInstancesNode;
 import androidx.wear.protolayout.expression.pipeline.DurationNodes.FixedDurationNode;
+import androidx.wear.protolayout.expression.pipeline.DurationNodes.StateDurationSourceNode;
 import androidx.wear.protolayout.expression.pipeline.FloatNodes.AnimatableFixedFloatNode;
 import androidx.wear.protolayout.expression.pipeline.FloatNodes.ArithmeticFloatNode;
 import androidx.wear.protolayout.expression.pipeline.FloatNodes.DynamicAnimatedFloatNode;
@@ -49,12 +47,14 @@ import androidx.wear.protolayout.expression.pipeline.FloatNodes.Int32ToFloatNode
 import androidx.wear.protolayout.expression.pipeline.FloatNodes.StateFloatSourceNode;
 import androidx.wear.protolayout.expression.pipeline.InstantNodes.FixedInstantNode;
 import androidx.wear.protolayout.expression.pipeline.InstantNodes.PlatformTimeSourceNode;
+import androidx.wear.protolayout.expression.pipeline.InstantNodes.StateInstantSourceNode;
 import androidx.wear.protolayout.expression.pipeline.Int32Nodes.AnimatableFixedInt32Node;
 import androidx.wear.protolayout.expression.pipeline.Int32Nodes.ArithmeticInt32Node;
 import androidx.wear.protolayout.expression.pipeline.Int32Nodes.DynamicAnimatedInt32Node;
 import androidx.wear.protolayout.expression.pipeline.Int32Nodes.FixedInt32Node;
 import androidx.wear.protolayout.expression.pipeline.Int32Nodes.FloatToInt32Node;
 import androidx.wear.protolayout.expression.pipeline.Int32Nodes.GetDurationPartOpNode;
+import androidx.wear.protolayout.expression.pipeline.Int32Nodes.GetZonedDateTimePartOpNode;
 import androidx.wear.protolayout.expression.pipeline.Int32Nodes.LegacyPlatformInt32SourceNode;
 import androidx.wear.protolayout.expression.pipeline.Int32Nodes.StateInt32SourceNode;
 import androidx.wear.protolayout.expression.pipeline.StringNodes.FixedStringNode;
@@ -62,6 +62,7 @@ import androidx.wear.protolayout.expression.pipeline.StringNodes.FloatFormatNode
 import androidx.wear.protolayout.expression.pipeline.StringNodes.Int32FormatNode;
 import androidx.wear.protolayout.expression.pipeline.StringNodes.StateStringNode;
 import androidx.wear.protolayout.expression.pipeline.StringNodes.StringConcatOpNode;
+import androidx.wear.protolayout.expression.pipeline.ZonedDateTimeNodes.InstantToZonedDateTimeOpNode;
 import androidx.wear.protolayout.expression.proto.DynamicProto;
 import androidx.wear.protolayout.expression.proto.DynamicProto.AnimatableDynamicColor;
 import androidx.wear.protolayout.expression.proto.DynamicProto.AnimatableDynamicFloat;
@@ -79,14 +80,18 @@ import androidx.wear.protolayout.expression.proto.DynamicProto.DynamicFloat;
 import androidx.wear.protolayout.expression.proto.DynamicProto.DynamicInstant;
 import androidx.wear.protolayout.expression.proto.DynamicProto.DynamicInt32;
 import androidx.wear.protolayout.expression.proto.DynamicProto.DynamicString;
+import androidx.wear.protolayout.expression.proto.DynamicProto.DynamicZonedDateTime;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
 /**
@@ -108,10 +113,17 @@ import java.util.function.Supplier;
 public class DynamicTypeEvaluator {
     private static final String TAG = "DynamicTypeEvaluator";
     private static final QuotaManager NO_OP_QUOTA_MANAGER =
-            new FixedQuotaManagerImpl(Integer.MAX_VALUE, "dynamic nodes noop");
+            new QuotaManager() {
+                @Override
+                public boolean tryAcquireQuota(int quota) {
+                    return true;
+                }
 
-    @NonNull
-    private static final QuotaManager DISABLED_ANIMATIONS_QUOTA_MANAGER =
+                @Override
+                public void releaseQuota(int quota) {}
+            };
+
+    private static final @NonNull QuotaManager DISABLED_ANIMATIONS_QUOTA_MANAGER =
             new QuotaManager() {
                 @Override
                 public boolean tryAcquireQuota(int quota) {
@@ -132,30 +144,31 @@ public class DynamicTypeEvaluator {
         }
     }
 
-    @NonNull private static final StateStore EMPTY_STATE_STORE = new StateStore(emptyMap());
+    private static final @NonNull StateStore EMPTY_STATE_STORE = new StateStore(emptyMap());
 
-    @NonNull private final StateStore mStateStore;
-    @NonNull private final PlatformDataStore mPlatformDataStore;
-    @NonNull private final QuotaManager mAnimationQuotaManager;
-    @NonNull private final QuotaManager mDynamicTypesQuotaManager;
-    @NonNull private final EpochTimePlatformDataSource mTimeDataSource;
+    private final @NonNull StateStore mStateStore;
+    private final @NonNull PlatformDataStore mPlatformDataStore;
+    private final @NonNull QuotaManager mAnimationQuotaManager;
+    private final @NonNull QuotaManager mDynamicTypesQuotaManager;
+    private final @NonNull EpochTimePlatformDataSource mTimeDataSource;
 
     /** Configuration for creating {@link DynamicTypeEvaluator}. */
     public static final class Config {
-        @Nullable private final StateStore mStateStore;
-        @Nullable private final QuotaManager mAnimationQuotaManager;
-        @Nullable private final QuotaManager mDynamicTypesQuotaManager;
-        @NonNull private final Map<PlatformDataKey<?>, PlatformDataProvider>
-                mSourceKeyToDataProviders = new ArrayMap<>();
-        @Nullable private final PlatformTimeUpdateNotifier mPlatformTimeUpdateNotifier;
-        @Nullable private final Supplier<Instant> mClock;
+        private final @Nullable StateStore mStateStore;
+        private final @Nullable QuotaManager mAnimationQuotaManager;
+        private final @Nullable QuotaManager mDynamicTypesQuotaManager;
+
+        private final @NonNull Map<PlatformDataKey<?>, PlatformDataProvider>
+                        mSourceKeyToDataProviders = new ArrayMap<>();
+
+        private final @Nullable PlatformTimeUpdateNotifier mPlatformTimeUpdateNotifier;
+        private final @Nullable Supplier<Instant> mClock;
 
         Config(
                 @Nullable StateStore stateStore,
                 @Nullable QuotaManager animationQuotaManager,
                 @Nullable QuotaManager dynamicTypesQuotaManager,
-                @NonNull Map<PlatformDataKey<?>, PlatformDataProvider>
-                        sourceKeyToDataProviders,
+                @NonNull Map<PlatformDataKey<?>, PlatformDataProvider> sourceKeyToDataProviders,
                 @Nullable PlatformTimeUpdateNotifier platformTimeUpdateNotifier,
                 @Nullable Supplier<Instant> clock) {
             this.mStateStore = stateStore;
@@ -168,13 +181,15 @@ public class DynamicTypeEvaluator {
 
         /** Builds a {@link DynamicTypeEvaluator.Config}. */
         public static final class Builder {
-            @Nullable private StateStore mStateStore = null;
-            @Nullable private QuotaManager mAnimationQuotaManager = null;
-            @Nullable private QuotaManager mDynamicTypesQuotaManager = null;
-            @NonNull private final Map<PlatformDataKey<?>, PlatformDataProvider>
+            private @Nullable StateStore mStateStore = null;
+            private @Nullable QuotaManager mAnimationQuotaManager = null;
+            private @Nullable QuotaManager mDynamicTypesQuotaManager = null;
+
+            private final @NonNull Map<PlatformDataKey<?>, PlatformDataProvider>
                     mSourceKeyToDataProviders = new ArrayMap<>();
-            @Nullable private PlatformTimeUpdateNotifier mPlatformTimeUpdateNotifier = null;
-            @Nullable private Supplier<Instant> mClock = null;
+
+            private @Nullable PlatformTimeUpdateNotifier mPlatformTimeUpdateNotifier = null;
+            private @Nullable Supplier<Instant> mClock = null;
 
             /**
              * Sets the state store that will be used for dereferencing the state keys in the
@@ -183,8 +198,7 @@ public class DynamicTypeEvaluator {
              * <p>If not set, it's the equivalent of setting an empty state store (state bindings
              * will trigger {@link DynamicTypeValueReceiver#onInvalidated()}).
              */
-            @NonNull
-            public Builder setStateStore(@NonNull StateStore value) {
+            public @NonNull Builder setStateStore(@NonNull StateStore value) {
                 mStateStore = value;
                 return this;
             }
@@ -196,8 +210,7 @@ public class DynamicTypeEvaluator {
              * <p>If not set, animations are disabled and non-infinite animations will have the end
              * value immediately.
              */
-            @NonNull
-            public Builder setAnimationQuotaManager(@NonNull QuotaManager value) {
+            public @NonNull Builder setAnimationQuotaManager(@NonNull QuotaManager value) {
                 mAnimationQuotaManager = value;
                 return this;
             }
@@ -208,8 +221,7 @@ public class DynamicTypeEvaluator {
              *
              * <p>If not set, number of dynamic types will not be restricted.
              */
-            @NonNull
-            public Builder setDynamicTypesQuotaManager(@NonNull QuotaManager value) {
+            public @NonNull Builder setDynamicTypesQuotaManager(@NonNull QuotaManager value) {
                 mDynamicTypesQuotaManager = value;
                 return this;
             }
@@ -217,19 +229,17 @@ public class DynamicTypeEvaluator {
             /**
              * Add a platform data provider and specify the keys it can provide dynamic data for.
              *
-             * <p> The provider must support at least one key. If the provider supports multiple
+             * <p>The provider must support at least one key. If the provider supports multiple
              * keys, they should not be independent, as their values should always update together.
              * One data key must not have multiple providers, or an exception will be thrown.
              *
-             * @throws IllegalArgumentException If a PlatformDataProvider supports an empty key
-             * set or if a key has multiple data providers.
+             * @throws IllegalArgumentException If a PlatformDataProvider supports an empty key set
+             *     or if a key has multiple data providers.
              */
             @SuppressLint("MissingGetterMatchingBuilder")
-            @NonNull
-            public Builder addPlatformDataProvider(
+            public @NonNull Builder addPlatformDataProvider(
                     @NonNull PlatformDataProvider platformDataProvider,
-                    @NonNull Set<PlatformDataKey<?>> supportedDataKeys
-            ) {
+                    @NonNull Set<PlatformDataKey<?>> supportedDataKeys) {
                 if (supportedDataKeys.isEmpty()) {
                     throw new IllegalArgumentException(
                             "The PlatformDataProvider must support at least one key");
@@ -237,8 +247,10 @@ public class DynamicTypeEvaluator {
                 for (PlatformDataKey<?> dataKey : supportedDataKeys) {
                     // Throws exception when one data key has multiple providers.
                     if (mSourceKeyToDataProviders.containsKey(dataKey)) {
-                        throw new IllegalArgumentException(String.format(
-                                "Multiple data providers for PlatformDataKey (%s)", dataKey));
+                        throw new IllegalArgumentException(
+                                String.format(
+                                        "Multiple data providers for PlatformDataKey (%s)",
+                                        dataKey));
                     }
                     mSourceKeyToDataProviders.put(dataKey, platformDataProvider);
                 }
@@ -250,8 +262,7 @@ public class DynamicTypeEvaluator {
              * Sets the notifier used for updating the platform time data. If not set, by default
              * platform time will be updated at 1Hz using a {@code Handler} on the main thread.
              */
-            @NonNull
-            public Builder setPlatformTimeUpdateNotifier(
+            public @NonNull Builder setPlatformTimeUpdateNotifier(
                     @NonNull PlatformTimeUpdateNotifier notifier) {
                 this.mPlatformTimeUpdateNotifier = notifier;
                 return this;
@@ -263,14 +274,12 @@ public class DynamicTypeEvaluator {
              * {@link Instant#now()}.
              */
             @VisibleForTesting
-            @NonNull
-            public Builder setClock(@NonNull Supplier<Instant> clock) {
+            public @NonNull Builder setClock(@NonNull Supplier<Instant> clock) {
                 this.mClock = clock;
                 return this;
             }
 
-            @NonNull
-            public Config build() {
+            public @NonNull Config build() {
                 return new Config(
                         mStateStore,
                         mAnimationQuotaManager,
@@ -286,8 +295,7 @@ public class DynamicTypeEvaluator {
          * types, or {@code null} which is equivalent to an empty state store (state bindings will
          * trigger {@link DynamicTypeValueReceiver#onInvalidated()}).
          */
-        @Nullable
-        public StateStore getStateStore() {
+        public @Nullable StateStore getStateStore() {
             return mStateStore;
         }
 
@@ -296,8 +304,7 @@ public class DynamicTypeEvaluator {
          * or {@code null} if animations are disabled, causing non-infinite animations to have to
          * the end value immediately.
          */
-        @Nullable
-        public QuotaManager getAnimationQuotaManager() {
+        public @Nullable QuotaManager getAnimationQuotaManager() {
             return mAnimationQuotaManager;
         }
 
@@ -306,16 +313,12 @@ public class DynamicTypeEvaluator {
          * pipeline, or {@code null} if there are no restriction on the number of dynamic types. If
          * present, the quota manager is used to prevent unreasonably expensive expressions.
          */
-        @Nullable
-        public QuotaManager getDynamicTypesQuotaManager() {
+        public @Nullable QuotaManager getDynamicTypesQuotaManager() {
             return mDynamicTypesQuotaManager;
         }
 
-        /**
-         * Returns any available mapping between source key and its data provider.
-         */
-        @NonNull
-        public Map<PlatformDataKey<?>, PlatformDataProvider> getPlatformDataProviders() {
+        /** Returns any available mapping between source key and its data provider. */
+        public @NonNull Map<PlatformDataKey<?>, PlatformDataProvider> getPlatformDataProviders() {
             return new ArrayMap<>(
                     (ArrayMap<PlatformDataKey<?>, PlatformDataProvider>) mSourceKeyToDataProviders);
         }
@@ -326,14 +329,12 @@ public class DynamicTypeEvaluator {
          * set to {@link Instant#now()}.
          */
         @VisibleForTesting
-        @Nullable
-        public Supplier<Instant> getClock() {
+        public @Nullable Supplier<Instant> getClock() {
             return mClock;
         }
 
         /** Gets the notifier used for updating the platform time data. */
-        @Nullable
-        public PlatformTimeUpdateNotifier getPlatformTimeUpdateNotifier() {
+        public @Nullable PlatformTimeUpdateNotifier getPlatformTimeUpdateNotifier() {
             return mPlatformTimeUpdateNotifier;
         }
     }
@@ -351,8 +352,7 @@ public class DynamicTypeEvaluator {
                         ? config.getDynamicTypesQuotaManager()
                         : NO_OP_QUOTA_MANAGER;
         this.mPlatformDataStore = new PlatformDataStore(config.getPlatformDataProviders());
-        PlatformTimeUpdateNotifier notifier =
-                config.getPlatformTimeUpdateNotifier();
+        PlatformTimeUpdateNotifier notifier = config.getPlatformTimeUpdateNotifier();
         if (notifier == null) {
             notifier = new PlatformTimeUpdateNotifierImpl();
             ((PlatformTimeUpdateNotifierImpl) notifier).setUpdatesEnabled(true);
@@ -370,11 +370,10 @@ public class DynamicTypeEvaluator {
      * @throws EvaluationException when {@link QuotaManager} fails to allocate enough quota to bind
      *     the {@link DynamicTypeBindingRequest}.
      */
-    @NonNull
-    public BoundDynamicType bind(@NonNull DynamicTypeBindingRequest request)
+    public @NonNull BoundDynamicType bind(@NonNull DynamicTypeBindingRequest request)
             throws EvaluationException {
         BoundDynamicTypeImpl boundDynamicType = request.callBindOn(this);
-        if (!mDynamicTypesQuotaManager.tryAcquireQuota(boundDynamicType.getDynamicNodeCount())) {
+        if (!mDynamicTypesQuotaManager.tryAcquireQuota(boundDynamicType.getDynamicNodeCost())) {
             throw new EvaluationException(
                     "Dynamic type expression limit reached. Try making the dynamic type expression"
                             + " shorter or reduce the number of dynamic type expressions.");
@@ -382,154 +381,76 @@ public class DynamicTypeEvaluator {
         return boundDynamicType;
     }
 
-    @NonNull
-    BoundDynamicTypeImpl bindInternal(
-            @NonNull DynamicBuilders.DynamicString stringSource,
-            @NonNull ULocale locale,
-            @NonNull Executor executor,
-            @NonNull DynamicTypeValueReceiver<String> consumer) {
-        return bindInternal(
-                stringSource.toDynamicStringProto(),
-                locale,
-                new DynamicTypeValueReceiverOnExecutor<>(executor, consumer));
-    }
-
-    @NonNull
     @RestrictTo(Scope.LIBRARY_GROUP)
-    BoundDynamicTypeImpl bindInternal(
+    @NonNull BoundDynamicTypeImpl bindInternal(
             @NonNull DynamicString stringSource,
             @NonNull ULocale locale,
-            @NonNull DynamicTypeValueReceiver<String> consumer) {
+            @NonNull DynamicTypeValueReceiverWithPreUpdate<String> consumer) {
         List<DynamicDataNode<?>> resultBuilder = new ArrayList<>();
-        bindRecursively(
-                stringSource,
-                new DynamicTypeValueReceiverOnExecutor<>(consumer),
-                locale,
-                resultBuilder);
+        bindRecursively(stringSource, consumer, locale, resultBuilder);
         return new BoundDynamicTypeImpl(resultBuilder, mDynamicTypesQuotaManager);
     }
 
-    @NonNull
-    BoundDynamicTypeImpl bindInternal(
-            @NonNull DynamicBuilders.DynamicInt32 int32Source,
-            @NonNull Executor executor,
-            @NonNull DynamicTypeValueReceiver<Integer> consumer) {
-        return bindInternal(
-                int32Source.toDynamicInt32Proto(),
-                new DynamicTypeValueReceiverOnExecutor<>(executor, consumer));
-    }
-
-    @NonNull
     @RestrictTo(Scope.LIBRARY_GROUP)
-    BoundDynamicTypeImpl bindInternal(
+    @NonNull BoundDynamicTypeImpl bindInternal(
             @NonNull DynamicInt32 int32Source,
-            @NonNull DynamicTypeValueReceiver<Integer> consumer) {
+            @NonNull DynamicTypeValueReceiverWithPreUpdate<Integer> consumer) {
         List<DynamicDataNode<?>> resultBuilder = new ArrayList<>();
-        bindRecursively(
-                int32Source, new DynamicTypeValueReceiverOnExecutor<>(consumer), resultBuilder);
+        bindRecursively(int32Source, consumer, resultBuilder);
         return new BoundDynamicTypeImpl(resultBuilder, mDynamicTypesQuotaManager);
     }
 
-    @NonNull
-    BoundDynamicTypeImpl bindInternal(
-            @NonNull DynamicBuilders.DynamicFloat floatSource,
-            @NonNull Executor executor,
-            @NonNull DynamicTypeValueReceiver<Float> consumer) {
-        return bindInternal(
-                floatSource.toDynamicFloatProto(),
-                new DynamicTypeValueReceiverOnExecutor<>(executor, consumer));
-    }
-
-    @NonNull
     @RestrictTo(Scope.LIBRARY_GROUP)
-    BoundDynamicTypeImpl bindInternal(
-            @NonNull DynamicFloat floatSource, @NonNull DynamicTypeValueReceiver<Float> consumer) {
+    @NonNull BoundDynamicTypeImpl bindInternal(
+            @NonNull DynamicFloat floatSource,
+            @NonNull DynamicTypeValueReceiverWithPreUpdate<Float> consumer) {
         List<DynamicDataNode<?>> resultBuilder = new ArrayList<>();
-        bindRecursively(
-                floatSource, new DynamicTypeValueReceiverOnExecutor<>(consumer), resultBuilder);
+        bindRecursively(floatSource, consumer, resultBuilder);
         return new BoundDynamicTypeImpl(resultBuilder, mDynamicTypesQuotaManager);
     }
 
-    @NonNull
-    BoundDynamicTypeImpl bindInternal(
-            @NonNull DynamicBuilders.DynamicColor colorSource,
-            @NonNull Executor executor,
-            @NonNull DynamicTypeValueReceiver<Integer> consumer) {
-        return bindInternal(
-                colorSource.toDynamicColorProto(),
-                new DynamicTypeValueReceiverOnExecutor<>(executor, consumer));
-    }
-
-    @NonNull
     @RestrictTo(Scope.LIBRARY_GROUP)
-    BoundDynamicTypeImpl bindInternal(
+    @NonNull BoundDynamicTypeImpl bindInternal(
             @NonNull DynamicColor colorSource,
-            @NonNull DynamicTypeValueReceiver<Integer> consumer) {
+            @NonNull DynamicTypeValueReceiverWithPreUpdate<Integer> consumer) {
         List<DynamicDataNode<?>> resultBuilder = new ArrayList<>();
-        bindRecursively(
-                colorSource, new DynamicTypeValueReceiverOnExecutor<>(consumer), resultBuilder);
+        bindRecursively(colorSource, consumer, resultBuilder);
         return new BoundDynamicTypeImpl(resultBuilder, mDynamicTypesQuotaManager);
     }
 
-    @NonNull
-    BoundDynamicTypeImpl bindInternal(
-            @NonNull DynamicBuilders.DynamicDuration durationSource,
-            @NonNull Executor executor,
-            @NonNull DynamicTypeValueReceiver<Duration> consumer) {
-        return bindInternal(
-                durationSource.toDynamicDurationProto(),
-                new DynamicTypeValueReceiverOnExecutor<>(executor, consumer));
-    }
-
-    @NonNull
     @RestrictTo(Scope.LIBRARY_GROUP)
-    BoundDynamicTypeImpl bindInternal(
+    @NonNull BoundDynamicTypeImpl bindInternal(
             @NonNull DynamicDuration durationSource,
-            @NonNull DynamicTypeValueReceiver<Duration> consumer) {
+            @NonNull DynamicTypeValueReceiverWithPreUpdate<Duration> consumer) {
         List<DynamicDataNode<?>> resultBuilder = new ArrayList<>();
-        bindRecursively(
-                durationSource, new DynamicTypeValueReceiverOnExecutor<>(consumer), resultBuilder);
+        bindRecursively(durationSource, consumer, resultBuilder);
         return new BoundDynamicTypeImpl(resultBuilder, mDynamicTypesQuotaManager);
     }
 
-    @NonNull
-    BoundDynamicTypeImpl bindInternal(
-            @NonNull DynamicBuilders.DynamicInstant instantSource,
-            @NonNull Executor executor,
-            @NonNull DynamicTypeValueReceiver<Instant> consumer) {
-        return bindInternal(
-                instantSource.toDynamicInstantProto(),
-                new DynamicTypeValueReceiverOnExecutor<>(executor, consumer));
-    }
-
-    @NonNull
     @RestrictTo(Scope.LIBRARY_GROUP)
-    BoundDynamicTypeImpl bindInternal(
+    @NonNull BoundDynamicTypeImpl bindInternal(
             @NonNull DynamicInstant instantSource,
-            @NonNull DynamicTypeValueReceiver<Instant> consumer) {
+            @NonNull DynamicTypeValueReceiverWithPreUpdate<Instant> consumer) {
         List<DynamicDataNode<?>> resultBuilder = new ArrayList<>();
-        bindRecursively(
-                instantSource, new DynamicTypeValueReceiverOnExecutor<>(consumer), resultBuilder);
+        bindRecursively(instantSource, consumer, resultBuilder);
         return new BoundDynamicTypeImpl(resultBuilder, mDynamicTypesQuotaManager);
     }
 
-    @NonNull
-    BoundDynamicTypeImpl bindInternal(
-            @NonNull DynamicBuilders.DynamicBool boolSource,
-            @NonNull Executor executor,
-            @NonNull DynamicTypeValueReceiver<Boolean> consumer) {
-        return bindInternal(
-                boolSource.toDynamicBoolProto(),
-                new DynamicTypeValueReceiverOnExecutor<>(executor, consumer));
+    @RestrictTo(Scope.LIBRARY_GROUP)
+    @NonNull BoundDynamicTypeImpl bindInternal(
+            @NonNull DynamicZonedDateTime zdtSource,
+            @NonNull DynamicTypeValueReceiverWithPreUpdate<ZonedDateTime> consumer) {
+        List<DynamicDataNode<?>> resultBuilder = new ArrayList<>();
+        bindRecursively(zdtSource, consumer, resultBuilder);
+        return new BoundDynamicTypeImpl(resultBuilder, mDynamicTypesQuotaManager);
     }
 
-    @NonNull
     @RestrictTo(Scope.LIBRARY_GROUP)
-    BoundDynamicTypeImpl bindInternal(
-            @NonNull DynamicBool boolSource, @NonNull DynamicTypeValueReceiver<Boolean> consumer) {
+    @NonNull BoundDynamicTypeImpl bindInternal(
+            @NonNull DynamicBool boolSource,
+            @NonNull DynamicTypeValueReceiverWithPreUpdate<Boolean> consumer) {
         List<DynamicDataNode<?>> resultBuilder = new ArrayList<>();
-        bindRecursively(
-                boolSource, new DynamicTypeValueReceiverOnExecutor<>(consumer), resultBuilder);
+        bindRecursively(boolSource, consumer, resultBuilder);
         return new BoundDynamicTypeImpl(resultBuilder, mDynamicTypesQuotaManager);
     }
 
@@ -576,11 +497,12 @@ public class DynamicTypeEvaluator {
                 {
                     DynamicProto.StateStringSource stateSource = stringSource.getStateSource();
                     node =
-                           new StateStringNode(
-                                   stateSource.getSourceNamespace().isEmpty()
-                                           ? mStateStore : mPlatformDataStore,
-                                   stateSource,
-                                   consumer);
+                            new StateStringNode(
+                                    stateSource.getSourceNamespace().isEmpty()
+                                            ? mStateStore
+                                            : mPlatformDataStore,
+                                    stateSource,
+                                    consumer);
                     break;
                 }
             case CONDITIONAL_OP:
@@ -645,13 +567,13 @@ public class DynamicTypeEvaluator {
             case FIXED:
                 node = new FixedInt32Node(int32Source.getFixed(), consumer);
                 break;
-            case PLATFORM_SOURCE: {
-                node = new LegacyPlatformInt32SourceNode(
-                        mPlatformDataStore,
-                        int32Source.getPlatformSource(),
-                        consumer);
-                break;
-            }
+            case PLATFORM_SOURCE:
+                {
+                    node =
+                            new LegacyPlatformInt32SourceNode(
+                                    mPlatformDataStore, int32Source.getPlatformSource(), consumer);
+                    break;
+                }
             case ARITHMETIC_OPERATION:
                 {
                     ArithmeticInt32Node arithmeticNode =
@@ -672,11 +594,13 @@ public class DynamicTypeEvaluator {
             case STATE_SOURCE:
                 {
                     DynamicProto.StateInt32Source stateSource = int32Source.getStateSource();
-                    node = new StateInt32SourceNode(
-                            stateSource.getSourceNamespace().isEmpty()
-                                    ? mStateStore : mPlatformDataStore,
-                            stateSource,
-                            consumer);
+                    node =
+                            new StateInt32SourceNode(
+                                    stateSource.getSourceNamespace().isEmpty()
+                                            ? mStateStore
+                                            : mPlatformDataStore,
+                                    stateSource,
+                                    consumer);
                     break;
                 }
             case CONDITIONAL_OP:
@@ -721,6 +645,19 @@ public class DynamicTypeEvaluator {
                     bindRecursively(
                             int32Source.getDurationPart().getInput(),
                             durationPartOpNode.getIncomingCallback(),
+                            resultBuilder);
+                    break;
+                }
+            case ZONED_DATE_TIME_PART:
+                {
+                    GetZonedDateTimePartOpNode zdtPartOpNode =
+                            new GetZonedDateTimePartOpNode(
+                                    int32Source.getZonedDateTimePart(), consumer);
+                    node = zdtPartOpNode;
+
+                    bindRecursively(
+                            int32Source.getZonedDateTimePart().getInput(),
+                            zdtPartOpNode.getIncomingCallback(),
                             resultBuilder);
                     break;
                 }
@@ -802,10 +739,55 @@ public class DynamicTypeEvaluator {
 
                 node = conditionalNode;
                 break;
+            case STATE_SOURCE:
+                {
+                    DynamicProto.StateDurationSource stateSource = durationSource.getStateSource();
+                    node =
+                            new StateDurationSourceNode(
+                                    stateSource.getSourceNamespace().isEmpty()
+                                            ? mStateStore
+                                            : mPlatformDataStore,
+                                    stateSource,
+                                    consumer);
+                    break;
+                }
             case INNER_NOT_SET:
                 throw new IllegalArgumentException("DynamicDuration has no inner source set");
             default:
                 throw new IllegalArgumentException("Unknown DynamicDuration source type");
+        }
+
+        resultBuilder.add(node);
+    }
+
+    /**
+     * Same as {@link #bind}, but instead of returning one {@link BoundDynamicType}, all {@link
+     * DynamicDataNode} produced by evaluating given dynamic type are added to the given list.
+     */
+    private void bindRecursively(
+            @NonNull DynamicZonedDateTime zdtSource,
+            @NonNull DynamicTypeValueReceiverWithPreUpdate<ZonedDateTime> consumer,
+            @NonNull List<DynamicDataNode<?>> resultBuilder) {
+        DynamicDataNode<?> node;
+
+        switch (zdtSource.getInnerCase()) {
+            case INSTANT_TO_ZONED_DATE_TIME:
+                {
+                    InstantToZonedDateTimeOpNode conversionNode =
+                            new InstantToZonedDateTimeOpNode(
+                                    zdtSource.getInstantToZonedDateTime(), consumer);
+                    node = conversionNode;
+
+                    bindRecursively(
+                            zdtSource.getInstantToZonedDateTime().getInstant(),
+                            conversionNode.getIncomingCallback(),
+                            resultBuilder);
+                    break;
+                }
+            case INNER_NOT_SET:
+                throw new IllegalArgumentException("DynamicZonedDateTime has no inner source set");
+            default:
+                throw new IllegalArgumentException("Unknown DynamicZonedDateTime source type");
         }
 
         resultBuilder.add(node);
@@ -848,6 +830,18 @@ public class DynamicTypeEvaluator {
                 node = conditionalNode;
                 break;
 
+            case STATE_SOURCE:
+                {
+                    DynamicProto.StateInstantSource stateSource = instantSource.getStateSource();
+                    node =
+                            new StateInstantSourceNode(
+                                    stateSource.getSourceNamespace().isEmpty()
+                                            ? mStateStore
+                                            : mPlatformDataStore,
+                                    stateSource,
+                                    consumer);
+                    break;
+                }
             case INNER_NOT_SET:
                 throw new IllegalArgumentException("DynamicInstant has no inner source set");
             default:
@@ -874,11 +868,13 @@ public class DynamicTypeEvaluator {
             case STATE_SOURCE:
                 {
                     DynamicProto.StateFloatSource stateSource = floatSource.getStateSource();
-                    node = new StateFloatSourceNode(
-                            stateSource.getSourceNamespace().isEmpty()
-                                    ? mStateStore : mPlatformDataStore,
-                            stateSource,
-                            consumer);
+                    node =
+                            new StateFloatSourceNode(
+                                    stateSource.getSourceNamespace().isEmpty()
+                                            ? mStateStore
+                                            : mPlatformDataStore,
+                                    stateSource,
+                                    consumer);
                     break;
                 }
             case ARITHMETIC_OPERATION:
@@ -979,11 +975,13 @@ public class DynamicTypeEvaluator {
                 break;
             case STATE_SOURCE:
                 DynamicProto.StateColorSource stateSource = colorSource.getStateSource();
-                node = new StateColorSourceNode(
-                        stateSource.getSourceNamespace().isEmpty()
-                                ? mStateStore : mPlatformDataStore,
-                        stateSource,
-                        consumer);
+                node =
+                        new StateColorSourceNode(
+                                stateSource.getSourceNamespace().isEmpty()
+                                        ? mStateStore
+                                        : mPlatformDataStore,
+                                stateSource,
+                                consumer);
                 break;
             case ANIMATABLE_FIXED:
                 // We don't have to check if enableAnimations is true, because if it's false and
@@ -1053,11 +1051,13 @@ public class DynamicTypeEvaluator {
             case STATE_SOURCE:
                 {
                     DynamicProto.StateBoolSource stateSource = boolSource.getStateSource();
-                    node = new StateBoolNode(
-                            stateSource.getSourceNamespace().isEmpty()
-                                    ? mStateStore : mPlatformDataStore,
-                            stateSource,
-                            consumer);
+                    node =
+                            new StateBoolNode(
+                                    stateSource.getSourceNamespace().isEmpty()
+                                            ? mStateStore
+                                            : mPlatformDataStore,
+                                    stateSource,
+                                    consumer);
                     break;
                 }
             case INT32_COMPARISON:
@@ -1128,43 +1128,5 @@ public class DynamicTypeEvaluator {
         }
 
         resultBuilder.add(node);
-    }
-
-    /**
-     * Wraps {@link DynamicTypeValueReceiver} and executes its methods on the given {@link
-     * Executor}.
-     */
-    private static class DynamicTypeValueReceiverOnExecutor<T>
-            implements DynamicTypeValueReceiverWithPreUpdate<T> {
-
-        @NonNull private final Executor mExecutor;
-        @NonNull private final DynamicTypeValueReceiver<T> mConsumer;
-
-        DynamicTypeValueReceiverOnExecutor(@NonNull DynamicTypeValueReceiver<T> consumer) {
-            this(Runnable::run, consumer);
-        }
-
-        DynamicTypeValueReceiverOnExecutor(
-                @NonNull Executor executor, @NonNull DynamicTypeValueReceiver<T> consumer) {
-            this.mConsumer = consumer;
-            this.mExecutor = executor;
-        }
-
-        /** This method is noop in this class. */
-        @Override
-        @SuppressWarnings("ExecutorTaskName")
-        public void onPreUpdate() {}
-
-        @Override
-        @SuppressWarnings("ExecutorTaskName")
-        public void onData(@NonNull T newData) {
-            mExecutor.execute(() -> mConsumer.onData(newData));
-        }
-
-        @Override
-        @SuppressWarnings("ExecutorTaskName")
-        public void onInvalidated() {
-            mExecutor.execute(mConsumer::onInvalidated);
-        }
     }
 }

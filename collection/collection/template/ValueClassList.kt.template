@@ -13,37 +13,40 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@file:Suppress("NOTHING_TO_INLINE", "RedundantVisibilityModifier", "UnusedImport")
-/* ktlint-disable max-line-length */
-/* ktlint-disable import-ordering */
+
+@file:Suppress(
+    "RedundantVisibilityModifier",
+    "KotlinRedundantDiagnosticSuppress",
+    "KotlinConstantConditions",
+    "PropertyName",
+    "ConstPropertyName",
+    "PrivatePropertyName",
+    "NOTHING_TO_INLINE",
+    "UnusedImport",
+)
+@file:OptIn(ExperimentalContracts::class)
 
 package PACKAGE
 
+import androidx.annotation.IntRange
 import androidx.collection.PRIMITIVEList
 import androidx.collection.MutablePRIMITIVEList
 import androidx.collection.emptyPRIMITIVEList
 import androidx.collection.mutablePRIMITIVEListOf
 import VALUE_PKG.VALUE_CLASS
 import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
 import kotlin.jvm.JvmInline
 
-// To use this template, you must substitute several strings. You can copy this and search/replace
-// or use a sed command. These properties must be changed:
-// * PACKAGE - target package (e.g. androidx.compose.ui.ui.collection)
-// * VALUE_PKG - package in which the value class resides
-// * VALUE_CLASS - the value class contained in the list (e.g. Color or Offset)
-// * vALUE_CLASS - the value class, with the first letter lower case (e.g. color or offset)
-// * BACKING_PROPERTY - the field in VALUE_CLASS containing the backing primitive (e.g. packedValue)
-// * PRIMITIVE - the primitive type of the backing list (e.g. Long or Float)
-// * TO_PARAM - an operation done on the primitive to convert to the value class parameter
+// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// DO NOT MAKE CHANGES to this kotlin source file.
 //
-// For example, to create a ColorList:
-// sed -e "s/PACKAGE/androidx.compose.ui.graphics/" -e "s/VALUE_CLASS/Color/g" \
-//     -e "s/vALUE_CLASS/color/g" -e "s/BACKING_PROPERTY/value.toLong()/g" -e "s/PRIMITIVE/Long/g" \
-//     -e "s/TO_PARAM/.toULong()/g" -e "s/VALUE_PKG/androidx.compose.ui.graphics/g" \
-//     collection/collection/template/ValueClassList.kt.template \
-//     > compose/ui/ui-graphics/src/commonMain/kotlin/androidx/compose/ui/graphics/ColorList.kt
+// This file was generated from a template:
+//   collection/collection/template/ValueClassList.kt.template
+// Make a change to the original template and run the generateValueClassCollections.sh script
+// to ensure the change is available on all versions of the list.
+// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 /**
  * [VALUE_CLASSList] is a [List]-like collection for [VALUE_CLASS] values. It allows retrieving
@@ -56,25 +59,24 @@ import kotlin.jvm.JvmInline
  * the appropriate synchronization. It is also not safe to mutate during reentrancy --
  * in the middle of a [forEach], for example. However, concurrent reads are safe.
  */
-@OptIn(ExperimentalContracts::class)
 @JvmInline
-internal value class VALUE_CLASSList(val list: PRIMITIVEList) {
+VISIBILITY value class VALUE_CLASSList(val list: PRIMITIVEList) {
     /**
      * The number of elements in the [VALUE_CLASSList].
      */
-    @get:androidx.annotation.IntRange(from = 0)
+    @get:IntRange(from = 0)
     public inline val size: Int get() = list.size
 
     /**
      * Returns the last valid index in the [VALUE_CLASSList]. This can be `-1` when the list is empty.
      */
-    @get:androidx.annotation.IntRange(from = -1)
+    @get:IntRange(from = -1)
     public inline val lastIndex: Int get() = list.lastIndex
 
     /**
      * Returns an [IntRange] of the valid indices for this [VALUE_CLASSList].
      */
-    public inline val indices: IntRange get() = list.indices
+    public inline val indices: kotlin.ranges.IntRange get() = list.indices
 
     /**
      * Returns `true` if the collection has no elements in it.
@@ -261,14 +263,14 @@ internal value class VALUE_CLASSList(val list: PRIMITIVEList) {
      * the [index] is out of bounds of this collection.
      */
     public inline operator fun get(
-        @androidx.annotation.IntRange(from = 0) index: Int
+        @IntRange(from = 0) index: Int
     ): VALUE_CLASS = VALUE_CLASS(list[index]TO_PARAM)
 
     /**
      * Returns the element at the given [index] or throws [IndexOutOfBoundsException] if
      * the [index] is out of bounds of this collection.
      */
-    public inline fun elementAt(@androidx.annotation.IntRange(from = 0) index: Int): VALUE_CLASS =
+    public inline fun elementAt(@IntRange(from = 0) index: Int): VALUE_CLASS =
         VALUE_CLASS(list[index]TO_PARAM)
 
     /**
@@ -279,7 +281,7 @@ internal value class VALUE_CLASSList(val list: PRIMITIVEList) {
      * an index not in the list.
      */
     public inline fun elementAtOrElse(
-        @androidx.annotation.IntRange(from = 0) index: Int,
+        @IntRange(from = 0) index: Int,
         defaultValue: (index: Int) -> VALUE_CLASS
     ): VALUE_CLASS =
         VALUE_CLASS(list.elementAtOrElse(index) { defaultValue(it).BACKING_PROPERTY }TO_PARAM)
@@ -376,27 +378,26 @@ internal value class VALUE_CLASSList(val list: PRIMITIVEList) {
  *
  * @constructor Creates a [MutableVALUE_CLASSList] with a [capacity] of `initialCapacity`.
  */
-@OptIn(ExperimentalContracts::class)
 @JvmInline
-internal value class MutableVALUE_CLASSList(val list: MutablePRIMITIVEList) {
+VISIBILITY value class MutableVALUE_CLASSList(val list: MutablePRIMITIVEList) {
     public constructor(initialCapacity: Int = 16) : this(MutablePRIMITIVEList(initialCapacity))
 
     /**
      * The number of elements in the [VALUE_CLASSList].
      */
-    @get:androidx.annotation.IntRange(from = 0)
+    @get:IntRange(from = 0)
     public inline val size: Int get() = list.size
 
     /**
      * Returns the last valid index in the [VALUE_CLASSList]. This can be `-1` when the list is empty.
      */
-    @get:androidx.annotation.IntRange(from = -1)
+    @get:IntRange(from = -1)
     public inline val lastIndex: Int get() = list.lastIndex
 
     /**
      * Returns an [IntRange] of the valid indices for this [VALUE_CLASSList].
      */
-    public inline val indices: IntRange get() = list.indices
+    public inline val indices: kotlin.ranges.IntRange get() = list.indices
 
     /**
      * Returns `true` if the collection has no elements in it.
@@ -583,14 +584,14 @@ internal value class MutableVALUE_CLASSList(val list: MutablePRIMITIVEList) {
      * the [index] is out of bounds of this collection.
      */
     public inline operator fun get(
-        @androidx.annotation.IntRange(from = 0) index: Int
+        @IntRange(from = 0) index: Int
     ): VALUE_CLASS = VALUE_CLASS(list[index]TO_PARAM)
 
     /**
      * Returns the element at the given [index] or throws [IndexOutOfBoundsException] if
      * the [index] is out of bounds of this collection.
      */
-    public inline fun elementAt(@androidx.annotation.IntRange(from = 0) index: Int): VALUE_CLASS =
+    public inline fun elementAt(@IntRange(from = 0) index: Int): VALUE_CLASS =
         VALUE_CLASS(list[index]TO_PARAM)
 
     /**
@@ -601,7 +602,7 @@ internal value class MutableVALUE_CLASSList(val list: MutablePRIMITIVEList) {
      * an index not in the list.
      */
     public inline fun elementAtOrElse(
-        @androidx.annotation.IntRange(from = 0) index: Int,
+        @IntRange(from = 0) index: Int,
         defaultValue: (index: Int) -> VALUE_CLASS
     ): VALUE_CLASS =
         VALUE_CLASS(list.elementAtOrElse(index) { defaultValue(it).BACKING_PROPERTY }TO_PARAM)
@@ -695,7 +696,7 @@ internal value class MutableVALUE_CLASSList(val list: MutablePRIMITIVEList) {
      * @throws IndexOutOfBoundsException if [index] isn't between 0 and [size], inclusive
      */
     public inline fun add(
-        @androidx.annotation.IntRange(from = 0) index: Int,
+        @IntRange(from = 0) index: Int,
         element: VALUE_CLASS
     ) = list.add(index, element.BACKING_PROPERTY)
 
@@ -706,7 +707,7 @@ internal value class MutableVALUE_CLASSList(val list: MutablePRIMITIVEList) {
      * @throws IndexOutOfBoundsException if [index] isn't between 0 and [size], inclusive
      */
     public inline fun addAll(
-        @androidx.annotation.IntRange(from = 0) index: Int,
+        @IntRange(from = 0) index: Int,
         elements: VALUE_CLASSList
     ): Boolean = list.addAll(index, elements.list)
 
@@ -717,7 +718,7 @@ internal value class MutableVALUE_CLASSList(val list: MutablePRIMITIVEList) {
      * @throws IndexOutOfBoundsException if [index] isn't between 0 and [size], inclusive
      */
     public inline fun addAll(
-        @androidx.annotation.IntRange(from = 0) index: Int,
+        @IntRange(from = 0) index: Int,
         elements: MutableVALUE_CLASSList
     ): Boolean = list.addAll(index, elements.list)
 
@@ -812,7 +813,7 @@ internal value class MutableVALUE_CLASSList(val list: MutablePRIMITIVEList) {
      * Removes the element at the given [index] and returns it.
      * @throws IndexOutOfBoundsException if [index] isn't between 0 and [lastIndex], inclusive
      */
-    public inline fun removeAt(@androidx.annotation.IntRange(from = 0) index: Int): VALUE_CLASS =
+    public inline fun removeAt(@IntRange(from = 0) index: Int): VALUE_CLASS =
         VALUE_CLASS(list.removeAt(index)TO_PARAM)
 
     /**
@@ -821,8 +822,8 @@ internal value class MutableVALUE_CLASSList(val list: MutablePRIMITIVEList) {
      * @throws IllegalArgumentException if [start] is greater than [end]
      */
     public inline fun removeRange(
-        @androidx.annotation.IntRange(from = 0) start: Int,
-        @androidx.annotation.IntRange(from = 0) end: Int
+        @IntRange(from = 0) start: Int,
+        @IntRange(from = 0) end: Int
     ) = list.removeRange(start, end)
 
     /**
@@ -845,7 +846,7 @@ internal value class MutableVALUE_CLASSList(val list: MutablePRIMITIVEList) {
      * @throws IndexOutOfBoundsException if [index] isn't between 0 and [lastIndex], inclusive
      */
     public inline operator fun set(
-        @androidx.annotation.IntRange(from = 0) index: Int,
+        @IntRange(from = 0) index: Int,
         element: VALUE_CLASS
     ): VALUE_CLASS = VALUE_CLASS(list.set(index, element.BACKING_PROPERTY)TO_PARAM)
 }
@@ -853,23 +854,23 @@ internal value class MutableVALUE_CLASSList(val list: MutablePRIMITIVEList) {
 /**
  * @return a read-only [VALUE_CLASSList] with nothing in it.
  */
-internal inline fun emptyVALUE_CLASSList(): VALUE_CLASSList = VALUE_CLASSList(emptyPRIMITIVEList())
+VISIBILITY inline fun emptyVALUE_CLASSList(): VALUE_CLASSList = VALUE_CLASSList(emptyPRIMITIVEList())
 
 /**
  * @return a read-only [VALUE_CLASSList] with nothing in it.
  */
-internal inline fun vALUE_CLASSListOf(): VALUE_CLASSList = VALUE_CLASSList(emptyPRIMITIVEList())
+VISIBILITY inline fun vALUE_CLASSListOf(): VALUE_CLASSList = VALUE_CLASSList(emptyPRIMITIVEList())
 
 /**
  * @return a new read-only [VALUE_CLASSList] with [element1] as the only item in the list.
  */
-internal inline fun vALUE_CLASSListOf(element1: VALUE_CLASS): VALUE_CLASSList =
+VISIBILITY inline fun vALUE_CLASSListOf(element1: VALUE_CLASS): VALUE_CLASSList =
     VALUE_CLASSList(mutablePRIMITIVEListOf(element1.BACKING_PROPERTY))
 
 /**
  * @return a new read-only [VALUE_CLASSList] with 2 elements, [element1] and [element2], in order.
  */
-internal inline fun vALUE_CLASSListOf(element1: VALUE_CLASS, element2: VALUE_CLASS): VALUE_CLASSList =
+VISIBILITY inline fun vALUE_CLASSListOf(element1: VALUE_CLASS, element2: VALUE_CLASS): VALUE_CLASSList =
     VALUE_CLASSList(
         mutablePRIMITIVEListOf(
             element1.BACKING_PROPERTY,
@@ -881,7 +882,7 @@ internal inline fun vALUE_CLASSListOf(element1: VALUE_CLASS, element2: VALUE_CLA
  * @return a new read-only [VALUE_CLASSList] with 3 elements, [element1], [element2], and [element3],
  * in order.
  */
-internal inline fun vALUE_CLASSListOf(
+VISIBILITY inline fun vALUE_CLASSListOf(
         element1: VALUE_CLASS,
         element2: VALUE_CLASS,
         element3: VALUE_CLASS
@@ -896,19 +897,19 @@ internal inline fun vALUE_CLASSListOf(
 /**
  * @return a new empty [MutableVALUE_CLASSList] with the default capacity.
  */
-internal inline fun mutableVALUE_CLASSListOf(): MutableVALUE_CLASSList =
+VISIBILITY inline fun mutableVALUE_CLASSListOf(): MutableVALUE_CLASSList =
     MutableVALUE_CLASSList(MutablePRIMITIVEList())
 
 /**
  * @return a new [MutableVALUE_CLASSList] with [element1] as the only item in the list.
  */
-internal inline fun mutableVALUE_CLASSListOf(element1: VALUE_CLASS): MutableVALUE_CLASSList =
+VISIBILITY inline fun mutableVALUE_CLASSListOf(element1: VALUE_CLASS): MutableVALUE_CLASSList =
     MutableVALUE_CLASSList(mutablePRIMITIVEListOf(element1.BACKING_PROPERTY))
 
 /**
  * @return a new [MutableVALUE_CLASSList] with 2 elements, [element1] and [element2], in order.
  */
-internal inline fun mutableVALUE_CLASSListOf(
+VISIBILITY inline fun mutableVALUE_CLASSListOf(
         element1: VALUE_CLASS,
         element2: VALUE_CLASS
     ): MutableVALUE_CLASSList = MutableVALUE_CLASSList(
@@ -922,7 +923,7 @@ internal inline fun mutableVALUE_CLASSListOf(
  * @return a new [MutableVALUE_CLASSList] with 3 elements, [element1], [element2], and [element3],
  * in order.
  */
-internal inline fun mutableVALUE_CLASSListOf(
+VISIBILITY inline fun mutableVALUE_CLASSListOf(
         element1: VALUE_CLASS,
         element2: VALUE_CLASS,
         element3: VALUE_CLASS
@@ -933,3 +934,37 @@ internal inline fun mutableVALUE_CLASSListOf(
         element3.BACKING_PROPERTY
     )
 )
+
+/**
+ * Builds a new [VALUE_CLASSList] by populating a [MutableVALUE_CLASSList] using the given
+ * [builderAction].
+ *
+ * The list passed as a receiver to the [builderAction] is valid only inside that function.
+ * Using it outside of the function produces an unspecified behavior.
+ *
+ * @param builderAction Lambda in which the [MutableVALUE_CLASSList] can be populated.
+ */
+VISIBILITY inline fun buildVALUE_CLASSList(
+    builderAction: MutableVALUE_CLASSList.() -> Unit,
+): VALUE_CLASSList {
+    contract { callsInPlace(builderAction, InvocationKind.EXACTLY_ONCE) }
+    return MutableVALUE_CLASSList().apply(builderAction).asVALUE_CLASSList()
+}
+
+/**
+ * Builds a new [VALUE_CLASSList] by populating a [MutableVALUE_CLASSList] using the given
+ * [builderAction].
+ *
+ * The list passed as a receiver to the [builderAction] is valid only inside that function.
+ * Using it outside of the function produces an unspecified behavior.
+ *
+ * @param initialCapacity Hint for the expected number of elements added in the [builderAction].
+ * @param builderAction Lambda in which the [MutableVALUE_CLASSList] can be populated.
+ */
+VISIBILITY inline fun buildVALUE_CLASSList(
+    initialCapacity: Int,
+    builderAction: MutableVALUE_CLASSList.() -> Unit,
+): VALUE_CLASSList {
+    contract { callsInPlace(builderAction, InvocationKind.EXACTLY_ONCE) }
+    return MutableVALUE_CLASSList(initialCapacity).apply(builderAction).asVALUE_CLASSList()
+}

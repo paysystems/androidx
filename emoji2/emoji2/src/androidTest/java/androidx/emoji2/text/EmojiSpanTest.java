@@ -36,11 +36,10 @@ import android.text.TextPaint;
 import android.text.style.BackgroundColorSpan;
 import android.text.style.MetricAffectingSpan;
 
-import androidx.annotation.NonNull;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
-import androidx.test.filters.SdkSuppress;
 
+import org.jspecify.annotations.NonNull;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -49,7 +48,6 @@ import org.mockito.stubbing.Answer;
 
 @LargeTest
 @RunWith(AndroidJUnit4.class)
-@SdkSuppress(minSdkVersion = 19)
 public class EmojiSpanTest {
 
     @Before

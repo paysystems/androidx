@@ -16,14 +16,15 @@
 
 package androidx.camera.video;
 
+import android.hardware.camera2.CaptureRequest;
 import android.util.Size;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.annotation.RequiresApi;
 import androidx.annotation.RestrictTo;
 import androidx.camera.core.DynamicRange;
 import androidx.camera.video.internal.VideoValidatedEncoderProfilesProxy;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -45,7 +46,6 @@ import java.util.Set;
  *   List<Quality> supportedQualities = videoCapabilities.getSupportedQualities(dynamicRange);
  * }</pre>
  */
-@RequiresApi(21) // TODO(b/200306659): Remove and replace with annotation on package-info.java
 public interface VideoCapabilities {
 
     /**
@@ -59,8 +59,7 @@ public interface VideoCapabilities {
      *
      * @return a set of supported dynamic ranges.
      */
-    @NonNull
-    Set<DynamicRange> getSupportedDynamicRanges();
+    @NonNull Set<DynamicRange> getSupportedDynamicRanges();
 
     /**
      * Gets all supported qualities for the input dynamic range.
@@ -85,8 +84,7 @@ public interface VideoCapabilities {
      * @param dynamicRange the dynamicRange.
      * @return a list of supported qualities sorted by size from large to small.
      */
-    @NonNull
-    List<Quality> getSupportedQualities(@NonNull DynamicRange dynamicRange);
+    @NonNull List<Quality> getSupportedQualities(@NonNull DynamicRange dynamicRange);
 
     /**
      * Checks if the quality is supported for the input dynamic range.
@@ -114,6 +112,28 @@ public interface VideoCapabilities {
     boolean isQualitySupported(@NonNull Quality quality, @NonNull DynamicRange dynamicRange);
 
     /**
+     * Returns if video stabilization is supported on the device. Video stabilization can be
+     * turned on via {@link VideoCapture.Builder#setVideoStabilizationEnabled(boolean)}.
+     *
+     * <p>Not all recording sizes or frame rates may be supported for
+     * stabilization by a device that reports stabilization support. It is guaranteed
+     * that an output targeting a MediaRecorder or MediaCodec will be stabilized if
+     * the recording resolution is less than or equal to 1920 x 1080 (width less than
+     * or equal to 1920, height less than or equal to 1080), and the recording
+     * frame rate is less than or equal to 30fps. At other sizes, the video stabilization will
+     * not take effect.
+     *
+     * @return true if {@link CaptureRequest#CONTROL_VIDEO_STABILIZATION_MODE_ON} is supported,
+     * otherwise false.
+     *
+     * @see VideoCapture.Builder#setVideoStabilizationEnabled(boolean)
+     * @see CaptureRequest#CONTROL_VIDEO_STABILIZATION_MODE
+     */
+    default boolean isStabilizationSupported() {
+        return false;
+    }
+
+    /**
      * Gets the corresponding {@link VideoValidatedEncoderProfilesProxy} of the input quality and
      * dynamic range.
      *
@@ -125,8 +145,7 @@ public interface VideoCapabilities {
      * quality is not supported on the device.
      */
     @RestrictTo(RestrictTo.Scope.LIBRARY)
-    @Nullable
-    default VideoValidatedEncoderProfilesProxy getProfiles(@NonNull Quality quality,
+    default @Nullable VideoValidatedEncoderProfilesProxy getProfiles(@NonNull Quality quality,
             @NonNull DynamicRange dynamicRange) {
         return null;
     }
@@ -142,12 +161,12 @@ public interface VideoCapabilities {
      * nearest EncoderProfilesProxy will be selected, whether that EncoderProfilesProxy's
      * resolution is above or below the given size.
      *
-     * @see #findHighestSupportedQualityFor(Size, DynamicRange)
+     * @see #findNearestHigherSupportedQualityFor(Size, DynamicRange)
      */
     @RestrictTo(RestrictTo.Scope.LIBRARY)
-    @Nullable
-    default VideoValidatedEncoderProfilesProxy findHighestSupportedEncoderProfilesFor(
-            @NonNull Size size, @NonNull DynamicRange dynamicRange) {
+    default @Nullable VideoValidatedEncoderProfilesProxy
+            findNearestHigherSupportedEncoderProfilesFor(
+                    @NonNull Size size, @NonNull DynamicRange dynamicRange) {
         return null;
     }
 
@@ -166,31 +185,32 @@ public interface VideoCapabilities {
      * then {@link Quality#NONE} is returned.
      */
     @RestrictTo(RestrictTo.Scope.LIBRARY)
-    @NonNull
-    default Quality findHighestSupportedQualityFor(@NonNull Size size,
+    default @NonNull Quality findNearestHigherSupportedQualityFor(@NonNull Size size,
             @NonNull DynamicRange dynamicRange) {
         return Quality.NONE;
     }
 
     /** An empty implementation. */
     @RestrictTo(RestrictTo.Scope.LIBRARY)
-    @NonNull
-    VideoCapabilities EMPTY = new VideoCapabilities() {
-        @NonNull
+    @NonNull VideoCapabilities EMPTY = new VideoCapabilities() {
         @Override
-        public Set<DynamicRange> getSupportedDynamicRanges() {
+        public @NonNull Set<DynamicRange> getSupportedDynamicRanges() {
             return new HashSet<>();
         }
 
-        @NonNull
         @Override
-        public List<Quality> getSupportedQualities(@NonNull DynamicRange dynamicRange) {
+        public @NonNull List<Quality> getSupportedQualities(@NonNull DynamicRange dynamicRange) {
             return new ArrayList<>();
         }
 
         @Override
         public boolean isQualitySupported(@NonNull Quality quality,
                 @NonNull DynamicRange dynamicRange) {
+            return false;
+        }
+
+        @Override
+        public boolean isStabilizationSupported() {
             return false;
         }
     };

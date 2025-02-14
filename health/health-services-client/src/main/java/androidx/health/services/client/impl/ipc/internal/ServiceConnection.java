@@ -26,10 +26,11 @@ import android.os.IBinder;
 import android.os.RemoteException;
 import android.util.Log;
 
-import androidx.annotation.Nullable;
 import androidx.annotation.RestrictTo;
 import androidx.annotation.RestrictTo.Scope;
 import androidx.annotation.VisibleForTesting;
+
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -163,7 +164,7 @@ public class ServiceConnection implements android.content.ServiceConnection {
         if (mServiceConnectionRetry < MAX_RETRIES) {
             Log.w(
                     TAG,
-                    "WCS SDK Client '"
+                    "HealthServices SDK Client '"
                             + mConnectionConfiguration.getClientName()
                             + "' disconnected, retrying connection. Retry attempt: "
                             + mServiceConnectionRetry,

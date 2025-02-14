@@ -2,6 +2,7 @@ package com.example.appsearch;
 
 import androidx.appsearch.app.AppSearchSchema;
 import androidx.appsearch.app.DocumentClassFactory;
+import androidx.appsearch.app.DocumentClassMappingContext;
 import androidx.appsearch.app.GenericDocument;
 import androidx.appsearch.exceptions.AppSearchException;
 import java.lang.Class;
@@ -49,9 +50,10 @@ public final class $$__AppSearch__Gift$$__InnerGift implements DocumentClassFact
   }
 
   @Override
-  public Gift.InnerGift fromGenericDocument(GenericDocument genericDoc) throws AppSearchException {
-    String idConv = genericDoc.getId();
+  public Gift.InnerGift fromGenericDocument(GenericDocument genericDoc,
+      DocumentClassMappingContext documentClassMappingContext) throws AppSearchException {
     String namespaceConv = genericDoc.getNamespace();
+    String idConv = genericDoc.getId();
     String[] arrStringConv = genericDoc.getPropertyStringArray("arrString");
     Gift.InnerGift document = new Gift.InnerGift();
     document.namespace = namespaceConv;

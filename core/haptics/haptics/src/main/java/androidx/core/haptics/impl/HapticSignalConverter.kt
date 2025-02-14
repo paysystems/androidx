@@ -18,7 +18,6 @@ package androidx.core.haptics.impl
 
 import android.os.Build
 import android.os.VibrationEffect
-import androidx.annotation.DoNotInline
 import androidx.annotation.RequiresApi
 import androidx.core.haptics.PatternVibrationWrapper
 import androidx.core.haptics.VibrationEffectWrapper
@@ -35,10 +34,6 @@ import kotlin.math.roundToInt
 private const val VIBRATION_DEFAULT_AMPLITUDE: Int = -1 // VibrationEffect.DEFAULT_AMPLITUDE
 private const val VIBRATION_MAX_AMPLITUDE: Int = 255 // VibrationEffect.MAX_AMPLITUDE
 
-/** Returns true if amplitude is 0, 1 or [DEFAULT_AMPLITUDE]. */
-internal fun ConstantVibrationAtom.hasPatternAmplitude(): Boolean =
-    (amplitude == 0f) || (amplitude == 1f) || (amplitude == DEFAULT_AMPLITUDE)
-
 /** Returns the amplitude value in [0,255] or [android.os.VibrationEffect.DEFAULT_AMPLITUDE]. */
 internal fun ConstantVibrationAtom.getAmplitudeInt(): Int =
     if (amplitude == DEFAULT_AMPLITUDE) {
@@ -47,9 +42,7 @@ internal fun ConstantVibrationAtom.getAmplitudeInt(): Int =
         (amplitude * VIBRATION_MAX_AMPLITUDE).roundToInt()
     }
 
-/**
- * Helper class to convert haptic signals to platform types based on SDK support available.
- */
+/** Helper class to convert haptic signals to platform types based on SDK support available. */
 internal object HapticSignalConverter {
 
     internal fun toVibration(effect: PredefinedEffectSignal): VibrationWrapper? =
@@ -82,7 +75,6 @@ internal object HapticSignalConverter {
     @RequiresApi(31)
     private object Api31Impl {
         @JvmStatic
-        @DoNotInline
         fun toVibrationEffect(composition: CompositionSignal): VibrationEffectWrapper? =
             if (composition.minSdk() <= 31) {
                 // Use same API to create composition from API 30, but allow constants from API 31.
@@ -96,7 +88,6 @@ internal object HapticSignalConverter {
     @RequiresApi(30)
     private object Api30Impl {
         @JvmStatic
-        @DoNotInline
         fun toVibrationEffect(composition: CompositionSignal): VibrationEffectWrapper? =
             if (composition.minSdk() <= 30) {
                 createComposition(composition)
@@ -105,7 +96,6 @@ internal object HapticSignalConverter {
             }
 
         @JvmStatic
-        @DoNotInline
         fun createComposition(composition: CompositionSignal): VibrationEffectWrapper? {
             val platformComposition = VibrationEffect.startComposition()
             var delayMs = 0
@@ -116,11 +106,9 @@ internal object HapticSignalConverter {
                         platformComposition.addPrimitive(atom.type, atom.amplitudeScale, delayMs)
                         delayMs = 0
                     }
-
                     is OffAtom -> {
                         delayMs += atom.durationMillis.toInt()
                     }
-
                     else -> {
                         // Unsupported composition atom
                         return@createComposition null
@@ -136,7 +124,6 @@ internal object HapticSignalConverter {
     @RequiresApi(29)
     private object Api29Impl {
         @JvmStatic
-        @DoNotInline
         fun toVibrationEffect(effect: PredefinedEffectSignal): VibrationEffectWrapper? =
             if (effect.minSdk() <= 29) {
                 VibrationEffectWrapper(VibrationEffect.createPredefined(effect.type))
@@ -150,13 +137,14 @@ internal object HapticSignalConverter {
     private object Api26Impl {
 
         @JvmStatic
-        @DoNotInline
         fun toVibrationEffect(
             initialWaveform: WaveformSignal? = null,
             repeatingWaveform: WaveformSignal? = null,
         ): VibrationEffectWrapper? {
-            if (initialWaveform?.atoms?.any { it !is ConstantVibrationAtom } == true ||
-                repeatingWaveform?.atoms?.any { it !is ConstantVibrationAtom } == true) {
+            if (
+                initialWaveform?.atoms?.any { it !is ConstantVibrationAtom } == true ||
+                    repeatingWaveform?.atoms?.any { it !is ConstantVibrationAtom } == true
+            ) {
                 // Unsupported waveform atoms
                 return null
             }
@@ -197,8 +185,7 @@ internal object HapticSignalConverter {
                     PatternVibrationWrapper(longArrayOf(0, 30), repeatIndex = -1)
                 PredefinedEffectSignal.DOUBLE_CLICK ->
                     PatternVibrationWrapper(longArrayOf(0, 30, 100, 30), repeatIndex = -1)
-                else ->
-                    null
+                else -> null
             }
 
         @JvmStatic
@@ -206,20 +193,27 @@ internal object HapticSignalConverter {
             initialWaveform: WaveformSignal? = null,
             repeatingWaveform: WaveformSignal? = null,
         ): PatternVibrationWrapper? {
-            if (initialWaveform?.atoms?.any { it !is ConstantVibrationAtom } == true ||
-                repeatingWaveform?.atoms?.any { it !is ConstantVibrationAtom } == true) {
+            if (
+                initialWaveform?.atoms?.any { it !is ConstantVibrationAtom } == true ||
+                    repeatingWaveform?.atoms?.any { it !is ConstantVibrationAtom } == true
+            ) {
                 // Unsupported waveform entries
                 return null
             }
 
             val initialAtoms =
-                initialWaveform?.atoms?.filterIsInstance<ConstantVibrationAtom>().orEmpty()
+                initialWaveform
+                    ?.atoms
+                    ?.filterIsInstance<ConstantVibrationAtom>()
+                    .orEmpty()
                     .toMutableList()
             val repeatingAtoms =
                 repeatingWaveform?.atoms?.filterIsInstance<ConstantVibrationAtom>().orEmpty()
 
-            if (!initialAtoms.all { it.hasPatternAmplitude() } ||
-                !repeatingAtoms.all { it.hasPatternAmplitude() }) {
+            if (
+                !initialAtoms.all { it.hasPatternAmplitude() } ||
+                    !repeatingAtoms.all { it.hasPatternAmplitude() }
+            ) {
                 // Not possible to represent all amplitudes by an on-off pattern.
                 return null
             }

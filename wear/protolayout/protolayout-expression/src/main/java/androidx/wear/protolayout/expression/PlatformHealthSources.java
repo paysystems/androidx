@@ -16,21 +16,18 @@
 
 package androidx.wear.protolayout.expression;
 
-import static androidx.wear.protolayout.expression.DynamicBuilders.PLATFORM_INT32_SOURCE_TYPE_CURRENT_HEART_RATE;
-import static androidx.wear.protolayout.expression.DynamicBuilders.PLATFORM_INT32_SOURCE_TYPE_DAILY_STEP_COUNT;
-
 import android.Manifest;
 
 import androidx.annotation.IntDef;
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.annotation.RequiresPermission;
 import androidx.annotation.RestrictTo;
 import androidx.wear.protolayout.expression.DynamicBuilders.DynamicFloat;
 import androidx.wear.protolayout.expression.DynamicBuilders.DynamicInt32;
-import androidx.wear.protolayout.expression.DynamicBuilders.PlatformInt32Source;
 import androidx.wear.protolayout.expression.DynamicDataBuilders.DynamicDataValue;
 import androidx.wear.protolayout.expression.proto.DynamicProto;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -51,14 +48,19 @@ public class PlatformHealthSources {
 
     /** Heart rate accuracy is unknown. */
     public static final int HEART_RATE_ACCURACY_UNKNOWN = 0;
+
     /** Heart rate cannot be acquired because the sensor is not properly contacting skin. */
     public static final int HEART_RATE_ACCURACY_NO_CONTACT = 1;
+
     /** Heart rate data is currently too unreliable to be used. */
     public static final int HEART_RATE_ACCURACY_UNRELIABLE = 2;
+
     /** Heart rate data is available but the accuracy is low. */
     public static final int HEART_RATE_ACCURACY_LOW = 3;
+
     /** Heart rate data is available and the accuracy is medium. */
     public static final int HEART_RATE_ACCURACY_MEDIUM = 4;
+
     /** Heart rate data is available with high accuracy. */
     public static final int HEART_RATE_ACCURACY_HIGH = 5;
 
@@ -67,28 +69,26 @@ public class PlatformHealthSources {
         private Keys() {}
 
         /** The data source key for heart rate bpm data from platform health sources. */
-        @NonNull
         @RequiresPermission(Manifest.permission.BODY_SENSORS)
-        public static final PlatformDataKey<DynamicFloat> HEART_RATE_BPM =
+        public static final @NonNull PlatformDataKey<DynamicFloat> HEART_RATE_BPM =
                 new PlatformDataKey<>("HeartRate");
 
         /**
          * The data source key for heart rate sensor accuracy data from platform health sources. The
          * accuracy value is one of {@code HEART_RATE_ACCURACY_*} constants.
          */
-        @NonNull
         @RequiresPermission(Manifest.permission.BODY_SENSORS)
-        public static final PlatformDataKey<DynamicHeartRateAccuracy> HEART_RATE_ACCURACY =
+        public static final @NonNull PlatformDataKey<DynamicHeartRateAccuracy> HEART_RATE_ACCURACY =
                 new PlatformDataKey<>("HeartRate Accuracy");
+
         /**
          * The data source key for daily step count data from platform health sources. This is the
          * total step count over a day and it resets when 00:00 is reached (in whatever is the
          * timezone set at that time). This can result in the DAILY period being greater than or
          * less than 24 hours when the timezone of the device is changed.
          */
-        @NonNull
         @RequiresPermission(Manifest.permission.ACTIVITY_RECOGNITION)
-        public static final PlatformDataKey<DynamicInt32> DAILY_STEPS =
+        public static final @NonNull PlatformDataKey<DynamicInt32> DAILY_STEPS =
                 new PlatformDataKey<>("Daily Steps");
 
         /**
@@ -97,21 +97,19 @@ public class PlatformHealthSources {
          * the timezone set at that time). This can result in the DAILY period being greater than or
          * less than 24 hours when the timezone of the device is changed.
          */
-        @NonNull
         @RequiresPermission(Manifest.permission.ACTIVITY_RECOGNITION)
-        public static final PlatformDataKey<DynamicFloat> DAILY_DISTANCE_METERS =
+        public static final @NonNull PlatformDataKey<DynamicFloat> DAILY_DISTANCE_METERS =
                 new PlatformDataKey<>("Daily Distance");
 
         /**
          * The data source key for daily calories (kcal) data from platform health sources. This is
-         * the total number of kilocalories over a day (including both BMR and active calories)
-         * and it resets when 00:00 is reached (in whatever is the timezone set at that time).
-         * This can result in the DAILY period being greater than or less than 24 hours when the
-         * timezone of the device is changed.
+         * the total number of kilocalories over a day (including both BMR and active calories) and
+         * it resets when 00:00 is reached (in whatever is the timezone set at that time). This can
+         * result in the DAILY period being greater than or less than 24 hours when the timezone of
+         * the device is changed.
          */
-        @NonNull
         @RequiresPermission(Manifest.permission.ACTIVITY_RECOGNITION)
-        public static final PlatformDataKey<DynamicFloat> DAILY_CALORIES =
+        public static final @NonNull PlatformDataKey<DynamicFloat> DAILY_CALORIES =
                 new PlatformDataKey<>("Daily Calories");
 
         /**
@@ -120,9 +118,8 @@ public class PlatformHealthSources {
          * the timezone set at that time). This can result in the DAILY period being greater than or
          * less than 24 hours when the timezone of the device is changed.
          */
-        @NonNull
         @RequiresPermission(Manifest.permission.ACTIVITY_RECOGNITION)
-        public static final PlatformDataKey<DynamicFloat> DAILY_FLOORS =
+        public static final @NonNull PlatformDataKey<DynamicFloat> DAILY_FLOORS =
                 new PlatformDataKey<>("Daily Floors");
     }
 
@@ -135,12 +132,9 @@ public class PlatformHealthSources {
      * Keys#HEART_RATE_BPM} directly.
      */
     @RequiresPermission(Manifest.permission.BODY_SENSORS)
-    @NonNull
-    public static DynamicFloat heartRateBpm() {
-        return new PlatformInt32Source.Builder()
-                .setSourceType(PLATFORM_INT32_SOURCE_TYPE_CURRENT_HEART_RATE)
-                .build()
-                .asFloat();
+    @RequiresSchemaVersion(major = 1, minor = 200)
+    public static @NonNull DynamicFloat heartRateBpm() {
+        return DynamicFloat.from(Keys.HEART_RATE_BPM);
     }
 
     /**
@@ -150,8 +144,8 @@ public class PlatformHealthSources {
      * <p>The accuracy value is one of {@link DynamicHeartRateAccuracy} constants.
      */
     @RequiresPermission(Manifest.permission.BODY_SENSORS)
-    @NonNull
-    public static DynamicHeartRateAccuracy heartRateAccuracy() {
+    @RequiresSchemaVersion(major = 1, minor = 200)
+    public static @NonNull DynamicHeartRateAccuracy heartRateAccuracy() {
         return new DynamicHeartRateAccuracy(
                 new DynamicBuilders.StateInt32Source.Builder()
                         .setSourceKey(Keys.HEART_RATE_ACCURACY.getKey())
@@ -169,11 +163,9 @@ public class PlatformHealthSources {
      * Keys#DAILY_STEPS} directly.
      */
     @RequiresPermission(Manifest.permission.ACTIVITY_RECOGNITION)
-    @NonNull
-    public static DynamicInt32 dailySteps() {
-        return new PlatformInt32Source.Builder()
-                .setSourceType(PLATFORM_INT32_SOURCE_TYPE_DAILY_STEP_COUNT)
-                .build();
+    @RequiresSchemaVersion(major = 1, minor = 200)
+    public static @NonNull DynamicInt32 dailySteps() {
+        return DynamicInt32.from(Keys.DAILY_STEPS);
     }
 
     /**
@@ -183,8 +175,8 @@ public class PlatformHealthSources {
      * being greater than or less than 24 hours when the timezone of the device is changed.
      */
     @RequiresPermission(Manifest.permission.ACTIVITY_RECOGNITION)
-    @NonNull
-    public static DynamicFloat dailyFloors() {
+    @RequiresSchemaVersion(major = 1, minor = 200)
+    public static @NonNull DynamicFloat dailyFloors() {
         return DynamicFloat.from(Keys.DAILY_FLOORS);
     }
 
@@ -196,8 +188,8 @@ public class PlatformHealthSources {
      * timezone of the device is changed.
      */
     @RequiresPermission(Manifest.permission.ACTIVITY_RECOGNITION)
-    @NonNull
-    public static DynamicFloat dailyCalories() {
+    @RequiresSchemaVersion(major = 1, minor = 200)
+    public static @NonNull DynamicFloat dailyCalories() {
         return DynamicFloat.from(Keys.DAILY_CALORIES);
     }
 
@@ -208,8 +200,8 @@ public class PlatformHealthSources {
      * period being greater than or less than 24 hours when the timezone of the device is changed.
      */
     @RequiresPermission(Manifest.permission.ACTIVITY_RECOGNITION)
-    @NonNull
-    public static DynamicFloat dailyDistanceMeters() {
+    @RequiresSchemaVersion(major = 1, minor = 200)
+    public static @NonNull DynamicFloat dailyDistanceMeters() {
         return DynamicFloat.from(Keys.DAILY_DISTANCE_METERS);
     }
 
@@ -222,31 +214,35 @@ public class PlatformHealthSources {
         }
 
         /** Creates a constant-valued {@link DynamicHeartRateAccuracy}. */
-        @NonNull
-        public static DynamicHeartRateAccuracy constant(@HeartRateAccuracy int val) {
+        @RequiresSchemaVersion(major = 1, minor = 200)
+        public static @NonNull DynamicHeartRateAccuracy constant(@HeartRateAccuracy int val) {
             return new DynamicHeartRateAccuracy(DynamicInt32.constant(val));
         }
 
         /** Creates a value to be provided from a {@code PlatformDataProvider}. */
-        @NonNull
         @SuppressWarnings("unchecked") // DynamicHeartRateAccuracy acts like DynamicInt32.
-        public static DynamicDataValue<DynamicHeartRateAccuracy> dynamicDataValueOf(
+        @RequiresSchemaVersion(major = 1, minor = 200)
+        public static @NonNull DynamicDataValue<DynamicHeartRateAccuracy> dynamicDataValueOf(
                 @HeartRateAccuracy int val) {
             return (DynamicDataValue<DynamicHeartRateAccuracy>)
                     (DynamicDataValue<?>) DynamicDataValue.fromInt(val);
         }
 
         @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
-        @NonNull
         @Override
-        public DynamicProto.DynamicInt32 toDynamicInt32Proto() {
+        public DynamicProto.@NonNull DynamicInt32 toDynamicInt32Proto() {
             return mImpl.toDynamicInt32Proto();
         }
 
         @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
-        @Nullable
         @Override
-        public Fingerprint getFingerprint() {
+        public DynamicProto.@NonNull DynamicInt32 toDynamicInt32Proto(boolean withFingerprint) {
+            return mImpl.toDynamicInt32Proto(withFingerprint);
+        }
+
+        @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+        @Override
+        public @Nullable Fingerprint getFingerprint() {
             return mImpl.getFingerprint();
         }
     }

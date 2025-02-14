@@ -37,16 +37,24 @@ import org.junit.runners.JUnit4
 @SmallTest
 class PlayWaveformSignalSdk26AndAboveTest {
     private val fakeVibrator = AmplitudeVibrator()
-    private val hapticManager = HapticManager.createForVibrator(fakeVibrator)
+    private val hapticManager = requireNotNull(HapticManager.createForVibrator(fakeVibrator))
 
     @Test
     fun play_withOneShot_vibratesWithOneShotEffect() {
-        hapticManager.play(waveformOf(on(durationMillis = 10)))
-        hapticManager.play(waveformOf(on(durationMillis = 20, amplitude = 0.2f)))
-        assertThat(fakeVibrator).vibratedExactly(
-            vibration(timings = longArrayOf(10), amplitudes = intArrayOf(-1)),
-            vibration(timings = longArrayOf(20), amplitudes = intArrayOf(51)),
-        ).inOrder()
+        hapticManager.play(
+            waveformOf(on(durationMillis = 10)),
+            HapticAttributes(HapticAttributes.USAGE_TOUCH),
+        )
+        hapticManager.play(
+            waveformOf(on(durationMillis = 20, amplitude = 0.2f)),
+            HapticAttributes(HapticAttributes.USAGE_TOUCH),
+        )
+        assertThat(fakeVibrator)
+            .vibratedExactly(
+                vibration(timings = longArrayOf(10), amplitudes = intArrayOf(-1)),
+                vibration(timings = longArrayOf(20), amplitudes = intArrayOf(51)),
+            )
+            .inOrder()
     }
 
     @Test
@@ -57,14 +65,16 @@ class PlayWaveformSignalSdk26AndAboveTest {
                 on(durationMillis = 20, amplitude = 0.8f),
                 on(durationMillis = 30, amplitude = 0f),
                 on(durationMillis = 40, amplitude = 1f),
-            )
+            ),
+            HapticAttributes(HapticAttributes.USAGE_TOUCH),
         )
-        assertThat(fakeVibrator).vibratedExactly(
-            vibration(
-                timings = longArrayOf(10, 20, 30, 40),
-                amplitudes = intArrayOf(51, 204, 0, 255),
+        assertThat(fakeVibrator)
+            .vibratedExactly(
+                vibration(
+                    timings = longArrayOf(10, 20, 30, 40),
+                    amplitudes = intArrayOf(51, 204, 0, 255),
+                )
             )
-        )
     }
 
     @Test
@@ -75,34 +85,39 @@ class PlayWaveformSignalSdk26AndAboveTest {
                 off(durationMillis = 20),
                 on(durationMillis = 30),
                 off(durationMillis = 40),
-            )
+            ),
+            HapticAttributes(HapticAttributes.USAGE_TOUCH),
         )
-        assertThat(fakeVibrator).vibratedExactly(
-            vibration(
-                timings = longArrayOf(10, 20, 30, 40),
-                amplitudes = intArrayOf(-1, 0, -1, 0),
+        assertThat(fakeVibrator)
+            .vibratedExactly(
+                vibration(
+                    timings = longArrayOf(10, 20, 30, 40),
+                    amplitudes = intArrayOf(-1, 0, -1, 0),
+                )
             )
-        )
     }
 
     @Test
     fun play_withRepeatingAmplitudes_vibratesWithRepeatIndex() {
         hapticManager.play(
             waveformOf(
-                on(durationMillis = 10, amplitude = 0.2f),
-                on(durationMillis = 20, amplitude = 0.4f),
-            ).thenRepeat(
-                on(durationMillis = 30, amplitude = 0.6f),
-                on(durationMillis = 40, amplitude = 0.8f),
-            )
+                    on(durationMillis = 10, amplitude = 0.2f),
+                    on(durationMillis = 20, amplitude = 0.4f),
+                )
+                .thenRepeat(
+                    on(durationMillis = 30, amplitude = 0.6f),
+                    on(durationMillis = 40, amplitude = 0.8f),
+                ),
+            HapticAttributes(HapticAttributes.USAGE_TOUCH),
         )
-        assertThat(fakeVibrator).vibratedExactly(
-            vibration(
-                timings = longArrayOf(10, 20, 30, 40),
-                amplitudes = intArrayOf(51, 102, 153, 204),
-                repeat = 2,
+        assertThat(fakeVibrator)
+            .vibratedExactly(
+                vibration(
+                    timings = longArrayOf(10, 20, 30, 40),
+                    amplitudes = intArrayOf(51, 102, 153, 204),
+                    repeat = 2,
+                )
             )
-        )
     }
 }
 
@@ -111,18 +126,29 @@ class PlayWaveformSignalSdk26AndAboveTest {
 @SmallTest
 class PlayWaveformSignalBelowSdk26Test {
     private val fakeVibrator = PatternVibrator()
-    private val hapticManager = HapticManager.createForVibrator(fakeVibrator)
+    private val hapticManager = requireNotNull(HapticManager.createForVibrator(fakeVibrator))
 
     @Test
     fun play_withOneShot_vibratesWithPatternForDefaultAndMaxAmplitudes() {
-        hapticManager.play(waveformOf(on(durationMillis = 10)))
-        hapticManager.play(waveformOf(on(durationMillis = 20, amplitude = 1f)))
-        hapticManager.play(waveformOf(on(durationMillis = 30, amplitude = 0.2f)))
-        assertThat(fakeVibrator).vibratedExactly(
-            vibration(pattern = longArrayOf(0, 10)),
-            vibration(pattern = longArrayOf(0, 20)),
-            // Ignores last request with non-default amplitude
-        ).inOrder()
+        hapticManager.play(
+            waveformOf(on(durationMillis = 10)),
+            HapticAttributes(HapticAttributes.USAGE_TOUCH),
+        )
+        hapticManager.play(
+            waveformOf(on(durationMillis = 20, amplitude = 1f)),
+            HapticAttributes(HapticAttributes.USAGE_TOUCH),
+        )
+        hapticManager.play(
+            waveformOf(on(durationMillis = 30, amplitude = 0.2f)),
+            HapticAttributes(HapticAttributes.USAGE_TOUCH),
+        )
+        assertThat(fakeVibrator)
+            .vibratedExactly(
+                vibration(pattern = longArrayOf(0, 10)),
+                vibration(pattern = longArrayOf(0, 20)),
+                // Ignores last request with non-default amplitude
+            )
+            .inOrder()
     }
 
     @Test
@@ -133,7 +159,8 @@ class PlayWaveformSignalBelowSdk26Test {
                 on(durationMillis = 20, amplitude = 0.8f),
                 on(durationMillis = 30, amplitude = 0f),
                 on(durationMillis = 40, amplitude = 1f),
-            )
+            ),
+            HapticAttributes(HapticAttributes.USAGE_TOUCH),
         )
         assertThat(fakeVibrator).neverVibrated()
     }
@@ -148,12 +175,14 @@ class PlayWaveformSignalBelowSdk26Test {
                 on(durationMillis = 40),
                 off(durationMillis = 50),
                 off(durationMillis = 60),
+            ),
+            HapticAttributes(HapticAttributes.USAGE_TOUCH),
+        )
+        assertThat(fakeVibrator)
+            .vibratedExactly(
+                // OFF(0ms), ON(10ms), OFF(20ms), ON(30+40ms), OFF(50+60ms)
+                vibration(pattern = longArrayOf(0, 10, 20, 70, 110))
             )
-        )
-        assertThat(fakeVibrator).vibratedExactly(
-            // OFF(0ms), ON(10ms), OFF(20ms), ON(30+40ms), OFF(50+60ms)
-            vibration(pattern = longArrayOf(0, 10, 20, 70, 110))
-        )
     }
 
     @Test
@@ -165,12 +194,14 @@ class PlayWaveformSignalBelowSdk26Test {
                 off(durationMillis = 30),
                 on(durationMillis = 40, amplitude = 0f),
                 on(durationMillis = 50),
+            ),
+            HapticAttributes(HapticAttributes.USAGE_TOUCH),
+        )
+        assertThat(fakeVibrator)
+            .vibratedExactly(
+                // OFF(0ms), ON(10+20ms), OFF(30+40ms), ON(50ms)
+                vibration(pattern = longArrayOf(0, 30, 70, 50))
             )
-        )
-        assertThat(fakeVibrator).vibratedExactly(
-            // OFF(0ms), ON(10+20ms), OFF(30+40ms), ON(50ms)
-            vibration(pattern = longArrayOf(0, 30, 70, 50))
-        )
     }
 
     @Test
@@ -183,40 +214,46 @@ class PlayWaveformSignalBelowSdk26Test {
                 off(durationMillis = 40),
                 on(durationMillis = 50),
                 on(durationMillis = 60),
-            )
+            ),
+            HapticAttributes(HapticAttributes.USAGE_TOUCH),
         )
-        assertThat(fakeVibrator).vibratedExactly(
-            vibration(
-                // OFF(10ms), ON(20ms), OFF(30+40ms), ON(50+60ms)
-                pattern = longArrayOf(10, 20, 70, 110),
-                repeat = 0,
+        assertThat(fakeVibrator)
+            .vibratedExactly(
+                vibration(
+                    // OFF(10ms), ON(20ms), OFF(30+40ms), ON(50+60ms)
+                    pattern = longArrayOf(10, 20, 70, 110),
+                    repeat = 0,
+                )
             )
-        )
     }
 
     @Test
     fun play_withInitialAndRepeatingPattern_doesNotMergeInitialWithRepeatingPattern() {
         hapticManager.play(
             waveformOf(
-                on(durationMillis = 10),
-                off(durationMillis = 20),
-                off(durationMillis = 30),
-                on(durationMillis = 40),
-            ).thenRepeat(
-                on(durationMillis = 50),
-                on(durationMillis = 60),
-                off(durationMillis = 70),
-                off(durationMillis = 80),
-            )
+                    on(durationMillis = 10),
+                    off(durationMillis = 20),
+                    off(durationMillis = 30),
+                    on(durationMillis = 40),
+                )
+                .thenRepeat(
+                    on(durationMillis = 50),
+                    on(durationMillis = 60),
+                    off(durationMillis = 70),
+                    off(durationMillis = 80),
+                ),
+            HapticAttributes(HapticAttributes.USAGE_TOUCH),
         )
-        assertThat(fakeVibrator).vibratedExactly(
-            vibration(
-                // Does not merge consecutive ON steps 40 and 50 because of repeat index.
-                // OFF(0ms), ON(10ms), OFF(20+30ms), ON(40ms), OFF(+0ms), ON(50+60ms), OFF(70+80ms)
-                pattern = longArrayOf(0, 10, 50, 40, 0, 110, 150),
-                repeat = 4,
+        assertThat(fakeVibrator)
+            .vibratedExactly(
+                vibration(
+                    // Does not merge consecutive ON steps 40 and 50 because of repeat index.
+                    // OFF(0ms), ON(10ms), OFF(20+30ms), ON(40ms), OFF(+0ms), ON(50+60ms),
+                    // OFF(70+80ms)
+                    pattern = longArrayOf(0, 10, 50, 40, 0, 110, 150),
+                    repeat = 4,
+                )
             )
-        )
     }
 }
 
@@ -224,12 +261,18 @@ class PlayWaveformSignalBelowSdk26Test {
 @SmallTest
 class PlayWaveformSignalAllSdksTest {
     private val fakeVibrator = AmplitudeVibrator()
-    private val hapticManager = HapticManager.createForVibrator(fakeVibrator)
+    private val hapticManager = requireNotNull(HapticManager.createForVibrator(fakeVibrator))
 
     @Test
     fun play_withZeroDurationSignal_doesNotVibrate() {
-        hapticManager.play(waveformOf(on(durationMillis = 0)))
-        hapticManager.play(waveformOf(on(durationMillis = 0, amplitude = 0.2f)))
+        hapticManager.play(
+            waveformOf(on(durationMillis = 0)),
+            HapticAttributes(HapticAttributes.USAGE_TOUCH),
+        )
+        hapticManager.play(
+            waveformOf(on(durationMillis = 0, amplitude = 0.2f)),
+            HapticAttributes(HapticAttributes.USAGE_TOUCH),
+        )
         hapticManager.play(
             waveformOf(
                 on(durationMillis = 0, amplitude = 0.2f),
@@ -237,16 +280,15 @@ class PlayWaveformSignalAllSdksTest {
                 on(durationMillis = 0, amplitude = 0f),
                 on(durationMillis = 0, amplitude = 1f),
                 off(durationMillis = 0),
-            )
+            ),
+            HapticAttributes(HapticAttributes.USAGE_TOUCH),
         )
         assertThat(fakeVibrator).neverVibrated()
     }
 
     @Test
     fun waveformOf_withNoAtom_throwsException() {
-        assertThrows(IllegalArgumentException::class.java) {
-            waveformOf()
-        }
+        assertThrows(IllegalArgumentException::class.java) { waveformOf() }
     }
 
     @Test
@@ -265,15 +307,11 @@ class PlayWaveformSignalAllSdksTest {
 
     @Test
     fun on_withNegativeDuration_throwsException() {
-        assertThrows(IllegalArgumentException::class.java) {
-            on(durationMillis = -10)
-        }
+        assertThrows(IllegalArgumentException::class.java) { on(durationMillis = -10) }
     }
 
     @Test
     fun off_withNegativeDuration_throwsException() {
-        assertThrows(IllegalArgumentException::class.java) {
-            off(durationMillis = -10)
-        }
+        assertThrows(IllegalArgumentException::class.java) { off(durationMillis = -10) }
     }
 }

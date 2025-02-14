@@ -32,12 +32,12 @@ import android.view.View;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 import androidx.test.filters.SdkSuppress;
 
+import org.jspecify.annotations.NonNull;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -45,7 +45,6 @@ import java.util.concurrent.TimeoutException;
 
 @LargeTest
 @RunWith(AndroidJUnit4.class)
-@SdkSuppress(minSdkVersion = 18)
 public class GridLayoutManagerUiAutomationTests extends BaseGridLayoutManagerTest {
 
     private static final int DEFAULT_ACCESSIBILITY_EVENT_TIMEOUT_MILLIS = 5000;
@@ -873,9 +872,8 @@ public class GridLayoutManagerUiAutomationTests extends BaseGridLayoutManagerTes
     }
 
     @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-    @NonNull
-    private UiAutomation setUpGridLayoutManagerAccessibilityTest(int itemCount, int orientation)
-            throws Throwable {
+    private @NonNull UiAutomation setUpGridLayoutManagerAccessibilityTest(int itemCount,
+            int orientation) throws Throwable {
         // TODO(b/267511848): suppress to LOLLIPOP once U constants are finalized and available in
         //  earlier android versions.
 
@@ -891,9 +889,7 @@ public class GridLayoutManagerUiAutomationTests extends BaseGridLayoutManagerTes
         return bundle;
     }
 
-    @NonNull
-    @RequiresApi(Build.VERSION_CODES.JELLY_BEAN_MR2)
-    private UiAutomation setUpAndReturnUiAutomation() {
+    private @NonNull UiAutomation setUpAndReturnUiAutomation() {
         UiAutomation uiAutomation = getInstrumentation().getUiAutomation();
         final AccessibilityServiceInfo info = uiAutomation.getServiceInfo();
         info.flags |= AccessibilityServiceInfo.FLAG_REQUEST_TOUCH_EXPLORATION_MODE;

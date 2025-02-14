@@ -15,6 +15,7 @@
  */
 package androidx.collection
 
+import kotlin.js.JsName
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -22,6 +23,14 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+
+// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// DO NOT MAKE CHANGES to the kotlin source file.
+//
+// This file was generated from a template in the template directory.
+// Make a change to the original template and run the generateCollections.sh script
+// to ensure the change is available on all versions of the map.
+// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 class LongSetTest {
     @Test
@@ -74,9 +83,7 @@ class LongSetTest {
         assertEquals(2, set.size)
         val elements = LongArray(2)
         var index = 0
-        set.forEach { element ->
-            elements[index++] = element
-        }
+        set.forEach { element -> elements[index++] = element }
         elements.sort()
         assertEquals(1L, elements[0])
         assertEquals(2L, elements[1])
@@ -147,9 +154,9 @@ class LongSetTest {
         val set = MutableLongSet()
         set += 1L
         set += 2L
-        var element: Long = Long.MIN_VALUE
-        var otherElement: Long = Long.MIN_VALUE
-        set.forEach { if (element == Long.MIN_VALUE) element = it else otherElement = it }
+        var element: Long = -1L
+        var otherElement: Long = -1L
+        set.forEach { if (element == -1L) element = it else otherElement = it }
         assertEquals(element, set.first())
         set -= element
         assertEquals(otherElement, set.first())
@@ -229,7 +236,7 @@ class LongSetTest {
 
         // Make sure reinserting an entry after filling the table
         // with "Deleted" markers works
-        set += 3L
+        set += 1L
 
         assertEquals(1, set.size)
         assertEquals(capacity, set.capacity)
@@ -297,9 +304,7 @@ class LongSetTest {
 
             val elements = LongArray(i)
             var index = 0
-            set.forEach { element ->
-                elements[index++] = element
-            }
+            set.forEach { element -> elements[index++] = element }
             elements.sort()
 
             index = 0
@@ -332,13 +337,38 @@ class LongSetTest {
 
         set += 1L
         set += 5L
-        assertTrue(
-            "[1, 5]" == set.toString() ||
-                "[5, 1]" == set.toString()
+        assertTrue("[${1L}, ${5L}]" == set.toString() || "[${5L}, ${1L}]" == set.toString())
+    }
+
+    @Test
+    fun joinToString() {
+        val set = longSetOf(1L, 2L, 3L, 4L, 5L)
+        val order = IntArray(5)
+        var index = 0
+        set.forEach { element -> order[index++] = element.toInt() }
+        assertEquals(
+            "${order[0].toLong()}, ${order[1].toLong()}, ${order[2].toLong()}, " +
+                "${order[3].toLong()}, ${order[4].toLong()}",
+            set.joinToString()
+        )
+        assertEquals(
+            "x${order[0].toLong()}, ${order[1].toLong()}, ${order[2].toLong()}...",
+            set.joinToString(prefix = "x", postfix = "y", limit = 3)
+        )
+        assertEquals(
+            ">${order[0].toLong()}-${order[1].toLong()}-${order[2].toLong()}-" +
+                "${order[3].toLong()}-${order[4].toLong()}<",
+            set.joinToString(separator = "-", prefix = ">", postfix = "<")
+        )
+        val names = arrayOf("one", "two", "three", "four", "five")
+        assertEquals(
+            "${names[order[0]]}, ${names[order[1]]}, ${names[order[2]]}...",
+            set.joinToString(limit = 3) { names[it.toInt()] }
         )
     }
 
     @Test
+    @JsName("jsEquals")
     fun equals() {
         val set = MutableLongSet()
         set += 1L
@@ -437,8 +467,7 @@ class LongSetTest {
         set.clear()
         assertEquals(capacity, set.trim())
         assertEquals(0, set.capacity)
-        set.addAll(longArrayOf(1L, 2L, 3L, 4L, 5L, 7L, 6L, 8L,
-            9L, 10L, 11L, 12L, 13L, 14L))
+        set.addAll(longArrayOf(1L, 2L, 3L, 4L, 5L, 7L, 6L, 8L, 9L, 10L, 11L, 12L, 13L, 14L))
         set.removeAll(longArrayOf(6L, 8L, 9L, 10L, 11L, 12L, 13L, 14L))
         assertTrue(set.trim() > 0)
         assertEquals(capacity, set.capacity)
@@ -522,5 +551,46 @@ class LongSetTest {
         assertTrue(3L in set)
         assertTrue(4L in set)
         assertFalse(5L in set)
+    }
+
+    @Test
+    fun buildLongSetFunction() {
+        val contract: Boolean
+        val set = buildLongSet {
+            contract = true
+            add(1L)
+            add(2L)
+        }
+        assertTrue(contract)
+        assertEquals(2, set.size)
+        assertTrue(1L in set)
+        assertTrue(2L in set)
+    }
+
+    @Test
+    fun buildLongSetWithCapacityFunction() {
+        val contract: Boolean
+        val set =
+            buildLongSet(20) {
+                contract = true
+                add(1L)
+                add(2L)
+            }
+        assertTrue(contract)
+        assertEquals(2, set.size)
+        assertTrue(set.capacity >= 18)
+        assertTrue(1L in set)
+        assertTrue(2L in set)
+    }
+
+    @Test
+    fun insertManyRemoveMany() {
+        val set = mutableLongSetOf()
+
+        for (i in 0..1000000) {
+            set.add(i.toLong())
+            set.remove(i.toLong())
+            assertTrue(set.capacity < 16, "Set grew larger than 16 after step $i")
+        }
     }
 }

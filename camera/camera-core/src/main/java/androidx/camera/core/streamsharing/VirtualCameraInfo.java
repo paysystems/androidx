@@ -16,22 +16,25 @@
 
 package androidx.camera.core.streamsharing;
 
-import android.os.Build;
+import static androidx.camera.core.impl.utils.TransformUtils.within360;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.RequiresApi;
+import android.view.Surface;
+
 import androidx.camera.core.impl.CameraInfoInternal;
 import androidx.camera.core.impl.ForwardingCameraInfo;
+import androidx.camera.core.impl.ImageOutputConfig;
+
+import org.jspecify.annotations.NonNull;
 
 import java.util.UUID;
 
 /**
  * A {@link CameraInfoInternal} that returns info of the virtual camera.
  */
-@RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
 public class VirtualCameraInfo extends ForwardingCameraInfo {
 
     private final String mVirtualCameraId;
+    private int mVirtualCameraRotationDegrees;
 
     VirtualCameraInfo(@NonNull CameraInfoInternal cameraInfoInternal) {
         super(cameraInfoInternal);
@@ -43,9 +46,28 @@ public class VirtualCameraInfo extends ForwardingCameraInfo {
     /**
      * Override the parent camera ID.
      */
-    @NonNull
     @Override
-    public String getCameraId() {
+    public @NonNull String getCameraId() {
         return mVirtualCameraId;
+    }
+
+    /**
+     * Sets the rotation applied by this virtual camera.
+     */
+    void setVirtualCameraRotationDegrees(int virtualCameraRotationDegrees) {
+        mVirtualCameraRotationDegrees = virtualCameraRotationDegrees;
+    }
+
+    @Override
+    public int getSensorRotationDegrees() {
+        return getSensorRotationDegrees(Surface.ROTATION_0);
+    }
+
+    @Override
+    public int getSensorRotationDegrees(@ImageOutputConfig.RotationValue int relativeRotation) {
+        // The child UseCase calls this method to get the remaining rotation degrees, which is the
+        // original rotation minus the rotation applied by the virtual camera.
+        return within360(
+                super.getSensorRotationDegrees(relativeRotation) - mVirtualCameraRotationDegrees);
     }
 }

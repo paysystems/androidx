@@ -24,14 +24,17 @@ import static androidx.appsearch.compiler.IntrospectionHelper.validateIsGetter;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.appsearch.compiler.annotationwrapper.DataPropertyAnnotation;
+import androidx.appsearch.compiler.annotationwrapper.LongPropertyAnnotation;
 import androidx.appsearch.compiler.annotationwrapper.MetadataPropertyAnnotation;
 import androidx.appsearch.compiler.annotationwrapper.PropertyAnnotation;
+import androidx.appsearch.compiler.annotationwrapper.SerializerClass;
 import androidx.appsearch.compiler.annotationwrapper.StringPropertyAnnotation;
 
 import com.google.auto.value.AutoValue;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.List;
@@ -89,8 +92,7 @@ public abstract class AnnotatedGetterOrField {
      * Creates a {@link AnnotatedGetterOrField} if the element is annotated with some
      * {@link PropertyAnnotation}. Otherwise returns null.
      */
-    @Nullable
-    public static AnnotatedGetterOrField tryCreateFor(
+    public static @Nullable AnnotatedGetterOrField tryCreateFor(
             @NonNull Element element,
             @NonNull ProcessingEnvironment env) throws ProcessingException {
         requireNonNull(element);
@@ -122,8 +124,7 @@ public abstract class AnnotatedGetterOrField {
      * Creates a {@link AnnotatedGetterOrField} for a {@code getterOrField} annotated with the
      * specified {@code annotation}.
      */
-    @NonNull
-    public static AnnotatedGetterOrField create(
+    public static @NonNull AnnotatedGetterOrField create(
             @NonNull PropertyAnnotation annotation,
             @NonNull Element getterOrField,
             @NonNull ProcessingEnvironment env) throws ProcessingException {
@@ -149,28 +150,24 @@ public abstract class AnnotatedGetterOrField {
     /**
      * The annotation that the getter or field is annotated with.
      */
-    @NonNull
-    public abstract PropertyAnnotation getAnnotation();
+    public abstract @NonNull PropertyAnnotation getAnnotation();
 
     /**
      * The annotated getter or field.
      */
-    @NonNull
-    public abstract Element getElement();
+    public abstract @NonNull Element getElement();
 
     /**
      * The type-category of the getter or field.
      *
      * <p>Note: {@code byte[]} as treated specially as documented in {@link ElementTypeCategory}.
      */
-    @NonNull
-    public abstract ElementTypeCategory getElementTypeCategory();
+    public abstract @NonNull ElementTypeCategory getElementTypeCategory();
 
     /**
      * The field/getter's return type.
      */
-    @NonNull
-    public TypeMirror getJvmType() {
+    public @NonNull TypeMirror getJvmType() {
         return isGetter()
                 ? ((ExecutableElement) getElement()).getReturnType()
                 : getElement().asType();
@@ -192,14 +189,12 @@ public abstract class AnnotatedGetterOrField {
      * }
      * </pre>
      */
-    @NonNull
-    public abstract TypeMirror getComponentType();
+    public abstract @NonNull TypeMirror getComponentType();
 
     /**
      * The getter/field's jvm name e.g. {@code mId} or {@code getName}.
      */
-    @NonNull
-    public String getJvmName() {
+    public @NonNull String getJvmName() {
         return getElement().getSimpleName().toString();
     }
 
@@ -217,8 +212,7 @@ public abstract class AnnotatedGetterOrField {
      * }
      * </pre>
      */
-    @NonNull
-    public abstract String getNormalizedName();
+    public abstract @NonNull String getNormalizedName();
 
     /**
      * Whether the {@link #getElement()} is a getter.
@@ -261,8 +255,7 @@ public abstract class AnnotatedGetterOrField {
      *
      * <p>Note: {@code byte[]} are treated specially as documented in {@link ElementTypeCategory}.
      */
-    @NonNull
-    private static ElementTypeCategory inferTypeCategory(
+    private static @NonNull ElementTypeCategory inferTypeCategory(
             @NonNull Element getterOrField,
             @NonNull ProcessingEnvironment env) {
         TypeMirror jvmType = getPropertyType(getterOrField);
@@ -288,8 +281,7 @@ public abstract class AnnotatedGetterOrField {
      *
      * <p>For example, {@code String mField -> String} and {@code List<String> mField -> String}.
      */
-    @NonNull
-    private static TypeMirror inferComponentType(
+    private static @NonNull TypeMirror inferComponentType(
             @NonNull Element getterOrField,
             @NonNull ElementTypeCategory typeCategory) throws ProcessingException {
         TypeMirror jvmType = getPropertyType(getterOrField);
@@ -313,8 +305,7 @@ public abstract class AnnotatedGetterOrField {
         }
     }
 
-    @NonNull
-    private static String inferNormalizedName(
+    private static @NonNull String inferNormalizedName(
             @NonNull Element element,
             @NonNull ProcessingEnvironment env) {
         return element.getKind() == ElementKind.METHOD
@@ -353,14 +344,13 @@ public abstract class AnnotatedGetterOrField {
      * @throws ProcessingException If the element is annotated with more than one of such
      *                             annotations.
      */
-    @Nullable
-    private static AnnotationMirror getSingleAppSearchAnnotation(
+    private static @Nullable AnnotationMirror getSingleAppSearchAnnotation(
             @NonNull Element element) throws ProcessingException {
         // @Document.* annotation
         List<? extends AnnotationMirror> annotations =
                 element.getAnnotationMirrors().stream()
                         .filter(ann -> ann.getAnnotationType().toString().startsWith(
-                                DOCUMENT_ANNOTATION_CLASS)).toList();
+                                DOCUMENT_ANNOTATION_CLASS.canonicalName())).toList();
         if (annotations.isEmpty()) {
             return null;
         }
@@ -371,8 +361,7 @@ public abstract class AnnotatedGetterOrField {
         return annotations.get(0);
     }
 
-    @NonNull
-    private static String inferNormalizedMethodName(
+    private static @NonNull String inferNormalizedMethodName(
             @NonNull Element method, @NonNull ProcessingEnvironment env) {
         String methodName = method.getSimpleName().toString();
         IntrospectionHelper helper = new IntrospectionHelper(env);
@@ -392,8 +381,7 @@ public abstract class AnnotatedGetterOrField {
         return methodName;
     }
 
-    @NonNull
-    private static String inferNormalizedFieldName(@NonNull Element field) {
+    private static @NonNull String inferNormalizedFieldName(@NonNull Element field) {
         String fieldName = field.getSimpleName().toString();
         if (fieldName.length() < 2) {
             return fieldName;
@@ -474,19 +462,34 @@ public abstract class AnnotatedGetterOrField {
         IntrospectionHelper helper = new IntrospectionHelper(env);
         switch (annotation.getDataPropertyKind()) {
             case STRING_PROPERTY:
-                requireTypeIsOneOf(
-                        getterOrField, List.of(helper.mStringType), env, /* allowRepeated= */true);
+                SerializerClass stringSerializer =
+                        ((StringPropertyAnnotation) annotation).getCustomSerializer();
+                if (stringSerializer != null) {
+                    requireComponentTypeMatchesWithSerializer(getterOrField, stringSerializer, env);
+                } else {
+                    requireTypeIsOneOf(
+                            getterOrField,
+                            List.of(helper.mStringType),
+                            env,
+                            /* allowRepeated= */true);
+                }
                 break;
             case DOCUMENT_PROPERTY:
                 requireTypeIsSomeDocumentClass(getterOrField, env);
                 break;
             case LONG_PROPERTY:
-                requireTypeIsOneOf(
-                        getterOrField,
-                        List.of(helper.mLongPrimitiveType, helper.mIntPrimitiveType,
-                                helper.mLongBoxType, helper.mIntegerBoxType),
-                        env,
-                        /* allowRepeated= */true);
+                SerializerClass longSerializer =
+                        ((LongPropertyAnnotation) annotation).getCustomSerializer();
+                if (longSerializer != null) {
+                    requireComponentTypeMatchesWithSerializer(getterOrField, longSerializer, env);
+                } else {
+                    requireTypeIsOneOf(
+                            getterOrField,
+                            List.of(helper.mLongPrimitiveType, helper.mIntPrimitiveType,
+                                    helper.mLongBoxType, helper.mIntegerBoxType),
+                            env,
+                            /* allowRepeated= */true);
+                }
                 break;
             case DOUBLE_PROPERTY:
                 requireTypeIsOneOf(
@@ -507,6 +510,20 @@ public abstract class AnnotatedGetterOrField {
                 requireTypeIsOneOf(
                         getterOrField,
                         List.of(helper.mBytePrimitiveArrayType),
+                        env,
+                        /* allowRepeated= */true);
+                break;
+            case EMBEDDING_PROPERTY:
+                requireTypeIsOneOf(
+                        getterOrField,
+                        List.of(helper.mEmbeddingType),
+                        env,
+                        /* allowRepeated= */true);
+                break;
+            case BLOB_HANDLE_PROPERTY:
+                requireTypeIsOneOf(
+                        getterOrField,
+                        List.of(helper.mBlobHandleType),
                         env,
                         /* allowRepeated= */true);
                 break;
@@ -533,11 +550,39 @@ public abstract class AnnotatedGetterOrField {
                 .anyMatch(expectedType -> typeUtils.isSameType(expectedType, target));
         if (!isValid) {
             String error = "@"
-                    + getterOrField.getAnnotation().getSimpleClassName()
+                    + getterOrField.getAnnotation().getClassName().simpleName()
                     + " must only be placed on a getter/field of type "
                     + (allowRepeated ? "or array or collection of " : "")
                     + expectedTypes.stream().map(TypeMirror::toString).collect(joining("|"));
             throw new ProcessingException(error, getterOrField.getElement());
+        }
+    }
+
+    /**
+     * Makes sure the getter/field's component type is consistent with the serializer class.
+     *
+     * @throws ProcessingException If the getter/field is of a different type than what the
+     *                             serializer class serializes to/from.
+     */
+    private static void requireComponentTypeMatchesWithSerializer(
+            @NonNull AnnotatedGetterOrField getterOrField,
+            @NonNull SerializerClass serializerClass,
+            @NonNull ProcessingEnvironment env) throws ProcessingException {
+        // The component type must exactly match the type for which we have a serializer.
+        // Subtypes do not work e.g.
+        // @StringProperty(serializer = ParentSerializer.class) Child mField;
+        // because ParentSerializer.deserialize(String) would return a Parent, which we won't be
+        // able to assign to mField.
+        if (!env.getTypeUtils().isSameType(
+                getterOrField.getComponentType(), serializerClass.getCustomType())) {
+            throw new ProcessingException(
+                    ("@%s with serializer = %s must only be placed on a getter/field of type or "
+                            + "array or collection of %s")
+                            .formatted(
+                                    getterOrField.getAnnotation().getClassName().simpleName(),
+                                    serializerClass.getElement().getSimpleName(),
+                                    serializerClass.getCustomType()),
+                    getterOrField.getElement());
         }
     }
 
@@ -552,7 +597,7 @@ public abstract class AnnotatedGetterOrField {
         TypeMirror componentType = annotatedGetterOrField.getComponentType();
         if (componentType.getKind() == TypeKind.DECLARED) {
             Element element = env.getTypeUtils().asElement(componentType);
-            if (element.getKind() == ElementKind.CLASS && getDocumentAnnotation(element) != null) {
+            if (getDocumentAnnotation(element) != null) {
                 return;
             }
         }

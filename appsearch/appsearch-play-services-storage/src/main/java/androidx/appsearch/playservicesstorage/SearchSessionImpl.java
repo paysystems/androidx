@@ -16,7 +16,6 @@
 
 package androidx.appsearch.playservicesstorage;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.RestrictTo;
 import androidx.appsearch.app.AppSearchBatchResult;
 import androidx.appsearch.app.AppSearchSession;
@@ -40,6 +39,8 @@ import androidx.appsearch.playservicesstorage.converter.GetSchemaResponseToGmsCo
 import androidx.appsearch.playservicesstorage.converter.RequestToGmsConverter;
 import androidx.appsearch.playservicesstorage.converter.ResponseToGmsConverter;
 import androidx.appsearch.playservicesstorage.converter.SearchSpecToGmsConverter;
+import androidx.appsearch.playservicesstorage.converter.SearchSuggestionResultToGmsConverter;
+import androidx.appsearch.playservicesstorage.converter.SearchSuggestionSpecToGmsConverter;
 import androidx.appsearch.playservicesstorage.converter.SetSchemaRequestToGmsConverter;
 import androidx.appsearch.playservicesstorage.util.AppSearchTaskFutures;
 import androidx.core.util.Preconditions;
@@ -49,9 +50,12 @@ import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
 import com.google.common.util.concurrent.ListenableFuture;
 
+import org.jspecify.annotations.NonNull;
+
 import java.io.Closeable;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Executor;
 
 /**
  * An implementation of {@link AppSearchSession} which proxies to a Google Play Service's
@@ -62,48 +66,47 @@ class SearchSessionImpl implements AppSearchSession, Closeable {
     private final AppSearchClient mGmsClient;
     private final Features mFeatures;
     private final String mDatabaseName;
-
+    private final Executor mExecutor;
 
     SearchSessionImpl(
             @NonNull AppSearchClient gmsClient,
             @NonNull Features features,
-            @NonNull String databaseName) {
+            @NonNull String databaseName,
+            @NonNull Executor executor) {
         mGmsClient = Preconditions.checkNotNull(gmsClient);
         mFeatures = Preconditions.checkNotNull(features);
         mDatabaseName = Preconditions.checkNotNull(databaseName);
+        mExecutor = Preconditions.checkNotNull(executor);
     }
 
-    @NonNull
     @Override
-    public ListenableFuture<SetSchemaResponse> setSchemaAsync(@NonNull SetSchemaRequest request) {
+    public @NonNull ListenableFuture<SetSchemaResponse> setSchemaAsync(
+            @NonNull SetSchemaRequest request) {
         Preconditions.checkNotNull(request);
         return AppSearchTaskFutures.toListenableFuture(
                 mGmsClient.setSchema(
                         SetSchemaRequestToGmsConverter.toGmsSetSchemaRequest(
                                 request),
                         mDatabaseName),
-                SetSchemaRequestToGmsConverter::toJetpackSetSchemaResponse);
+                SetSchemaRequestToGmsConverter::toJetpackSetSchemaResponse, mExecutor);
     }
 
-    @NonNull
     @Override
-    public ListenableFuture<GetSchemaResponse> getSchemaAsync() {
+    public @NonNull ListenableFuture<GetSchemaResponse> getSchemaAsync() {
         return AppSearchTaskFutures.toListenableFuture(
                 mGmsClient.getSchema(mDatabaseName),
-                GetSchemaResponseToGmsConverter::toJetpackGetSchemaResponse);
+                GetSchemaResponseToGmsConverter::toJetpackGetSchemaResponse, mExecutor);
     }
 
-    @NonNull
     @Override
-    public ListenableFuture<Set<String>> getNamespacesAsync() {
+    public @NonNull ListenableFuture<Set<String>> getNamespacesAsync() {
         return AppSearchTaskFutures.toListenableFuture(
                 mGmsClient.getNamespaces(mDatabaseName),
-                /* valueMapper= */ i -> i);
+                /* valueMapper= */ i -> i, mExecutor);
     }
 
-    @NonNull
     @Override
-    public ListenableFuture<AppSearchBatchResult<String, Void>> putAsync(
+    public @NonNull ListenableFuture<AppSearchBatchResult<String, Void>> putAsync(
             @NonNull PutDocumentsRequest request) {
         Preconditions.checkNotNull(request);
         return AppSearchTaskFutures.toListenableFuture(
@@ -111,25 +114,25 @@ class SearchSessionImpl implements AppSearchSession, Closeable {
                         RequestToGmsConverter.toGmsPutDocumentsRequest(request),
                         mDatabaseName),
                 result -> AppSearchResultToGmsConverter.gmsAppSearchBatchResultToJetpack(
-                        result, /* valueMapper= */ i -> i));
+                        result, /* valueMapper= */ i -> i), mExecutor);
     }
 
-    @NonNull
     @Override
-    public ListenableFuture<AppSearchBatchResult<String, GenericDocument>> getByDocumentIdAsync(
-            @NonNull GetByDocumentIdRequest request) {
+    public @NonNull ListenableFuture<AppSearchBatchResult<String, GenericDocument>>
+            getByDocumentIdAsync(@NonNull GetByDocumentIdRequest request) {
         Preconditions.checkNotNull(request);
         return AppSearchTaskFutures.toListenableFuture(
                 mGmsClient.getByDocumentId(
                         RequestToGmsConverter.toGmsGetByDocumentIdRequest(request),
                         mDatabaseName),
                 result -> AppSearchResultToGmsConverter.gmsAppSearchBatchResultToJetpack(
-                                result, GenericDocumentToGmsConverter::toJetpackGenericDocument));
+                                result, GenericDocumentToGmsConverter::toJetpackGenericDocument),
+                mExecutor);
     }
 
-    @NonNull
     @Override
-    public SearchResults search(@NonNull String queryExpression, @NonNull SearchSpec searchSpec) {
+    public @NonNull SearchResults search(@NonNull String queryExpression,
+            @NonNull SearchSpec searchSpec) {
         Preconditions.checkNotNull(queryExpression);
         Preconditions.checkNotNull(searchSpec);
         com.google.android.gms.appsearch.SearchResults gmsSearchResults =
@@ -137,33 +140,37 @@ class SearchSessionImpl implements AppSearchSession, Closeable {
                         queryExpression,
                         SearchSpecToGmsConverter.toGmsSearchSpec(searchSpec),
                         mDatabaseName);
-        return new SearchResultsImpl(gmsSearchResults, searchSpec);
+        return new SearchResultsImpl(gmsSearchResults, mExecutor);
     }
 
-    @NonNull
     @Override
-    public ListenableFuture<List<SearchSuggestionResult>> searchSuggestionAsync(
+    public @NonNull ListenableFuture<List<SearchSuggestionResult>> searchSuggestionAsync(
             @NonNull String suggestionQueryExpression,
             @NonNull SearchSuggestionSpec searchSuggestionSpec) {
-        // TODO(b/274986359): Implement searchSuggestionAsync for PlayServicesStorage.
-        throw new UnsupportedOperationException(
-                "Search Suggestion is not yet supported on this AppSearch implementation.");
+        Preconditions.checkNotNull(suggestionQueryExpression);
+        Preconditions.checkNotNull(searchSuggestionSpec);
+        return AppSearchTaskFutures.toListenableFuture(
+                mGmsClient.searchSuggestion(
+                        suggestionQueryExpression,
+                        SearchSuggestionSpecToGmsConverter.toGmsSearchSuggestionSpec(
+                                searchSuggestionSpec),
+                        mDatabaseName),
+                SearchSuggestionResultToGmsConverter :: toGmsSearchSuggestionResults,
+                mExecutor);
     }
 
-    @NonNull
     @Override
-    public ListenableFuture<Void> reportUsageAsync(@NonNull ReportUsageRequest request) {
+    public @NonNull ListenableFuture<Void> reportUsageAsync(@NonNull ReportUsageRequest request) {
         Preconditions.checkNotNull(request);
         return AppSearchTaskFutures.toListenableFuture(
                 mGmsClient.reportUsage(
                         RequestToGmsConverter.toGmsReportUsageRequest(request),
                         mDatabaseName),
-                /* valueMapper= */ i -> i);
+                /* valueMapper= */ i -> i, mExecutor);
     }
 
-    @NonNull
     @Override
-    public ListenableFuture<AppSearchBatchResult<String, Void>> removeAsync(
+    public @NonNull ListenableFuture<AppSearchBatchResult<String, Void>> removeAsync(
             @NonNull RemoveByDocumentIdRequest request) {
         Preconditions.checkNotNull(request);
         return AppSearchTaskFutures.toListenableFuture(
@@ -172,12 +179,11 @@ class SearchSessionImpl implements AppSearchSession, Closeable {
                                 .toGmsRemoveByDocumentIdRequest(request),
                         mDatabaseName),
                 result -> AppSearchResultToGmsConverter.gmsAppSearchBatchResultToJetpack(
-                        result, /* valueMapper= */ i -> i));
+                        result, /* valueMapper= */ i -> i), mExecutor);
     }
 
-    @NonNull
     @Override
-    public ListenableFuture<Void> removeAsync(@NonNull String queryExpression,
+    public @NonNull ListenableFuture<Void> removeAsync(@NonNull String queryExpression,
             @NonNull SearchSpec searchSpec) {
         Preconditions.checkNotNull(queryExpression);
         Preconditions.checkNotNull(searchSpec);
@@ -185,27 +191,25 @@ class SearchSessionImpl implements AppSearchSession, Closeable {
                         queryExpression,
                         SearchSpecToGmsConverter.toGmsSearchSpec(searchSpec),
                         mDatabaseName),
-                /* valueMapper= */ i -> i);
+                /* valueMapper= */ i -> i, mExecutor);
     }
 
-    @NonNull
     @Override
-    public ListenableFuture<StorageInfo> getStorageInfoAsync() {
+    public @NonNull ListenableFuture<StorageInfo> getStorageInfoAsync() {
         return AppSearchTaskFutures.toListenableFuture(
                 mGmsClient.getStorageInfo(mDatabaseName),
-                ResponseToGmsConverter::toJetpackStorageInfo);
+                ResponseToGmsConverter::toJetpackStorageInfo, mExecutor);
     }
 
-    @NonNull
     @Override
-    public ListenableFuture<Void> requestFlushAsync() {
+    public @NonNull ListenableFuture<Void> requestFlushAsync() {
         Task<Void> flushTask = Tasks.forResult(null);
-        return AppSearchTaskFutures.toListenableFuture(flushTask, /* valueMapper= */ i-> i);
+        return AppSearchTaskFutures.toListenableFuture(flushTask, /* valueMapper= */ i-> i,
+                mExecutor);
     }
 
-    @NonNull
     @Override
-    public Features getFeatures() {
+    public @NonNull Features getFeatures() {
         return mFeatures;
     }
 

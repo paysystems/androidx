@@ -2,6 +2,7 @@ package com.example.appsearch;
 
 import androidx.appsearch.app.AppSearchSchema;
 import androidx.appsearch.app.DocumentClassFactory;
+import androidx.appsearch.app.DocumentClassMappingContext;
 import androidx.appsearch.app.GenericDocument;
 import androidx.appsearch.exceptions.AppSearchException;
 import java.lang.Class;
@@ -84,9 +85,10 @@ public final class $$__AppSearch__Gift implements DocumentClassFactory<Gift> {
   }
 
   @Override
-  public Gift fromGenericDocument(GenericDocument genericDoc) throws AppSearchException {
-    String idConv = genericDoc.getId();
+  public Gift fromGenericDocument(GenericDocument genericDoc,
+      DocumentClassMappingContext documentClassMappingContext) throws AppSearchException {
     String namespaceConv = genericDoc.getNamespace();
+    String idConv = genericDoc.getId();
     String[] note2Copy = genericDoc.getPropertyStringArray("note2");
     String note2Conv = null;
     if (note2Copy != null && note2Copy.length != 0) {
@@ -105,7 +107,7 @@ public final class $$__AppSearch__Gift implements DocumentClassFactory<Gift> {
     GenericDocument innerContentCopy = genericDoc.getPropertyDocument("innerContent");
     Inner innerContentConv = null;
     if (innerContentCopy != null) {
-      innerContentConv = innerContentCopy.toDocumentClass(Inner.class);
+      innerContentConv = innerContentCopy.toDocumentClass(Inner.class, documentClassMappingContext);
     }
     Gift document = new Gift();
     document.namespace = namespaceConv;

@@ -16,19 +16,19 @@
 
 package androidx.camera.core.internal.compat.workaround;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.RequiresApi;
+import androidx.annotation.VisibleForTesting;
 import androidx.camera.core.internal.compat.quirk.DeviceQuirks;
 import androidx.camera.core.internal.compat.quirk.LargeJpegImageQuirk;
+
+import org.jspecify.annotations.NonNull;
 
 /**
  * Workaround to check whether the captured JPEG image contains redundant 0's padding data.
  *
  * @see LargeJpegImageQuirk
  */
-@RequiresApi(21) // TODO(b/200306659): Remove and replace with annotation on package-info.java
 public class InvalidJpegDataParser {
-    private final boolean mHasQuirk = DeviceQuirks.get(LargeJpegImageQuirk.class) != null;
+    private final LargeJpegImageQuirk mQuirk = DeviceQuirks.get(LargeJpegImageQuirk.class);
 
     /**
      * Returns the valid data length of the input JPEG byte data array which is determined by the
@@ -36,17 +36,28 @@ public class InvalidJpegDataParser {
      *
      * <p>Returns the original byte array length when quirk doesn't exist or EOI can't be found.
      */
-    public int getValidDataLength(@NonNull byte[] bytes) {
-        if (!mHasQuirk) {
+    public int getValidDataLength(byte @NonNull [] bytes) {
+        if (mQuirk == null || !mQuirk.shouldCheckInvalidJpegData(bytes)) {
             return bytes.length;
         }
 
+        int jfifEoiMarkEndPosition = getJfifEoiMarkEndPosition(bytes);
+
+        return jfifEoiMarkEndPosition != -1 ? jfifEoiMarkEndPosition : bytes.length;
+    }
+
+    /**
+     * Returns the end position of JFIF EOI mark. Returns -1 while JFIF EOI mark can't be found
+     * in the provided byte array.
+     */
+    @VisibleForTesting
+    public static int getJfifEoiMarkEndPosition(byte @NonNull [] bytes) {
         // Parses the JFIF segments from the start of the JPEG image data
         int markPosition = 0x2;
         while (true) {
             // Breaks the while-loop and return null if the mark byte can't be correctly found.
             if (markPosition + 4 > bytes.length || bytes[markPosition] != ((byte) 0xff)) {
-                return bytes.length;
+                return -1;
             }
 
             int segmentLength =
@@ -65,7 +76,7 @@ public class InvalidJpegDataParser {
         while (true) {
             // Breaks the while-loop and return null if EOI mark can't be found
             if (eoiPosition + 2 > bytes.length) {
-                return bytes.length;
+                return -1;
             }
 
             if (bytes[eoiPosition] == ((byte) 0xff) && bytes[eoiPosition + 1] == ((byte) 0xd9)) {

@@ -19,6 +19,9 @@
  */
 package androidx.leanback.app;
 
+import android.app.Activity;
+import android.app.Fragment;
+import android.app.FragmentTransaction;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
@@ -31,11 +34,6 @@ import android.view.ViewGroup;
 import android.view.Window;
 
 import androidx.annotation.CallSuper;
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import android.app.Fragment;
-import android.app.Activity;
-import android.app.FragmentTransaction;
 import androidx.leanback.R;
 import androidx.leanback.transition.TransitionHelper;
 import androidx.leanback.transition.TransitionListener;
@@ -53,6 +51,9 @@ import androidx.leanback.widget.Presenter;
 import androidx.leanback.widget.PresenterSelector;
 import androidx.leanback.widget.RowPresenter;
 import androidx.leanback.widget.VerticalGridView;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.ref.WeakReference;
 
@@ -229,7 +230,7 @@ public class DetailsFragment extends BaseFragment {
     @Override
     void createStateMachineTransitions() {
         super.createStateMachineTransitions();
-        /**
+        /*
          * Part 1: Processing enter transitions after fragment.onCreate
          */
         mStateMachine.addTransition(STATE_START, STATE_ENTER_TRANSITION_INIT, EVT_ON_CREATE);
@@ -262,7 +263,7 @@ public class DetailsFragment extends BaseFragment {
         mStateMachine.addTransition(STATE_ENTER_TRANSITION_PENDING, STATE_ENTER_TRANSITION_COMPLETE,
                 EVT_ENTER_TRANSIITON_DONE);
 
-        /**
+        /*
          * Part 2: modification to the entrance transition defined in BaseFragment
          */
         // Must finish enter transition before perform entrance transition.
@@ -281,7 +282,7 @@ public class DetailsFragment extends BaseFragment {
         mStateMachine.addTransition(STATE_ENTRANCE_ON_PREPARED,
                 STATE_SET_ENTRANCE_START_STATE, EVT_ONSTART);
 
-        /**
+        /*
          * Part 3: onSafeStart()
          */
         // for onSafeStart: the condition is onStart called, entrance transition complete
@@ -479,8 +480,8 @@ public class DetailsFragment extends BaseFragment {
     }
 
     @Override
-    @Nullable
-    public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, Bundle savedInstanceState) {
+    public @Nullable View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container,
+            Bundle savedInstanceState) {
         mRootView = (BrowseFrameLayout) inflater.inflate(
                 R.layout.lb_details_fragment, container, false);
         mBackgroundView = mRootView.findViewById(R.id.details_background_view);

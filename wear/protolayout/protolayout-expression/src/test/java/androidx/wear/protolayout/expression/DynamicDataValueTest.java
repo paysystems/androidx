@@ -18,6 +18,10 @@ package androidx.wear.protolayout.expression;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import static org.junit.Assert.assertThrows;
+
+import android.graphics.Color;
+
 import androidx.wear.protolayout.expression.DynamicBuilders.DynamicBool;
 import androidx.wear.protolayout.expression.DynamicBuilders.DynamicColor;
 import androidx.wear.protolayout.expression.DynamicBuilders.DynamicFloat;
@@ -29,47 +33,141 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 
+import java.time.Duration;
+import java.time.Instant;
+
 @RunWith(RobolectricTestRunner.class)
 public final class DynamicDataValueTest {
     @Test
     public void boolDynamicDataValue() {
         DynamicDataValue<DynamicBool> boolDynamicDataValue = DynamicDataValue.fromBool(true);
 
+        assertThat(boolDynamicDataValue.hasBoolValue()).isTrue();
+        assertThat(boolDynamicDataValue.getBoolValue()).isTrue();
         assertThat(boolDynamicDataValue.toDynamicDataValueProto().getBoolVal().getValue()).isTrue();
+
+        assertThat(boolDynamicDataValue.hasColorValue()).isFalse();
+        assertThrows(IllegalStateException.class, boolDynamicDataValue::getColorValue);
+        assertThat(boolDynamicDataValue.hasValueOfType(Color.class)).isFalse();
+        assertThat(boolDynamicDataValue.hasValueOfType(boolean.class)).isTrue();
+        assertThat(boolDynamicDataValue.hasValueOfType(Boolean.class)).isTrue();
+        assertThat(boolDynamicDataValue.hasValueOfType(DynamicBool.class)).isTrue();
     }
 
     @Test
     public void colorDynamicDataValue() {
-        DynamicDataValue<DynamicColor> colorDynamicDataValue =
-                DynamicDataValue.fromColor(0xff00ff00);
+        int c = 0xff00ff00;
+        DynamicDataValue<DynamicColor> colorDynamicDataValue = DynamicDataValue.fromColor(c);
 
+        assertThat(colorDynamicDataValue.hasColorValue()).isTrue();
+        assertThat(colorDynamicDataValue.getColorValue()).isEqualTo(c);
         assertThat(colorDynamicDataValue.toDynamicDataValueProto().getColorVal().getArgb())
-                .isEqualTo(0xff00ff00);
+                .isEqualTo(c);
+
+        assertThat(colorDynamicDataValue.hasFloatValue()).isFalse();
+        assertThrows(IllegalStateException.class, colorDynamicDataValue::getFloatValue);
+        assertThat(colorDynamicDataValue.hasValueOfType(Float.class)).isFalse();
+        assertThat(colorDynamicDataValue.hasValueOfType(Color.class)).isTrue();
+        assertThat(colorDynamicDataValue.hasValueOfType(DynamicColor.class)).isTrue();
     }
 
     @Test
     public void floatDynamicDataValue() {
-        DynamicDataValue<DynamicFloat> floatDynamicDataValue = DynamicDataValue.fromFloat(42.42f);
+        float f = 42.42f;
+        DynamicDataValue<DynamicFloat> floatDynamicDataValue = DynamicDataValue.fromFloat(f);
 
+        assertThat(floatDynamicDataValue.hasFloatValue()).isTrue();
+        assertThat(floatDynamicDataValue.getFloatValue()).isEqualTo(f);
         assertThat(floatDynamicDataValue.toDynamicDataValueProto().getFloatVal().getValue())
                 .isWithin(0.0001f)
-                .of(42.42f);
+                .of(f);
+
+        assertThat(floatDynamicDataValue.hasIntValue()).isFalse();
+        assertThrows(IllegalStateException.class, floatDynamicDataValue::getIntValue);
+        assertThat(floatDynamicDataValue.hasValueOfType(int.class)).isFalse();
+        assertThat(floatDynamicDataValue.hasValueOfType(Float.class)).isTrue();
+        assertThat(floatDynamicDataValue.hasValueOfType(float.class)).isTrue();
+        assertThat(floatDynamicDataValue.hasValueOfType(DynamicFloat.class)).isTrue();
     }
 
     @Test
     public void intDynamicDataValue() {
-        DynamicDataValue<DynamicInt32> intDynamicDataValue = DynamicDataValue.fromInt(42);
+        int i = 42;
+        DynamicDataValue<DynamicInt32> intDynamicDataValue = DynamicDataValue.fromInt(i);
 
+        assertThat(intDynamicDataValue.hasIntValue()).isTrue();
+        assertThat(intDynamicDataValue.getIntValue()).isEqualTo(i);
         assertThat(intDynamicDataValue.toDynamicDataValueProto().getInt32Val().getValue())
-                .isEqualTo(42);
+                .isEqualTo(i);
+
+        assertThat(intDynamicDataValue.hasStringValue()).isFalse();
+        assertThrows(IllegalStateException.class, intDynamicDataValue::getStringValue);
+        assertThat(intDynamicDataValue.hasValueOfType(String.class)).isFalse();
+        assertThat(intDynamicDataValue.hasValueOfType(int.class)).isTrue();
+        assertThat(intDynamicDataValue.hasValueOfType(Integer.class)).isTrue();
+        assertThat(intDynamicDataValue.hasValueOfType(DynamicInt32.class)).isTrue();
+        assertThat(
+                        intDynamicDataValue.hasValueOfType(
+                                PlatformHealthSources.DynamicHeartRateAccuracy.class))
+                .isTrue();
     }
 
     @Test
     public void stringDynamicDataValue() {
-        DynamicDataValue<DynamicString> stringDynamicDataValue =
-                DynamicDataValue.fromString("constant-value");
+        String s = "constant-value";
+        DynamicDataValue<DynamicString> stringDynamicDataValue = DynamicDataValue.fromString(s);
 
+        assertThat(stringDynamicDataValue.hasStringValue()).isTrue();
+        assertThat(stringDynamicDataValue.getStringValue()).isEqualTo(s);
         assertThat(stringDynamicDataValue.toDynamicDataValueProto().getStringVal().getValue())
-                .isEqualTo("constant-value");
+                .isEqualTo(s);
+
+        assertThat(stringDynamicDataValue.hasInstantValue()).isFalse();
+        assertThrows(IllegalStateException.class, stringDynamicDataValue::getInstantValue);
+        assertThat(stringDynamicDataValue.hasValueOfType(Instant.class)).isFalse();
+        assertThat(stringDynamicDataValue.hasValueOfType(String.class)).isTrue();
+        assertThat(stringDynamicDataValue.hasValueOfType(DynamicString.class)).isTrue();
+    }
+
+    @Test
+    public void instantDynamicDataValue() {
+        Instant instant = Instant.ofEpochSecond(12345);
+        DynamicDataValue<DynamicBuilders.DynamicInstant> instantDynamicDataValue =
+                DynamicDataValue.fromInstant(instant);
+
+        assertThat(instantDynamicDataValue.hasInstantValue()).isTrue();
+        assertThat(instantDynamicDataValue.getInstantValue()).isEqualTo(instant);
+        assertThat(
+                        instantDynamicDataValue
+                                .toDynamicDataValueProto()
+                                .getInstantVal()
+                                .getEpochSeconds())
+                .isEqualTo(instant.getEpochSecond());
+
+        assertThat(instantDynamicDataValue.hasDurationValue()).isFalse();
+        assertThrows(IllegalStateException.class, instantDynamicDataValue::getDurationValue);
+        assertThat(instantDynamicDataValue.hasValueOfType(Duration.class)).isFalse();
+        assertThat(instantDynamicDataValue.hasValueOfType(Instant.class)).isTrue();
+        assertThat(instantDynamicDataValue.hasValueOfType(DynamicBuilders.DynamicInstant.class))
+                .isTrue();
+    }
+
+    @Test
+    public void durationDynamicDataValue() {
+        Duration duration = Duration.ofSeconds(12345);
+        DynamicDataValue<DynamicBuilders.DynamicDuration> durationDynamicDataValue =
+                DynamicDataValue.fromDuration(duration);
+
+        assertThat(durationDynamicDataValue.hasDurationValue()).isTrue();
+        assertThat(durationDynamicDataValue.getDurationValue()).isEqualTo(duration);
+        assertThat(durationDynamicDataValue.toDynamicDataValueProto().getDurationVal().getSeconds())
+                .isEqualTo(duration.getSeconds());
+
+        assertThat(durationDynamicDataValue.hasBoolValue()).isFalse();
+        assertThrows(IllegalStateException.class, durationDynamicDataValue::getBoolValue);
+        assertThat(durationDynamicDataValue.hasValueOfType(Boolean.class)).isFalse();
+        assertThat(durationDynamicDataValue.hasValueOfType(Duration.class)).isTrue();
+        assertThat(durationDynamicDataValue.hasValueOfType(DynamicBuilders.DynamicDuration.class))
+                .isTrue();
     }
 }

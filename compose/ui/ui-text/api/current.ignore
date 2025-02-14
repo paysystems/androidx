@@ -1,11 +1,21 @@
 // Baseline format: 1.0
-AddedAbstractMethod: androidx.compose.ui.text.Paragraph#fillBoundingBoxes(long, float[], int):
-    Added method androidx.compose.ui.text.Paragraph.fillBoundingBoxes(long,float[],int)
-
-
-ParameterNameChange: androidx.compose.ui.text.TextMeasurer#TextMeasurer(androidx.compose.ui.text.font.FontFamily.Resolver, androidx.compose.ui.unit.Density, androidx.compose.ui.unit.LayoutDirection, int) parameter #0:
-    Attempted to change parameter name from fallbackFontFamilyResolver to defaultFontFamilyResolver in constructor androidx.compose.ui.text.TextMeasurer
-ParameterNameChange: androidx.compose.ui.text.TextMeasurer#TextMeasurer(androidx.compose.ui.text.font.FontFamily.Resolver, androidx.compose.ui.unit.Density, androidx.compose.ui.unit.LayoutDirection, int) parameter #1:
-    Attempted to change parameter name from fallbackDensity to defaultDensity in constructor androidx.compose.ui.text.TextMeasurer
-ParameterNameChange: androidx.compose.ui.text.TextMeasurer#TextMeasurer(androidx.compose.ui.text.font.FontFamily.Resolver, androidx.compose.ui.unit.Density, androidx.compose.ui.unit.LayoutDirection, int) parameter #2:
-    Attempted to change parameter name from fallbackLayoutDirection to defaultLayoutDirection in constructor androidx.compose.ui.text.TextMeasurer
+RemovedMethod: androidx.compose.ui.text.TextRange#getCollapsed():
+    Removed method androidx.compose.ui.text.TextRange.getCollapsed()
+RemovedMethod: androidx.compose.ui.text.TextRange#getEnd():
+    Removed method androidx.compose.ui.text.TextRange.getEnd()
+RemovedMethod: androidx.compose.ui.text.TextRange#getLength():
+    Removed method androidx.compose.ui.text.TextRange.getLength()
+RemovedMethod: androidx.compose.ui.text.TextRange#getMax():
+    Removed method androidx.compose.ui.text.TextRange.getMax()
+RemovedMethod: androidx.compose.ui.text.TextRange#getMin():
+    Removed method androidx.compose.ui.text.TextRange.getMin()
+RemovedMethod: androidx.compose.ui.text.TextRange#getReversed():
+    Removed method androidx.compose.ui.text.TextRange.getReversed()
+RemovedMethod: androidx.compose.ui.text.TextRange#getStart():
+    Removed method androidx.compose.ui.text.TextRange.getStart()
+RemovedMethod: androidx.compose.ui.text.style.LineBreak#getStrategy():
+    Removed method androidx.compose.ui.text.style.LineBreak.getStrategy()
+RemovedMethod: androidx.compose.ui.text.style.LineBreak#getStrictness():
+    Removed method androidx.compose.ui.text.style.LineBreak.getStrictness()
+RemovedMethod: androidx.compose.ui.text.style.LineBreak#getWordBreak():
+    Removed method androidx.compose.ui.text.style.LineBreak.getWordBreak()
