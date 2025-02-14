@@ -16,12 +16,14 @@
 
 package androidx.wear.protolayout;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.annotation.RestrictTo;
 import androidx.annotation.RestrictTo.Scope;
 import androidx.wear.protolayout.LayoutElementBuilders.Layout;
+import androidx.wear.protolayout.expression.RequiresSchemaVersion;
 import androidx.wear.protolayout.proto.TimelineProto;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -36,9 +38,8 @@ public final class TimelineBuilders {
 
     /**
      * A time interval, typically used to describe the validity period of a {@link TimelineEntry}.
-     *
-     * @since 1.0
      */
+    @RequiresSchemaVersion(major = 1, minor = 0)
     public static final class TimeInterval {
         private final TimelineProto.TimeInterval mImpl;
 
@@ -46,41 +47,30 @@ public final class TimelineBuilders {
             this.mImpl = impl;
         }
 
-        /**
-         * Gets starting point of the time interval, in milliseconds since the Unix epoch.
-         *
-         * @since 1.0
-         */
+        /** Gets starting point of the time interval, in milliseconds since the Unix epoch. */
         public long getStartMillis() {
             return mImpl.getStartMillis();
         }
 
-        /**
-         * Gets end point of the time interval, in milliseconds since the Unix epoch.
-         *
-         * @since 1.0
-         */
+        /** Gets end point of the time interval, in milliseconds since the Unix epoch. */
         public long getEndMillis() {
             return mImpl.getEndMillis();
         }
 
         /** Creates a new wrapper instance from the proto. */
         @RestrictTo(Scope.LIBRARY_GROUP)
-        @NonNull
-        public static TimeInterval fromProto(@NonNull TimelineProto.TimeInterval proto) {
+        public static @NonNull TimeInterval fromProto(TimelineProto.@NonNull TimeInterval proto) {
             return new TimeInterval(proto);
         }
 
         /** Returns the internal proto instance. */
         @RestrictTo(Scope.LIBRARY_GROUP)
-        @NonNull
-        public TimelineProto.TimeInterval toProto() {
+        public TimelineProto.@NonNull TimeInterval toProto() {
             return mImpl;
         }
 
         @Override
-        @NonNull
-        public String toString() {
+        public @NonNull String toString() {
             return "TimeInterval{"
                     + "startMillis="
                     + getStartMillis()
@@ -94,43 +84,32 @@ public final class TimelineBuilders {
             private final TimelineProto.TimeInterval.Builder mImpl =
                     TimelineProto.TimeInterval.newBuilder();
 
+            /** Creates an instance of {@link Builder}. */
             public Builder() {}
 
-            /**
-             * Sets starting point of the time interval, in milliseconds since the Unix epoch.
-             *
-             * @since 1.0
-             */
-            @NonNull
-            public Builder setStartMillis(long startMillis) {
+            /** Sets starting point of the time interval, in milliseconds since the Unix epoch. */
+            @RequiresSchemaVersion(major = 1, minor = 0)
+            public @NonNull Builder setStartMillis(long startMillis) {
                 mImpl.setStartMillis(startMillis);
                 return this;
             }
 
-            /**
-             * Sets end point of the time interval, in milliseconds since the Unix epoch.
-             *
-             * @since 1.0
-             */
-            @NonNull
-            public Builder setEndMillis(long endMillis) {
+            /** Sets end point of the time interval, in milliseconds since the Unix epoch. */
+            @RequiresSchemaVersion(major = 1, minor = 0)
+            public @NonNull Builder setEndMillis(long endMillis) {
                 mImpl.setEndMillis(endMillis);
                 return this;
             }
 
             /** Builds an instance from accumulated values. */
-            @NonNull
-            public TimeInterval build() {
+            public @NonNull TimeInterval build() {
                 return TimeInterval.fromProto(mImpl.build());
             }
         }
     }
 
-    /**
-     * One piece of renderable content along with the time that it is valid for.
-     *
-     * @since 1.0
-     */
+    /** One piece of renderable content along with the time that it is valid for. */
+    @RequiresSchemaVersion(major = 1, minor = 0)
     public static final class TimelineEntry {
         private final TimelineProto.TimelineEntry mImpl;
 
@@ -138,13 +117,8 @@ public final class TimelineBuilders {
             this.mImpl = impl;
         }
 
-        /**
-         * Gets the validity period for this timeline entry.
-         *
-         * @since 1.0
-         */
-        @Nullable
-        public TimeInterval getValidity() {
+        /** Gets the validity period for this timeline entry. */
+        public @Nullable TimeInterval getValidity() {
             if (mImpl.hasValidity()) {
                 return TimeInterval.fromProto(mImpl.getValidity());
             } else {
@@ -152,13 +126,8 @@ public final class TimelineBuilders {
             }
         }
 
-        /**
-         * Gets the contents of this timeline entry.
-         *
-         * @since 1.0
-         */
-        @Nullable
-        public Layout getLayout() {
+        /** Gets the contents of this timeline entry. */
+        public @Nullable Layout getLayout() {
             if (mImpl.hasLayout()) {
                 return Layout.fromProto(mImpl.getLayout());
             } else {
@@ -166,34 +135,27 @@ public final class TimelineBuilders {
             }
         }
 
-        /**
-         * Returns the {@link TimelineEntry} object containing the given layout element.
-         *
-         * @since 1.0
-         */
-        @NonNull
-        public static TimelineEntry fromLayoutElement(
-                @NonNull LayoutElementBuilders.LayoutElement layoutElement) {
+        /** Returns the {@link TimelineEntry} object containing the given layout element. */
+        @RequiresSchemaVersion(major = 1, minor = 0)
+        public static @NonNull TimelineEntry fromLayoutElement(
+                LayoutElementBuilders.@NonNull LayoutElement layoutElement) {
             return new Builder().setLayout(Layout.fromLayoutElement(layoutElement)).build();
         }
 
         /** Creates a new wrapper instance from the proto. */
         @RestrictTo(Scope.LIBRARY_GROUP)
-        @NonNull
-        public static TimelineEntry fromProto(@NonNull TimelineProto.TimelineEntry proto) {
+        public static @NonNull TimelineEntry fromProto(TimelineProto.@NonNull TimelineEntry proto) {
             return new TimelineEntry(proto);
         }
 
         /** Returns the internal proto instance. */
         @RestrictTo(Scope.LIBRARY_GROUP)
-        @NonNull
-        public TimelineProto.TimelineEntry toProto() {
+        public TimelineProto.@NonNull TimelineEntry toProto() {
             return mImpl;
         }
 
         @Override
-        @NonNull
-        public String toString() {
+        public @NonNull String toString() {
             return "TimelineEntry{" + "validity=" + getValidity() + ", layout=" + getLayout() + "}";
         }
 
@@ -202,33 +164,25 @@ public final class TimelineBuilders {
             private final TimelineProto.TimelineEntry.Builder mImpl =
                     TimelineProto.TimelineEntry.newBuilder();
 
+            /** Creates an instance of {@link Builder}. */
             public Builder() {}
 
-            /**
-             * Sets the validity period for this timeline entry.
-             *
-             * @since 1.0
-             */
-            @NonNull
-            public Builder setValidity(@NonNull TimeInterval validity) {
+            /** Sets the validity period for this timeline entry. */
+            @RequiresSchemaVersion(major = 1, minor = 0)
+            public @NonNull Builder setValidity(@NonNull TimeInterval validity) {
                 mImpl.setValidity(validity.toProto());
                 return this;
             }
 
-            /**
-             * Sets the contents of this timeline entry.
-             *
-             * @since 1.0
-             */
-            @NonNull
-            public Builder setLayout(@NonNull Layout layout) {
+            /** Sets the contents of this timeline entry. */
+            @RequiresSchemaVersion(major = 1, minor = 0)
+            public @NonNull Builder setLayout(@NonNull Layout layout) {
                 mImpl.setLayout(layout.toProto());
                 return this;
             }
 
             /** Builds an instance from accumulated values. */
-            @NonNull
-            public TimelineEntry build() {
+            public @NonNull TimelineEntry build() {
                 return TimelineEntry.fromProto(mImpl.build());
             }
         }
@@ -247,9 +201,8 @@ public final class TimelineBuilders {
      * validity period will be shown. This allows a layout provider to show a "default" layout, and
      * override it at set points without having to explicitly insert the default layout between the
      * "override" layout.
-     *
-     * @since 1.0
      */
+    @RequiresSchemaVersion(major = 1, minor = 0)
     public static final class Timeline {
         private final TimelineProto.Timeline mImpl;
 
@@ -257,13 +210,8 @@ public final class TimelineBuilders {
             this.mImpl = impl;
         }
 
-        /**
-         * Gets the entries in a timeline.
-         *
-         * @since 1.0
-         */
-        @NonNull
-        public List<TimelineEntry> getTimelineEntries() {
+        /** Gets the entries in a timeline. */
+        public @NonNull List<TimelineEntry> getTimelineEntries() {
             List<TimelineEntry> list = new ArrayList<>();
             for (TimelineProto.TimelineEntry item : mImpl.getTimelineEntriesList()) {
                 list.add(TimelineEntry.fromProto(item));
@@ -271,14 +219,10 @@ public final class TimelineBuilders {
             return Collections.unmodifiableList(list);
         }
 
-        /**
-         * Returns the {@link Timeline} object containing the given layout element.
-         *
-         * @since 1.0
-         */
-        @NonNull
-        public static Timeline fromLayoutElement(
-                @NonNull LayoutElementBuilders.LayoutElement layoutElement) {
+        /** Returns the {@link Timeline} object containing the given layout element. */
+        @RequiresSchemaVersion(major = 1, minor = 0)
+        public static @NonNull Timeline fromLayoutElement(
+                LayoutElementBuilders.@NonNull LayoutElement layoutElement) {
             return new Builder()
                     .addTimelineEntry(TimelineEntry.fromLayoutElement(layoutElement))
                     .build();
@@ -286,21 +230,18 @@ public final class TimelineBuilders {
 
         /** Creates a new wrapper instance from the proto. */
         @RestrictTo(Scope.LIBRARY_GROUP)
-        @NonNull
-        public static Timeline fromProto(@NonNull TimelineProto.Timeline proto) {
+        public static @NonNull Timeline fromProto(TimelineProto.@NonNull Timeline proto) {
             return new Timeline(proto);
         }
 
         /** Returns the internal proto instance. */
         @RestrictTo(Scope.LIBRARY_GROUP)
-        @NonNull
-        public TimelineProto.Timeline toProto() {
+        public TimelineProto.@NonNull Timeline toProto() {
             return mImpl;
         }
 
         @Override
-        @NonNull
-        public String toString() {
+        public @NonNull String toString() {
             return "Timeline{" + "timelineEntries=" + getTimelineEntries() + "}";
         }
 
@@ -309,22 +250,18 @@ public final class TimelineBuilders {
             private final TimelineProto.Timeline.Builder mImpl =
                     TimelineProto.Timeline.newBuilder();
 
+            /** Creates an instance of {@link Builder}. */
             public Builder() {}
 
-            /**
-             * Adds one item to the entries in a timeline.
-             *
-             * @since 1.0
-             */
-            @NonNull
-            public Builder addTimelineEntry(@NonNull TimelineEntry timelineEntry) {
+            /** Adds one item to the entries in a timeline. */
+            @RequiresSchemaVersion(major = 1, minor = 0)
+            public @NonNull Builder addTimelineEntry(@NonNull TimelineEntry timelineEntry) {
                 mImpl.addTimelineEntries(timelineEntry.toProto());
                 return this;
             }
 
             /** Builds an instance from accumulated values. */
-            @NonNull
-            public Timeline build() {
+            public @NonNull Timeline build() {
                 return Timeline.fromProto(mImpl.build());
             }
         }

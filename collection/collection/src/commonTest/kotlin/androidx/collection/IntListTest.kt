@@ -22,6 +22,14 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
+// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// DO NOT MAKE CHANGES to the kotlin source file.
+//
+// This file was generated from a template in the template directory.
+// Make a change to the original template and run the generateCollections.sh script
+// to ensure the change is available on all versions of the map.
+// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
 class IntListTest {
     private val list: MutableIntList = mutableIntListOf(1, 2, 3, 4, 5)
 
@@ -80,8 +88,32 @@ class IntListTest {
 
     @Test
     fun string() {
-        assertEquals("[1, 2, 3, 4, 5]", list.toString())
+        assertEquals("[${1}, ${2}, ${3}, ${4}, ${5}]", list.toString())
         assertEquals("[]", mutableIntListOf().toString())
+    }
+
+    @Test
+    fun joinToString() {
+        assertEquals("${1}, ${2}, ${3}, ${4}, ${5}", list.joinToString())
+        assertEquals(
+            "x${1}, ${2}, ${3}...",
+            list.joinToString(prefix = "x", postfix = "y", limit = 3)
+        )
+        assertEquals(
+            ">${1}-${2}-${3}-${4}-${5}<",
+            list.joinToString(separator = "-", prefix = ">", postfix = "<")
+        )
+        assertEquals(
+            "one, two, three...",
+            list.joinToString(limit = 3) {
+                when (it.toInt()) {
+                    1 -> "one"
+                    2 -> "two"
+                    3 -> "three"
+                    else -> "whoops"
+                }
+            }
+        )
     }
 
     @Test
@@ -106,46 +138,47 @@ class IntListTest {
 
     @Test
     fun getOutOfBounds() {
-        assertFailsWith(IndexOutOfBoundsException::class) {
-            list[5]
-        }
+        assertFailsWith(IndexOutOfBoundsException::class) { list[5] }
     }
 
     @Test
     fun getOutOfBoundsNegative() {
-        assertFailsWith(IndexOutOfBoundsException::class) {
-            list[-1]
-        }
+        assertFailsWith(IndexOutOfBoundsException::class) { list[-1] }
     }
 
     @Test
     fun elementAtOfBounds() {
-        assertFailsWith(IndexOutOfBoundsException::class) {
-            list.elementAt(5)
-        }
+        assertFailsWith(IndexOutOfBoundsException::class) { list.elementAt(5) }
     }
 
     @Test
     fun elementAtOfBoundsNegative() {
-        assertFailsWith(IndexOutOfBoundsException::class) {
-            list.elementAt(-1)
-        }
+        assertFailsWith(IndexOutOfBoundsException::class) { list.elementAt(-1) }
     }
 
     @Test
     fun elementAtOrElse() {
-        assertEquals(1, list.elementAtOrElse(0) {
-            assertEquals(0, it)
-            0
-        })
-        assertEquals(0, list.elementAtOrElse(-1) {
-            assertEquals(-1, it)
-            0
-        })
-        assertEquals(0, list.elementAtOrElse(5) {
-            assertEquals(5, it)
-            0
-        })
+        assertEquals(
+            1,
+            list.elementAtOrElse(0) {
+                assertEquals(0, it)
+                0
+            }
+        )
+        assertEquals(
+            0,
+            list.elementAtOrElse(-1) {
+                assertEquals(-1, it)
+                0
+            }
+        )
+        assertEquals(
+            0,
+            list.elementAtOrElse(5) {
+                assertEquals(5, it)
+                0
+            }
+        )
     }
 
     @Test
@@ -289,9 +322,7 @@ class IntListTest {
 
     @Test
     fun firstException() {
-        assertFailsWith(NoSuchElementException::class) {
-            mutableIntListOf().first()
-        }
+        assertFailsWith(NoSuchElementException::class) { mutableIntListOf().first() }
     }
 
     @Test
@@ -302,9 +333,7 @@ class IntListTest {
 
     @Test
     fun firstWithPredicateException() {
-        assertFailsWith(NoSuchElementException::class) {
-            mutableIntListOf().first { it == 8 }
-        }
+        assertFailsWith(NoSuchElementException::class) { mutableIntListOf().first { it == 8 } }
     }
 
     @Test
@@ -314,9 +343,7 @@ class IntListTest {
 
     @Test
     fun lastException() {
-        assertFailsWith(NoSuchElementException::class) {
-            mutableIntListOf().last()
-        }
+        assertFailsWith(NoSuchElementException::class) { mutableIntListOf().last() }
     }
 
     @Test
@@ -327,38 +354,32 @@ class IntListTest {
 
     @Test
     fun lastWithPredicateException() {
-        assertFailsWith(NoSuchElementException::class) {
-            mutableIntListOf().last { it == 8 }
-        }
+        assertFailsWith(NoSuchElementException::class) { mutableIntListOf().last { it == 8 } }
     }
 
     @Test
     fun fold() {
-        assertEquals("12345", list.fold("") { acc, i -> acc + i.toString() })
+        assertEquals("12345", list.fold("") { acc, i -> acc + i.toInt().toString() })
     }
 
     @Test
     fun foldIndexed() {
         assertEquals(
             "01-12-23-34-45-",
-            list.foldIndexed("") { index, acc, i ->
-                "$acc$index$i-"
-            }
+            list.foldIndexed("") { index, acc, i -> "$acc$index${i.toInt()}-" }
         )
     }
 
     @Test
     fun foldRight() {
-        assertEquals("54321", list.foldRight("") { i, acc -> acc + i.toString() })
+        assertEquals("54321", list.foldRight("") { i, acc -> acc + i.toInt().toString() })
     }
 
     @Test
     fun foldRightIndexed() {
         assertEquals(
             "45-34-23-12-01-",
-            list.foldRightIndexed("") { index, i, acc ->
-                "$acc$index$i-"
-            }
+            list.foldRightIndexed("") { index, i, acc -> "$acc$index${i.toInt()}-" }
         )
     }
 
@@ -377,12 +398,8 @@ class IntListTest {
         l.add(0, 1)
         l.add(2, 3)
         assertEquals(list, l)
-        assertFailsWith(IndexOutOfBoundsException::class) {
-            l.add(-1, 2)
-        }
-        assertFailsWith(IndexOutOfBoundsException::class) {
-            l.add(6, 2)
-        }
+        assertFailsWith(IndexOutOfBoundsException::class) { l.add(-1, 2) }
+        assertFailsWith(IndexOutOfBoundsException::class) { l.add(6, 2) }
     }
 
     @Test
@@ -396,12 +413,8 @@ class IntListTest {
         assertTrue(l4.addAll(3, l))
         assertFalse(l4.addAll(0, mutableIntListOf()))
         assertEquals(list, l4)
-        assertFailsWith(IndexOutOfBoundsException::class) {
-            l4.addAll(6, mutableIntListOf())
-        }
-        assertFailsWith(IndexOutOfBoundsException::class) {
-            l4.addAll(-1, mutableIntListOf())
-        }
+        assertFailsWith(IndexOutOfBoundsException::class) { l4.addAll(6, mutableIntListOf()) }
+        assertFailsWith(IndexOutOfBoundsException::class) { l4.addAll(-1, mutableIntListOf()) }
     }
 
     @Test
@@ -438,12 +451,8 @@ class IntListTest {
         assertTrue(l.addAll(3, a1))
         assertFalse(l.addAll(0, intArrayOf()))
         assertEquals(list, l)
-        assertFailsWith(IndexOutOfBoundsException::class) {
-            l.addAll(6, intArrayOf())
-        }
-        assertFailsWith(IndexOutOfBoundsException::class) {
-            l.addAll(-1, intArrayOf())
-        }
+        assertFailsWith(IndexOutOfBoundsException::class) { l.addAll(6, intArrayOf()) }
+        assertFailsWith(IndexOutOfBoundsException::class) { l.addAll(-1, intArrayOf()) }
     }
 
     @Test
@@ -510,12 +519,8 @@ class IntListTest {
         val l = mutableIntListOf(1, 2, 3, 4, 5)
         l.removeAt(2)
         assertEquals(mutableIntListOf(1, 2, 4, 5), l)
-        assertFailsWith(IndexOutOfBoundsException::class) {
-            l.removeAt(6)
-        }
-        assertFailsWith(IndexOutOfBoundsException::class) {
-            l.removeAt(-1)
-        }
+        assertFailsWith(IndexOutOfBoundsException::class) { l.removeAt(6) }
+        assertFailsWith(IndexOutOfBoundsException::class) { l.removeAt(-1) }
     }
 
     @Test
@@ -527,13 +532,9 @@ class IntListTest {
         l[1] = 2
         l[3] = 4
         assertEquals(list, l)
-        assertFailsWith<IndexOutOfBoundsException> {
-            l.set(-1, 1)
-        }
-        assertFailsWith<IndexOutOfBoundsException> {
-            l.set(6, 1)
-        }
-        assertEquals(4, l.set(3, 1));
+        assertFailsWith<IndexOutOfBoundsException> { l.set(-1, 1) }
+        assertFailsWith<IndexOutOfBoundsException> { l.set(6, 1) }
+        assertEquals(4, l.set(3, 1))
     }
 
     @Test
@@ -601,18 +602,10 @@ class IntListTest {
         val l = mutableIntListOf(1, 9, 7, 6, 2, 3, 4, 5)
         l.removeRange(1, 4)
         assertEquals(list, l)
-        assertFailsWith<IndexOutOfBoundsException> {
-            l.removeRange(6, 6)
-        }
-        assertFailsWith<IndexOutOfBoundsException> {
-            l.removeRange(100, 200)
-        }
-        assertFailsWith<IndexOutOfBoundsException> {
-            l.removeRange(-1, 0)
-        }
-        assertFailsWith<IllegalArgumentException> {
-            l.removeRange(3, 2)
-        }
+        assertFailsWith<IndexOutOfBoundsException> { l.removeRange(6, 6) }
+        assertFailsWith<IndexOutOfBoundsException> { l.removeRange(100, 200) }
+        assertFailsWith<IndexOutOfBoundsException> { l.removeRange(-1, 0) }
+        assertFailsWith<IllegalArgumentException> { l.removeRange(3, 2) }
     }
 
     @Test
@@ -627,6 +620,14 @@ class IntListTest {
         val l = mutableIntListOf(1, 4, 2, 5, 3)
         l.sortDescending()
         assertEquals(mutableIntListOf(5, 4, 3, 2, 1), l)
+    }
+
+    @Test
+    fun sortEmpty() {
+        val l = MutableIntList(0)
+        l.sort()
+        l.sortDescending()
+        assertEquals(MutableIntList(0), l)
     }
 
     @Test
@@ -711,5 +712,47 @@ class IntListTest {
         assertEquals(10, l[1])
         assertEquals(-1, l[2])
         assertEquals(10, l[3])
+    }
+
+    @Test
+    fun buildIntListFunction() {
+        val contract: Boolean
+        val l = buildIntList {
+            contract = true
+            add(2)
+            add(10)
+        }
+        assertTrue(contract)
+        assertEquals(2, l.size)
+        assertEquals(2, l[0])
+        assertEquals(10, l[1])
+    }
+
+    @Test
+    fun buildIntListWithCapacityFunction() {
+        val contract: Boolean
+        val l =
+            buildIntList(20) {
+                contract = true
+                add(2)
+                add(10)
+            }
+        assertTrue(contract)
+        assertEquals(2, l.size)
+        assertTrue(l.content.size >= 20)
+        assertEquals(2, l[0])
+        assertEquals(10, l[1])
+    }
+
+    @Test
+    fun binarySearchIntList() {
+        val l = mutableIntListOf(-2, -1, 2, 10, 10)
+        assertEquals(0, l.binarySearch(-2))
+        assertEquals(2, l.binarySearch(2))
+        assertEquals(3, l.binarySearch(10))
+
+        assertEquals(-1, l.binarySearch(-20))
+        assertEquals(-4, l.binarySearch(3))
+        assertEquals(-6, l.binarySearch(20))
     }
 }

@@ -29,26 +29,30 @@ import org.junit.Test
 class SdkResourceGeneratorTest {
     @Test
     fun `All SDK properties are resolved`() {
-        androidx.build.dependencies.agpVersion = "1.2.3"
-        androidx.build.dependencies.kspVersion = "3.4.5"
-        androidx.build.dependencies.kotlinGradlePluginVersion = "1.7.10"
-
         val project = ProjectBuilder.builder().build()
         project.extensions.create(
             "androidXConfiguration",
             AndroidXConfigImpl::class.java,
-            project.provider { KotlinVersion.KOTLIN_1_7 },
-            project.provider { "1.7.10" }
+            project.provider { KotlinVersion.KOTLIN_1_8 },
+            project.provider { "1.8.21" },
         )
 
         project.setSupportRootFolder(File("files/support"))
         val extension = project.rootProject.property("ext") as ExtraPropertiesExtension
-        extension.set("buildSrcOut", project.projectDir.resolve("relative/path"))
+        extension.set("prebuiltsRoot", project.projectDir.resolve("relative/prebuilts"))
+        extension.set("androidx.compileSdk", 33)
+        extension.set("outDir", project.layout.buildDirectory.dir("out").get().asFile)
 
-        val taskProvider = SdkResourceGenerator.registerSdkResourceGeneratorTask(project)
+        val taskProvider =
+            SdkResourceGenerator.registerSdkResourceGeneratorTask(
+                project,
+                kspVersion = "1.2.3",
+                agpVersion = "4.5.6",
+                kgpVersion = "1.7.10",
+            )
         val tasks = project.getTasksByName(SdkResourceGenerator.TASK_NAME, false)
         val generator = tasks.first() as SdkResourceGenerator
-        generator.buildSrcOutRelativePath.check { it == "relative/path" }
+        generator.prebuiltsRelativePath.check { it == "relative/prebuilts" }
 
         val task = taskProvider.get()
         val propsFile = task.outputDir.file("sdk.prop").get().asFile
@@ -68,6 +72,6 @@ class SdkResourceGeneratorTest {
 
     internal open class AndroidXConfigImpl(
         override val kotlinApiVersion: Provider<KotlinVersion>,
-        override val kotlinBomVersion: Provider<String>
+        override val kotlinBomVersion: Provider<String>,
     ) : AndroidXConfiguration
 }

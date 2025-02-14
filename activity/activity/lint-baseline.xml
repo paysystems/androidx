@@ -1,67 +1,58 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<issues format="6" by="lint 8.2.0-alpha14" type="baseline" client="cli" dependencies="false" name="AGP (8.2.0-alpha14)" variant="all" version="8.2.0-alpha14">
+<issues format="6" by="lint 8.8.0-alpha06" type="baseline" client="gradle" dependencies="false" name="AGP (8.8.0-alpha06)" variant="all" version="8.8.0-alpha06">
 
     <issue
-        id="NewApi"
-        message="Field requires API level 19 (current min is 14): `ImageAndVideo`"
-        errorLine1="    mediaType: VisualMediaType = ImageAndVideo"
-        errorLine2="                                 ~~~~~~~~~~~~~">
+        id="ObsoleteSdkInt"
+        message="Unnecessary; `SDK_INT` is always >= 21"
+        errorLine1="    @RequiresApi(21)"
+        errorLine2="    ~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/androidx/activity/result/PickVisualMediaRequest.kt"/>
+            file="src/main/java/androidx/activity/result/contract/ActivityResultContracts.kt"/>
     </issue>
 
     <issue
-        id="NewApi"
-        message="Field requires API level 19 (current min is 14): `ImageAndVideo`"
-        errorLine1="    var mediaType: VisualMediaType = ImageAndVideo"
-        errorLine2="                                     ~~~~~~~~~~~~~">
+        id="ObsoleteSdkInt"
+        message="Unnecessary; `SDK_INT` is always >= 34"
+        errorLine1="        if (Build.VERSION.SDK_INT >= 34) {"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/androidx/activity/result/PickVisualMediaRequest.kt"/>
+            file="src/main/java/androidx/activity/BackEventCompat.kt"/>
     </issue>
 
     <issue
-        id="NewApi"
-        message="Field requires API level 19 (current min is 14): `ImageAndVideo`"
-        errorLine1="        private var mediaType: VisualMediaType = ImageAndVideo"
-        errorLine2="                                                 ~~~~~~~~~~~~~">
+        id="ObsoleteSdkInt"
+        message="Unnecessary; `SDK_INT` is always >= 21"
+        errorLine1="            if (Build.VERSION.SDK_INT > 19) {"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/androidx/activity/result/PickVisualMediaRequest.kt"/>
+            file="src/main/java/androidx/activity/ComponentActivity.kt"/>
     </issue>
 
     <issue
-        id="NewApi"
-        message="Field requires API level 19 (current min is 14): `VideoOnly`"
-        errorLine1="            ActivityResultContracts.PickVisualMedia.VideoOnly"
-        errorLine2="                                                    ~~~~~~~~~">
+        id="ObsoleteSdkInt"
+        message="Unnecessary; `Build.VERSION.SDK_INT == 19` is never true here"
+        errorLine1="                Build.VERSION.SDK_INT == 19 &amp;&amp;"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/androidTest/java/androidx/activity/result/PickVisualMediaRequestTest.kt"/>
+            file="src/main/java/androidx/activity/ComponentActivity.kt"/>
     </issue>
 
     <issue
-        id="NewApi"
-        message="Field requires API level 19 (current min is 14): `VideoOnly`"
-        errorLine1="        assertThat(request.mediaType).isEqualTo(ActivityResultContracts.PickVisualMedia.VideoOnly)"
-        errorLine2="                                                                                        ~~~~~~~~~">
+        id="ObsoleteSdkInt"
+        message="Unnecessary; `Build.VERSION.SDK_INT >= 21` is never true here (`SDK_INT` ≥ 21 and &lt; 23)"
+        errorLine1="                if (Build.VERSION.SDK_INT >= 21) {"
+        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/androidTest/java/androidx/activity/result/PickVisualMediaRequestTest.kt"/>
+            file="src/main/java/androidx/activity/EdgeToEdge.kt"/>
     </issue>
 
     <issue
-        id="NewApi"
-        message="Field requires API level 19 (current min is 14): `VideoOnly`"
-        errorLine1="        val request = PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)"
-        errorLine2="                                                                                     ~~~~~~~~~">
+        id="ObsoleteSdkInt"
+        message="Unnecessary; `SDK_INT` is always >= 21"
+        errorLine1="@RequiresApi(21)"
+        errorLine2="~~~~~~~~~~~~~~~~">
         <location
-            file="src/androidTest/java/androidx/activity/result/PickVisualMediaRequestTest.kt"/>
-    </issue>
-
-    <issue
-        id="NewApi"
-        message="Field requires API level 19 (current min is 14): `VideoOnly`"
-        errorLine1="        assertThat(request.mediaType).isEqualTo(ActivityResultContracts.PickVisualMedia.VideoOnly)"
-        errorLine2="                                                                                        ~~~~~~~~~">
-        <location
-            file="src/androidTest/java/androidx/activity/result/PickVisualMediaRequestTest.kt"/>
+            file="src/main/java/androidx/activity/EdgeToEdge.kt"/>
     </issue>
 
 </issues>

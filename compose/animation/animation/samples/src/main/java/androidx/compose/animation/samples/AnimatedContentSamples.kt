@@ -22,7 +22,6 @@ import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.keyframes
@@ -55,7 +54,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -76,18 +74,20 @@ fun AnimateIncrementDecrementSample() {
                 // different numbers have a spatial relationship - larger numbers are
                 // positioned (vertically) below smaller numbers.
                 if (targetState > initialState) {
-                    // If the incoming number is larger, new number slides up and fades in while
-                    // the previous (smaller) number slides up to make room and fades out.
-                    slideInVertically { it } + fadeIn() togetherWith
-                        slideOutVertically { -it } + fadeOut()
-                } else {
-                    // If the incoming number is smaller, new number slides down and fades in while
-                    // the previous number slides down and fades out.
-                    slideInVertically { -it } + fadeIn() togetherWith
-                        slideOutVertically { it } + fadeOut()
-                    // Disable clipping since the faded slide-out is desired out of bounds, but
-                    // the size transform is still needed from number getting longer
-                }.using(SizeTransform(clip = false)) // Using default spring for the size change.
+                        // If the incoming number is larger, new number slides up and fades in while
+                        // the previous (smaller) number slides up to make room and fades out.
+                        slideInVertically { it } + fadeIn() togetherWith
+                            slideOutVertically { -it } + fadeOut()
+                    } else {
+                        // If the incoming number is smaller, new number slides down and fades in
+                        // while
+                        // the previous number slides down and fades out.
+                        slideInVertically { -it } + fadeIn() togetherWith
+                            slideOutVertically { it } + fadeOut()
+                        // Disable clipping since the faded slide-out is desired out of bounds, but
+                        // the size transform is still needed from number getting longer
+                    }
+                    .using(SizeTransform(clip = false)) // Using default spring for the size change.
             }
         ) { targetCount ->
             // This establishes a mapping between the target state and the content in the form of a
@@ -115,29 +115,17 @@ fun SimpleAnimatedContentSample() {
     // enum class ContentState { Foo, Bar, Baz }
     @Composable
     fun Foo() {
-        Box(
-            Modifier
-                .size(200.dp)
-                .background(Color(0xffffdb00))
-        )
+        Box(Modifier.size(200.dp).background(Color(0xffffdb00)))
     }
 
     @Composable
     fun Bar() {
-        Box(
-            Modifier
-                .size(40.dp)
-                .background(Color(0xffff8100))
-        )
+        Box(Modifier.size(40.dp).background(Color(0xffff8100)))
     }
 
     @Composable
     fun Baz() {
-        Box(
-            Modifier
-                .size(80.dp, 20.dp)
-                .background(Color(0xffff4400))
-        )
+        Box(Modifier.size(80.dp, 20.dp).background(Color(0xffff4400)))
     }
 
     var contentState: ContentState by remember { mutableStateOf(ContentState.Foo) }
@@ -151,74 +139,79 @@ fun SimpleAnimatedContentSample() {
     }
 }
 
-private enum class ContentState { Foo, Bar, Baz }
+private enum class ContentState {
+    Foo,
+    Bar,
+    Baz
+}
 
 @Suppress("UNUSED_VARIABLE")
 @Sampled
 fun AnimatedContentTransitionSpecSample() {
     // enum class CartState { Expanded, Collapsed }
-    val transitionSpec: AnimatedContentTransitionScope<CartState>.() -> ContentTransform =
-        {
-            // Fade in with a delay so that it starts after fade out
-            fadeIn(animationSpec = tween(150, delayMillis = 150))
-                .togetherWith(fadeOut(animationSpec = tween(150)))
-                .using(
-                    SizeTransform { initialSize, targetSize ->
-                        // Using different SizeTransform for different state change
-                        if (CartState.Collapsed isTransitioningTo CartState.Expanded) {
-                            keyframes {
-                                durationMillis = 500
-                                // Animate to full target width and by 200px in height at 150ms
-                                IntSize(targetSize.width, initialSize.height + 200) at 150
-                            }
-                        } else {
-                            keyframes {
-                                durationMillis = 500
-                                // Animate 1/2 the height without changing the width at 150ms.
-                                // The width and rest of the height will be animated in the
-                                // timeframe between 150ms and duration (i.e. 500ms)
-                                IntSize(
-                                    initialSize.width,
-                                    (initialSize.height + targetSize.height) / 2
-                                ) at 150
-                            }
+    val transitionSpec: AnimatedContentTransitionScope<CartState>.() -> ContentTransform = {
+        // Fade in with a delay so that it starts after fade out
+        fadeIn(animationSpec = tween(150, delayMillis = 150))
+            .togetherWith(fadeOut(animationSpec = tween(150)))
+            .using(
+                SizeTransform { initialSize, targetSize ->
+                    // Using different SizeTransform for different state change
+                    if (CartState.Collapsed isTransitioningTo CartState.Expanded) {
+                        keyframes {
+                            durationMillis = 500
+                            // Animate to full target width and by 200px in height at 150ms
+                            IntSize(targetSize.width, initialSize.height + 200) at 150
+                        }
+                    } else {
+                        keyframes {
+                            durationMillis = 500
+                            // Animate 1/2 the height without changing the width at 150ms.
+                            // The width and rest of the height will be animated in the
+                            // timeframe between 150ms and duration (i.e. 500ms)
+                            IntSize(
+                                initialSize.width,
+                                (initialSize.height + targetSize.height) / 2
+                            ) at 150
                         }
                     }
-                )
-        }
+                }
+            )
+    }
 }
 
 @Sampled
 @Composable
 fun TransitionExtensionAnimatedContentSample() {
     @Composable
-    fun CollapsedCart() { /* Some content here */
+    fun CollapsedCart() {
+        /* Some content here */
     }
 
     @Composable
-    fun ExpandedCart() { /* Some content here */
+    fun ExpandedCart() {
+        /* Some content here */
     }
 
     // enum class CartState { Expanded, Collapsed }
     var cartState by remember { mutableStateOf(CartState.Collapsed) }
     // Creates a transition here to animate the corner shape and content.
     val cartOpenTransition = updateTransition(cartState, "CartOpenTransition")
-    val cornerSize by cartOpenTransition.animateDp(
-        label = "cartCornerSize",
-        transitionSpec = {
-            when {
-                CartState.Expanded isTransitioningTo CartState.Collapsed ->
-                    tween(durationMillis = 433, delayMillis = 67)
-
-                else ->
-                    tween(durationMillis = 150)
+    val cornerSize by
+        cartOpenTransition.animateDp(
+            label = "cartCornerSize",
+            transitionSpec = {
+                when {
+                    CartState.Expanded isTransitioningTo CartState.Collapsed ->
+                        tween(durationMillis = 433, delayMillis = 67)
+                    else -> tween(durationMillis = 150)
+                }
             }
+        ) {
+            if (it == CartState.Expanded) 0.dp else 24.dp
         }
-    ) { if (it == CartState.Expanded) 0.dp else 24.dp }
 
     Surface(
-        Modifier
-            .shadow(8.dp, CutCornerShape(topStart = cornerSize))
+        Modifier.shadow(8.dp, CutCornerShape(topStart = cornerSize))
             .clip(CutCornerShape(topStart = cornerSize)),
         color = Color(0xfffff0ea),
     ) {
@@ -252,16 +245,18 @@ fun TransitionExtensionAnimatedContentSample() {
                                 }
                             }
                         }
-                    ).apply {
-                        targetContentZIndex = when (targetState) {
-                            // This defines a relationship along z-axis during the momentary
-                            // overlap as both incoming and outgoing content is on screen. This
-                            // fixed zOrder will ensure that collapsed content will always be on
-                            // top of the expanded content - it will come in on top, and
-                            // disappear over the expanded content as well.
-                            CartState.Expanded -> 1f
-                            CartState.Collapsed -> 2f
-                        }
+                    )
+                    .apply {
+                        targetContentZIndex =
+                            when (targetState) {
+                                // This defines a relationship along z-axis during the momentary
+                                // overlap as both incoming and outgoing content is on screen. This
+                                // fixed zOrder will ensure that collapsed content will always be on
+                                // top of the expanded content - it will come in on top, and
+                                // disappear over the expanded content as well.
+                                CartState.Expanded -> 1f
+                                CartState.Collapsed -> 2f
+                            }
                     }
             }
         ) {
@@ -287,49 +282,27 @@ fun SlideIntoContainerSample() {
     // parent menu. See the demos directory of the source code for a full demo.
     val transitionSpec: AnimatedContentTransitionScope<NestedMenuState>.() -> ContentTransform = {
         if (initialState < targetState) {
-            // Going from parent menu to child menu, slide towards left
-            slideIntoContainer(towards = SlideDirection.Left) togetherWith
-                // Keep exiting content in place while sliding in the incoming content.
-                ExitTransition.Hold
-        } else {
-            // Going from child menu to parent menu, slide towards right.
-            // Slide parent by half amount compared to child menu to create an interesting
-            // parallax visual effect.
-            slideIntoContainer(towards = SlideDirection.Right) { offsetForFullSlide ->
-                offsetForFullSlide / 2
-            } togetherWith slideOutOfContainer(towards = SlideDirection.Right)
-        }.apply {
-            // Here we can specify the zIndex for the target (i.e. incoming) content.
-            targetContentZIndex = when (targetState) {
-                NestedMenuState.Level1 -> 1f
-                NestedMenuState.Level2 -> 2f
-                NestedMenuState.Level3 -> 3f
+                // Going from parent menu to child menu, slide towards left
+                slideIntoContainer(towards = SlideDirection.Left) togetherWith
+                    // Keep exiting content in place while sliding in the incoming content.
+                    ExitTransition.KeepUntilTransitionsFinished
+            } else {
+                // Going from child menu to parent menu, slide towards right.
+                // Slide parent by half amount compared to child menu to create an interesting
+                // parallax visual effect.
+                slideIntoContainer(towards = SlideDirection.Right) { offsetForFullSlide ->
+                    offsetForFullSlide / 2
+                } togetherWith slideOutOfContainer(towards = SlideDirection.Right)
             }
-        }
-    }
-}
-
-@OptIn(ExperimentalAnimationApi::class)
-@Suppress("UNUSED_VARIABLE")
-@Sampled
-@Composable
-fun ScaleInToFitContainerSample() {
-    // enum class CartState { Expanded, Collapsed }
-    // This is an example of scaling both the incoming content and outgoing content to fit in the
-    // animating container size while animating alpha.
-    val transitionSpec: AnimatedContentTransitionScope<CartState>.() -> ContentTransform = {
-        // Fade in while scaling the content.
-        fadeIn() + scaleInToFitContainer() togetherWith
-            // Fade out outgoing content while scaling it. It is important
-            // to combine `scaleOutToFitContainer` with another ExitTransition that defines
-            // a timeframe for the exit (such as fade/shrink/slide/Hold).
-            fadeOut() + scaleOutToFitContainer(
-                // Default alignment is the content alignment defined in AnimatedContent
-                Alignment.Center,
-                // Content will be scaled based on the height of the content. Default content
-                // scale is ContentScale.FillWidth.
-                ContentScale.FillHeight
-            )
+            .apply {
+                // Here we can specify the zIndex for the target (i.e. incoming) content.
+                targetContentZIndex =
+                    when (targetState) {
+                        NestedMenuState.Level1 -> 1f
+                        NestedMenuState.Level2 -> 2f
+                        NestedMenuState.Level3 -> 3f
+                    }
+            }
     }
 }
 
@@ -338,4 +311,8 @@ private enum class CartState {
     Collapsed
 }
 
-private enum class NestedMenuState { Level1, Level2, Level3 }
+private enum class NestedMenuState {
+    Level1,
+    Level2,
+    Level3
+}

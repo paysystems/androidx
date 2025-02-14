@@ -22,10 +22,10 @@ import static java.util.Objects.requireNonNull;
 
 import android.view.Surface;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.annotation.RequiresApi;
 import androidx.camera.effects.opengl.GlRenderer;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A GL texture for caching camera frames.
@@ -33,19 +33,16 @@ import androidx.camera.effects.opengl.GlRenderer;
  * <p>The frame can be empty or filled. A filled frame contains valid information on how to
  * render it. An empty frame can be filled with new content.
  */
-@RequiresApi(21)
 class TextureFrame {
 
     private static final long NO_VALUE = Long.MIN_VALUE;
 
     private final int mTextureId;
 
-    private long mTimestampNs = NO_VALUE;
-    @Nullable
-    private Surface mSurface;
+    private long mTimestampNanos = NO_VALUE;
+    private @Nullable Surface mSurface;
 
-    @NonNull
-    private final float[] mTransform = new float[16];
+    private final float @NonNull [] mTransform = new float[16];
 
     /**
      * Creates a frame that is backed by a texture ID.
@@ -61,7 +58,7 @@ class TextureFrame {
      * with new content.
      */
     boolean isEmpty() {
-        return mTimestampNs == NO_VALUE;
+        return mTimestampNanos == NO_VALUE;
     }
 
     /**
@@ -71,7 +68,7 @@ class TextureFrame {
      */
     void markEmpty() {
         checkState(!isEmpty(), "Frame is already empty");
-        mTimestampNs = NO_VALUE;
+        mTimestampNanos = NO_VALUE;
         mSurface = null;
     }
 
@@ -86,9 +83,9 @@ class TextureFrame {
      * @param transform   the transform to apply when rendering the frame.
      * @param surface     the output surface to which the frame should render.
      */
-    void markFilled(long timestampNs, @NonNull float[] transform, @NonNull Surface surface) {
+    void markFilled(long timestampNs, float @NonNull [] transform, @NonNull Surface surface) {
         checkState(isEmpty(), "Frame is already filled");
-        mTimestampNs = timestampNs;
+        mTimestampNanos = timestampNs;
         System.arraycopy(transform, 0, mTransform, 0, transform.length);
         mSurface = surface;
     }
@@ -98,8 +95,8 @@ class TextureFrame {
      *
      * <p>This value is used in {@link GlRenderer#renderQueueTextureToSurface}.
      */
-    long getTimestampNs() {
-        return mTimestampNs;
+    long getTimestampNanos() {
+        return mTimestampNanos;
     }
 
     /**
@@ -117,8 +114,7 @@ class TextureFrame {
      *
      * <p>This value is used in {@link GlRenderer#renderQueueTextureToSurface}.
      */
-    @NonNull
-    float[] getTransform() {
+    float @NonNull [] getTransform() {
         return mTransform;
     }
 
@@ -129,8 +125,7 @@ class TextureFrame {
      * always be rendered to the same surface than the one it was originally filled with. If the
      * Surface is no longer valid, the frame should be dropped.
      */
-    @NonNull
-    Surface getSurface() {
+    @NonNull Surface getSurface() {
         return requireNonNull(mSurface);
     }
 }

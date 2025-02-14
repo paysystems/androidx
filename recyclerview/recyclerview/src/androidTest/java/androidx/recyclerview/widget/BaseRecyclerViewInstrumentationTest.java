@@ -40,9 +40,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.core.view.ViewCompat;
 import androidx.recyclerview.test.R;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.testutils.ActivityScenarioResetRule;
@@ -51,6 +48,8 @@ import androidx.testutils.ResettableActivityScenarioRule;
 
 import org.hamcrest.CoreMatchers;
 import org.hamcrest.MatcherAssert;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.ClassRule;
@@ -71,7 +70,7 @@ abstract public class BaseRecyclerViewInstrumentationTest {
 
     private static final String TAG = "RecyclerViewTest";
 
-    private boolean mDebug;
+    private boolean mDebug = true;
 
     protected RecyclerView mRecyclerView;
 
@@ -79,7 +78,7 @@ abstract public class BaseRecyclerViewInstrumentationTest {
 
     private Throwable mMainThreadException;
 
-    private boolean mIgnoreMainThreadException = false;
+    private volatile boolean mIgnoreMainThreadException = false;
 
     Thread mInstrumentationThread;
 
@@ -96,7 +95,7 @@ abstract public class BaseRecyclerViewInstrumentationTest {
     }
 
     public BaseRecyclerViewInstrumentationTest(boolean debug) {
-        mDebug = debug;
+        mDebug = true;
     }
 
     void checkForMainThreadException() throws Throwable {
@@ -128,7 +127,7 @@ abstract public class BaseRecyclerViewInstrumentationTest {
             mActivityRule.runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    ViewCompat.setHasTransientState(view, value);
+                    view.setHasTransientState(value);
                 }
             });
         } catch (Throwable throwable) {
@@ -204,9 +203,19 @@ abstract public class BaseRecyclerViewInstrumentationTest {
             throw new RuntimeException(t);
         }
         if (mMainThreadException != null) {
-            Log.e(TAG, "receiving another main thread exception. dropping.", t);
+            String msg = "receiving another main thread exception. dropping.";
+            if (mIgnoreMainThreadException) {
+                Log.i(TAG, msg, t);
+            } else {
+                Log.e(TAG, msg, t);
+            }
         } else {
-            Log.e(TAG, "captured exception on main thread", t);
+            String msg = "captured exception on main thread";
+            if (mIgnoreMainThreadException) {
+                Log.i(TAG, msg, t);
+            } else {
+                Log.e(TAG, msg, t);
+            }
             mMainThreadException = t;
         }
 
@@ -408,7 +417,7 @@ abstract public class BaseRecyclerViewInstrumentationTest {
             mRecyclerView.addItemDecoration(new RecyclerView.ItemDecoration() {
                 @Override
                 public void getItemOffsets(@NonNull Rect outRect, @NonNull View view,
-                        @NonNull RecyclerView parent, @NonNull RecyclerView.State state) {
+                        @NonNull RecyclerView parent, RecyclerView.@NonNull State state) {
                     RecyclerView.ViewHolder vh = parent.getChildViewHolder(view);
                     if (!vh.isRemoved()) {
                         assertNotSame("If getItemOffsets is called, child should have a valid"
@@ -700,7 +709,7 @@ abstract public class BaseRecyclerViewInstrumentationTest {
                     addView(view);
                 }
                 measureChildWithMargins(view, 0, 0);
-                if (getLayoutDirection() == ViewCompat.LAYOUT_DIRECTION_RTL) {
+                if (getLayoutDirection() == View.LAYOUT_DIRECTION_RTL) {
                     layoutDecorated(view, getWidth() - getDecoratedMeasuredWidth(view), top,
                             getWidth(), top + getDecoratedMeasuredHeight(view));
                 } else {
@@ -877,20 +886,20 @@ abstract public class BaseRecyclerViewInstrumentationTest {
 
         ViewAttachDetachCounter mAttachmentCounter = new ViewAttachDetachCounter();
         List<Item> mItems;
-        @Nullable RecyclerView.LayoutParams mLayoutParams;
+        RecyclerView.@Nullable LayoutParams mLayoutParams;
         boolean mCancelViewPropertyAnimatorsInOnDetach;
 
         public TestAdapter(int count) {
             this(count, null);
         }
 
-        public TestAdapter(int count, @Nullable RecyclerView.LayoutParams layoutParams) {
+        public TestAdapter(int count, RecyclerView.@Nullable LayoutParams layoutParams) {
             mItems = new ArrayList<Item>(count);
             addItems(0, count, DEFAULT_ITEM_PREFIX);
             mLayoutParams = layoutParams;
         }
 
-        public void setItemLayoutParams(@Nullable RecyclerView.LayoutParams params) {
+        public void setItemLayoutParams(RecyclerView.@Nullable LayoutParams params) {
             mLayoutParams = params;
         }
 

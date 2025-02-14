@@ -21,14 +21,16 @@ import static androidx.annotation.Dimension.DP;
 import androidx.annotation.Dimension;
 import androidx.annotation.FloatRange;
 import androidx.annotation.IntDef;
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
 import androidx.annotation.RestrictTo;
 import androidx.annotation.RestrictTo.Scope;
 import androidx.wear.protolayout.expression.ProtoLayoutExperimental;
+import androidx.wear.protolayout.expression.RequiresSchemaVersion;
 import androidx.wear.protolayout.expression.VersionBuilders.VersionInfo;
 import androidx.wear.protolayout.proto.DeviceParametersProto;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -37,67 +39,45 @@ import java.lang.annotation.RetentionPolicy;
 public final class DeviceParametersBuilders {
     private DeviceParametersBuilders() {}
 
-    /**
-     * The platform of the device requesting a layout.
-     *
-     * @since 1.0
-     */
+    /** The platform of the device requesting a layout. */
+    @RequiresSchemaVersion(major = 1, minor = 0)
     @RestrictTo(RestrictTo.Scope.LIBRARY)
     @IntDef({DEVICE_PLATFORM_UNDEFINED, DEVICE_PLATFORM_WEAR_OS})
     @Retention(RetentionPolicy.SOURCE)
     public @interface DevicePlatform {}
 
-    /**
-     * Device platform is undefined.
-     *
-     * @since 1.0
-     */
+    /** Device platform is undefined. */
+    @RequiresSchemaVersion(major = 1, minor = 0)
     public static final int DEVICE_PLATFORM_UNDEFINED = 0;
 
-    /**
-     * Device is a Wear OS device.
-     *
-     * @since 1.0
-     */
+    /** Device is a Wear OS device. */
+    @RequiresSchemaVersion(major = 1, minor = 0)
     public static final int DEVICE_PLATFORM_WEAR_OS = 1;
 
-    /**
-     * The shape of a screen.
-     *
-     * @since 1.0
-     */
+    /** The shape of a screen. */
+    @RequiresSchemaVersion(major = 1, minor = 0)
     @RestrictTo(RestrictTo.Scope.LIBRARY)
     @IntDef({SCREEN_SHAPE_UNDEFINED, SCREEN_SHAPE_ROUND, SCREEN_SHAPE_RECT})
     @Retention(RetentionPolicy.SOURCE)
     public @interface ScreenShape {}
 
-    /**
-     * Screen shape is undefined.
-     *
-     * @since 1.0
-     */
+    /** Screen shape is undefined. */
+    @RequiresSchemaVersion(major = 1, minor = 0)
     public static final int SCREEN_SHAPE_UNDEFINED = 0;
 
-    /**
-     * A round screen (typically found on most Wear devices).
-     *
-     * @since 1.0
-     */
+    /** A round screen (typically found on most Wear devices). */
+    @RequiresSchemaVersion(major = 1, minor = 0)
     public static final int SCREEN_SHAPE_ROUND = 1;
 
-    /**
-     * Rectangular screens.
-     *
-     * @since 1.0
-     */
+    /** Rectangular screens. */
+    @RequiresSchemaVersion(major = 1, minor = 0)
     public static final int SCREEN_SHAPE_RECT = 2;
 
     /**
      * Parameters describing the device requesting a layout update. This contains physical and
      * logical characteristics about the device (e.g. screen size and density, etc).
-     *
-     * @since 1.0
      */
+    @RequiresSchemaVersion(major = 1, minor = 0)
     public static final class DeviceParameters {
         private final DeviceParametersProto.DeviceParameters mImpl;
 
@@ -105,21 +85,13 @@ public final class DeviceParametersBuilders {
             this.mImpl = impl;
         }
 
-        /**
-         * Gets width of the device's screen in DP.
-         *
-         * @since 1.0
-         */
+        /** Gets width of the device's screen in DP. */
         @Dimension(unit = DP)
         public int getScreenWidthDp() {
             return mImpl.getScreenWidthDp();
         }
 
-        /**
-         * Gets height of the device's screen in DP.
-         *
-         * @since 1.0
-         */
+        /** Gets height of the device's screen in DP. */
         @Dimension(unit = DP)
         public int getScreenHeightDp() {
             return mImpl.getScreenHeightDp();
@@ -128,8 +100,6 @@ public final class DeviceParametersBuilders {
         /**
          * Gets density of the display. This value is the scaling factor to get from DP to Pixels
          * (px = dp * density).
-         *
-         * @since 1.0
          */
         @FloatRange(from = 0.0, fromInclusive = false, toInclusive = false)
         public float getScreenDensity() {
@@ -139,29 +109,19 @@ public final class DeviceParametersBuilders {
         /**
          * Gets current user preference for the scaling factor for fonts displayed on the display.
          * This value is used to get from SP to DP (dp = sp * font_scale).
-         *
-         * @since 1.2
          */
         @FloatRange(from = 0.0, fromInclusive = false, toInclusive = false)
         public float getFontScale() {
             return mImpl.getFontScale();
         }
 
-        /**
-         * Gets the platform of the device.
-         *
-         * @since 1.0
-         */
+        /** Gets the platform of the device. */
         @DevicePlatform
         public int getDevicePlatform() {
             return mImpl.getDevicePlatform().getNumber();
         }
 
-        /**
-         * Gets the shape of the device's screen.
-         *
-         * @since 1.0
-         */
+        /** Gets the shape of the device's screen. */
         @ScreenShape
         public int getScreenShape() {
             return mImpl.getScreenShape().getNumber();
@@ -171,11 +131,8 @@ public final class DeviceParametersBuilders {
          * Gets the maximum schema version supported by the current renderer. When building a layout
          * that uses features not available on schema version 1.0 , this can be used to
          * conditionally choose which feature to use.
-         *
-         * @since 1.2
          */
-        @NonNull
-        public VersionInfo getRendererSchemaVersion() {
+        public @NonNull VersionInfo getRendererSchemaVersion() {
             if (mImpl.hasRendererSchemaVersion()) {
                 return VersionInfo.fromProto(mImpl.getRendererSchemaVersion());
             } else {
@@ -183,14 +140,9 @@ public final class DeviceParametersBuilders {
             }
         }
 
-        /**
-         * Gets renderer supported {@link Capabilities}.
-         *
-         * @since 1.2
-         */
+        /** Gets renderer supported {@link Capabilities}. */
         @ProtoLayoutExperimental
-        @Nullable
-        public Capabilities getCapabilities() {
+        public @Nullable Capabilities getCapabilities() {
             if (mImpl.hasCapabilities()) {
                 return Capabilities.fromProto(mImpl.getCapabilities());
             } else {
@@ -200,23 +152,20 @@ public final class DeviceParametersBuilders {
 
         /** Creates a new wrapper instance from the proto. */
         @RestrictTo(Scope.LIBRARY_GROUP)
-        @NonNull
-        public static DeviceParameters fromProto(
-                @NonNull DeviceParametersProto.DeviceParameters proto) {
+        public static @NonNull DeviceParameters fromProto(
+                DeviceParametersProto.@NonNull DeviceParameters proto) {
             return new DeviceParameters(proto);
         }
 
         /** Returns the internal proto instance. */
         @RestrictTo(Scope.LIBRARY_GROUP)
-        @NonNull
-        public DeviceParametersProto.DeviceParameters toProto() {
+        public DeviceParametersProto.@NonNull DeviceParameters toProto() {
             return mImpl;
         }
 
         @Override
         @OptIn(markerClass = ProtoLayoutExperimental.class)
-        @NonNull
-        public String toString() {
+        public @NonNull String toString() {
             return "DeviceParameters{"
                     + "screenWidthDp="
                     + getScreenWidthDp()
@@ -242,26 +191,19 @@ public final class DeviceParametersBuilders {
             private final DeviceParametersProto.DeviceParameters.Builder mImpl =
                     DeviceParametersProto.DeviceParameters.newBuilder();
 
+            /** Creates an instance of {@link Builder}. */
             public Builder() {}
 
-            /**
-             * Sets width of the device's screen in DP.
-             *
-             * @since 1.0
-             */
-            @NonNull
-            public Builder setScreenWidthDp(@Dimension(unit = DP) int screenWidthDp) {
+            /** Sets width of the device's screen in DP. */
+            @RequiresSchemaVersion(major = 1, minor = 0)
+            public @NonNull Builder setScreenWidthDp(@Dimension(unit = DP) int screenWidthDp) {
                 mImpl.setScreenWidthDp(screenWidthDp);
                 return this;
             }
 
-            /**
-             * Sets height of the device's screen in DP.
-             *
-             * @since 1.0
-             */
-            @NonNull
-            public Builder setScreenHeightDp(@Dimension(unit = DP) int screenHeightDp) {
+            /** Sets height of the device's screen in DP. */
+            @RequiresSchemaVersion(major = 1, minor = 0)
+            public @NonNull Builder setScreenHeightDp(@Dimension(unit = DP) int screenHeightDp) {
                 mImpl.setScreenHeightDp(screenHeightDp);
                 return this;
             }
@@ -269,11 +211,9 @@ public final class DeviceParametersBuilders {
             /**
              * Sets density of the display. This value is the scaling factor to get from DP to
              * Pixels (px = dp * density).
-             *
-             * @since 1.0
              */
-            @NonNull
-            public Builder setScreenDensity(
+            @RequiresSchemaVersion(major = 1, minor = 0)
+            public @NonNull Builder setScreenDensity(
                     @FloatRange(from = 0.0, fromInclusive = false, toInclusive = false)
                             float screenDensity) {
                 mImpl.setScreenDensity(screenDensity);
@@ -283,36 +223,26 @@ public final class DeviceParametersBuilders {
             /**
              * Sets current user preference for the scaling factor for fonts displayed on the
              * display. This value is used to get from SP to DP (dp = sp * font_scale).
-             *
-             * @since 1.2
              */
-            @NonNull
-            public Builder setFontScale(
+            @RequiresSchemaVersion(major = 1, minor = 200)
+            public @NonNull Builder setFontScale(
                     @FloatRange(from = 0.0, fromInclusive = false, toInclusive = false)
                             float fontScale) {
                 mImpl.setFontScale(fontScale);
                 return this;
             }
 
-            /**
-             * Sets the platform of the device.
-             *
-             * @since 1.0
-             */
-            @NonNull
-            public Builder setDevicePlatform(@DevicePlatform int devicePlatform) {
+            /** Sets the platform of the device. */
+            @RequiresSchemaVersion(major = 1, minor = 0)
+            public @NonNull Builder setDevicePlatform(@DevicePlatform int devicePlatform) {
                 mImpl.setDevicePlatform(
                         DeviceParametersProto.DevicePlatform.forNumber(devicePlatform));
                 return this;
             }
 
-            /**
-             * Sets the shape of the device's screen.
-             *
-             * @since 1.0
-             */
-            @NonNull
-            public Builder setScreenShape(@ScreenShape int screenShape) {
+            /** Sets the shape of the device's screen. */
+            @RequiresSchemaVersion(major = 1, minor = 0)
+            public @NonNull Builder setScreenShape(@ScreenShape int screenShape) {
                 mImpl.setScreenShape(DeviceParametersProto.ScreenShape.forNumber(screenShape));
                 return this;
             }
@@ -321,30 +251,24 @@ public final class DeviceParametersBuilders {
              * Sets the maximum schema version supported by the current renderer. When building a
              * layout that uses features not available on schema version 1.0 , this can be used to
              * conditionally choose which feature to use.
-             *
-             * @since 1.2
              */
-            @NonNull
-            public Builder setRendererSchemaVersion(@NonNull VersionInfo rendererSchemaVersion) {
+            @RequiresSchemaVersion(major = 1, minor = 0)
+            public @NonNull Builder setRendererSchemaVersion(
+                    @NonNull VersionInfo rendererSchemaVersion) {
                 mImpl.setRendererSchemaVersion(rendererSchemaVersion.toProto());
                 return this;
             }
 
-            /**
-             * Sets renderer supported {@link Capabilities}.
-             *
-             * @since 1.2
-             */
+            /** Sets renderer supported {@link Capabilities}. */
+            @RequiresSchemaVersion(major = 1, minor = 200)
             @ProtoLayoutExperimental
-            @NonNull
-            public Builder setCapabilities(@NonNull Capabilities capabilities) {
+            public @NonNull Builder setCapabilities(@NonNull Capabilities capabilities) {
                 mImpl.setCapabilities(capabilities.toProto());
                 return this;
             }
 
             /** Builds an instance from accumulated values. */
-            @NonNull
-            public DeviceParameters build() {
+            public @NonNull DeviceParameters build() {
                 return DeviceParameters.fromProto(mImpl.build());
             }
         }
@@ -355,9 +279,8 @@ public final class DeviceParametersBuilders {
      * not necessarily tied to a specific schema version. {@link
      * androidx.wear.protolayout.LayoutElementBuilders.Layout} providers can use these information
      * to conditionally generate different layouts based on the presence/value of a feature.
-     *
-     * @since 1.2
      */
+    @RequiresSchemaVersion(major = 1, minor = 200)
     @ProtoLayoutExperimental
     public static final class Capabilities {
         private final DeviceParametersProto.Capabilities mImpl;
@@ -370,31 +293,26 @@ public final class DeviceParametersBuilders {
          * Gets current minimum freshness limit in milliseconds for a layout. This can change based
          * on various factors. Any freshness request lower than the current limit will be replaced
          * by that limit. A value of 0 here signifies that the minimum freshness limit in unknown.
-         *
-         * @since 1.2
          */
-        @ProtoLayoutExperimental
         public long getMinimumFreshnessLimitMillis() {
             return mImpl.getMinimumFreshnessLimitMillis();
         }
 
         /** Creates a new wrapper instance from the proto. */
         @RestrictTo(Scope.LIBRARY_GROUP)
-        @NonNull
-        public static Capabilities fromProto(@NonNull DeviceParametersProto.Capabilities proto) {
+        public static @NonNull Capabilities fromProto(
+                DeviceParametersProto.@NonNull Capabilities proto) {
             return new Capabilities(proto);
         }
 
         /** Returns the internal proto instance. */
         @RestrictTo(Scope.LIBRARY_GROUP)
-        @NonNull
-        public DeviceParametersProto.Capabilities toProto() {
+        public DeviceParametersProto.@NonNull Capabilities toProto() {
             return mImpl;
         }
 
         @Override
-        @NonNull
-        public String toString() {
+        public @NonNull String toString() {
             return "Capabilities{"
                     + "minimumFreshnessLimitMillis="
                     + getMinimumFreshnessLimitMillis()
@@ -406,6 +324,7 @@ public final class DeviceParametersBuilders {
             private final DeviceParametersProto.Capabilities.Builder mImpl =
                     DeviceParametersProto.Capabilities.newBuilder();
 
+            /** Creates an instance of {@link Builder}. */
             public Builder() {}
 
             /**
@@ -413,19 +332,16 @@ public final class DeviceParametersBuilders {
              * based on various factors. Any freshness request lower than the current limit will be
              * replaced by that limit. A value of 0 here signifies that the minimum freshness limit
              * in unknown.
-             *
-             * @since 1.2
              */
-            @NonNull
-            @ProtoLayoutExperimental
-            public Builder setMinimumFreshnessLimitMillis(long minimumFreshnessLimitMillis) {
+            @RequiresSchemaVersion(major = 1, minor = 200)
+            public @NonNull Builder setMinimumFreshnessLimitMillis(
+                    long minimumFreshnessLimitMillis) {
                 mImpl.setMinimumFreshnessLimitMillis(minimumFreshnessLimitMillis);
                 return this;
             }
 
             /** Builds an instance from accumulated values. */
-            @NonNull
-            public Capabilities build() {
+            public @NonNull Capabilities build() {
                 return Capabilities.fromProto(mImpl.build());
             }
         }

@@ -37,10 +37,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.tv.foundation.ExperimentalTvFoundationApi
-import androidx.tv.foundation.text.AndroidImeOptions
+import androidx.tv.foundation.text.PlatformImeOptions
 import androidx.tv.foundation.text.TvKeyboardAlignment
+import androidx.tv.material3.ExperimentalTvMaterial3Api
+import androidx.tv.material3.MaterialTheme
 
 @Composable
 fun TextFieldContent() {
@@ -52,8 +56,9 @@ fun TextFieldContent() {
         }
         item {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                item { SampleTextField(label = "Email") }
-                item { SampleTextField(label = "Password") }
+                item { SampleTextField(label = "Name") }
+                item { SampleTextField(label = "Email", keyboardType = KeyboardType.Email) }
+                item { SampleTextField(label = "Password", keyboardType = KeyboardType.Password) }
                 item { SampleButton(text = "Submit") }
             }
         }
@@ -65,49 +70,55 @@ fun TextFieldContent() {
     }
 }
 
-@OptIn(ExperimentalTvFoundationApi::class)
+@OptIn(ExperimentalTvFoundationApi::class, ExperimentalTvMaterial3Api::class)
 @Composable
-fun SampleTextField(label: String) {
+fun SampleTextField(label: String, keyboardType: KeyboardType = KeyboardType.Text) {
     var text by remember { mutableStateOf("") }
 
     OutlinedTextField(
         value = text,
         onValueChange = { text = it },
-        label = {
-            Text(label)
-        },
+        label = { Text(label) },
         singleLine = true,
-        placeholder = {
-            Text("$label...")
-        },
-        keyboardOptions = KeyboardOptions(
-                platformImeOptions = AndroidImeOptions(TvKeyboardAlignment.Left)
-        ),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = Color.Cyan,
-            focusedLabelColor = Color.Cyan,
-            cursorColor = Color.White
-        )
+        placeholder = { Text("$label...") },
+        keyboardOptions =
+            KeyboardOptions(
+                keyboardType = keyboardType,
+                platformImeOptions = PlatformImeOptions(TvKeyboardAlignment.Left),
+                imeAction = ImeAction.Next
+            ),
+        colors =
+            OutlinedTextFieldDefaults.colors(
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedBorderColor = MaterialTheme.colorScheme.border,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                cursorColor = MaterialTheme.colorScheme.primary,
+                unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                focusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                focusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                errorLabelColor = MaterialTheme.colorScheme.error,
+                errorBorderColor = MaterialTheme.colorScheme.error
+            )
     )
 }
 
 @Composable
 fun SampleButton(text: String) {
-    Button(
-        onClick = { }
-    ) {
-        Text(text)
-    }
+    Button(onClick = {}) { Text(text) }
 }
 
 @Composable
 private fun SampleCardItem() {
     Box(
-        modifier = Modifier
-            .background(Color.Magenta.copy(alpha = 0.3f))
-            .width(50.dp)
-            .height(50.dp)
-            .drawBorderOnFocus()
-            .focusable()
+        modifier =
+            Modifier.background(Color.Magenta.copy(alpha = 0.3f))
+                .width(50.dp)
+                .height(50.dp)
+                .drawBorderOnFocus()
+                .focusable()
     )
 }

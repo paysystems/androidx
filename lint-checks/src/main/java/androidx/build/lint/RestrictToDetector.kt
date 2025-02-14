@@ -30,6 +30,9 @@ import com.android.tools.lint.detector.api.Scope
 import com.android.tools.lint.detector.api.Severity
 import com.android.tools.lint.detector.api.SourceCodeScanner
 import com.android.tools.lint.detector.api.isKotlin
+import com.android.tools.lint.model.DefaultLintModelMavenName
+import com.android.tools.lint.model.LintModelLibrary
+import com.android.tools.lint.model.LintModelMavenName
 import com.intellij.lang.jvm.annotation.JvmAnnotationConstantValue
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiCompiledElement
@@ -50,9 +53,7 @@ import org.jetbrains.uast.UastEmptyExpression
 import org.jetbrains.uast.getParentOfType
 import org.jetbrains.uast.util.isArrayInitializer
 
-/**
- * Adapted from com/android/tools/lint/checks/RestrictToDetector.kt in Android Studio repo.
- */
+/** Adapted from com/android/tools/lint/checks/RestrictToDetector.kt in Android Studio repo. */
 class RestrictToDetector : AbstractAnnotationDetector(), SourceCodeScanner {
     override fun applicableAnnotations(): List<String> = listOf(RESTRICT_TO_ANNOTATION)
 
@@ -80,7 +81,11 @@ class RestrictToDetector : AbstractAnnotationDetector(), SourceCodeScanner {
             // here, but that points to impl classes in its hierarchy which leads to
             // class loading trouble.
             val sourcePsi = element.sourcePsi
-            if (isKotlin(sourcePsi) && sourcePsi?.parent?.toString() == "CONSTRUCTOR_CALLEE") {
+            if (
+                sourcePsi != null &&
+                    isKotlin(sourcePsi.language) &&
+                    sourcePsi.parent?.toString() == "CONSTRUCTOR_CALLEE"
+            ) {
                 return
             }
         }
@@ -135,13 +140,7 @@ class RestrictToDetector : AbstractAnnotationDetector(), SourceCodeScanner {
     ) {
         val scope = getRestrictionScope(annotation)
         if (scope != 0) {
-            checkRestrictTo(
-                context,
-                node,
-                method,
-                usageInfo,
-                scope
-            )
+            checkRestrictTo(context, node, method, usageInfo, scope)
         }
     }
 
@@ -164,27 +163,14 @@ class RestrictToDetector : AbstractAnnotationDetector(), SourceCodeScanner {
 
         containingClass ?: return
 
-        if (
-            usageInfo.anyCloser {
-                it.qualifiedName == RESTRICT_TO_ANNOTATION
-            }
-        ) {
+        if (usageInfo.anyCloser { it.qualifiedName == RESTRICT_TO_ANNOTATION }) {
             return
         }
 
         if (scope and RESTRICT_TO_LIBRARY_GROUP != 0 && member != null) {
             val evaluator = context.evaluator
             val thisCoordinates = evaluator.getLibrary(node) ?: context.project.mavenCoordinate
-            val methodCoordinates =
-                evaluator.getLibrary(member)
-                    ?: run {
-                        if (thisCoordinates != null && member !is PsiCompiledElement) {
-                            // Local source?
-                            context.evaluator.getProject(member)?.mavenCoordinate
-                        } else {
-                            null
-                        }
-                    }
+            val methodCoordinates = context.findMavenCoordinate(member)
             val thisGroup = thisCoordinates?.groupId
             val methodGroup = methodCoordinates?.groupId
             if (thisGroup != methodGroup && methodGroup != null) {
@@ -211,7 +197,7 @@ class RestrictToDetector : AbstractAnnotationDetector(), SourceCodeScanner {
             val methodGroup = methodCoordinates?.groupId
             if (
                 methodGroup != null &&
-                (thisGroup == null || !sameLibraryGroupPrefix(thisGroup, methodGroup))
+                    (thisGroup == null || !sameLibraryGroupPrefix(thisGroup, methodGroup))
             ) {
                 val expectedPrefix =
                     methodGroup.lastIndexOf('.').let {
@@ -230,18 +216,19 @@ class RestrictToDetector : AbstractAnnotationDetector(), SourceCodeScanner {
         } else if (scope and RESTRICT_TO_LIBRARY != 0 && member != null) {
             val evaluator = context.evaluator
             val thisCoordinates = evaluator.getLibrary(node) ?: context.project.mavenCoordinate
-            val methodCoordinates = evaluator.getLibrary(member)
+            val methodCoordinates = context.findMavenCoordinate(member)
             val thisGroup = thisCoordinates?.groupId
             val methodGroup = methodCoordinates?.groupId
             if (thisGroup != methodGroup && methodGroup != null) {
                 val thisArtifact = thisCoordinates?.artifactId
                 val methodArtifact = methodCoordinates.artifactId
                 if (thisArtifact != methodArtifact) {
-                    val name = if (methodGroup == "__local_aars__") {
-                        "missing Maven coordinate due to repackaging"
-                    } else {
-                        "$methodGroup:$methodArtifact"
-                    }
+                    val name =
+                        if (methodGroup == "__local_aars__") {
+                            "missing Maven coordinate due to repackaging"
+                        } else {
+                            "$methodGroup:$methodArtifact"
+                        }
                     val where = "from within the same library ($name)"
                     reportRestriction(where, containingClass, member, context, node, usageInfo)
                 }
@@ -296,7 +283,12 @@ class RestrictToDetector : AbstractAnnotationDetector(), SourceCodeScanner {
 
                 if (!isSubClass) {
                     reportRestriction(
-                        "from subclasses", containingClass, member, context, node, usageInfo
+                        "from subclasses",
+                        containingClass,
+                        member,
+                        context,
+                        node,
+                        usageInfo
                     )
                 }
             }
@@ -317,11 +309,11 @@ class RestrictToDetector : AbstractAnnotationDetector(), SourceCodeScanner {
                 member?.name ?: (containingClass.name + " constructor")
             } else
             //noinspection LintImplPsiEquals
-                if (containingClass == member) {
-                    member.name ?: "class"
-                } else {
-                    containingClass.name + "." + member.name
-                }
+            if (containingClass == member) {
+                member.name ?: "class"
+            } else {
+                containingClass.name + "." + member.name
+            }
 
         var locationNode = node
         if (node is UCallExpression) {
@@ -340,8 +332,8 @@ class RestrictToDetector : AbstractAnnotationDetector(), SourceCodeScanner {
                 val className = annotated.name
                 if (
                     qualifier != null &&
-                    className != null &&
-                    qualifier.asSourceString() == className
+                        className != null &&
+                        qualifier.asSourceString() == className
                 ) {
                     locationNode = qualifier
                     api = className
@@ -349,7 +341,8 @@ class RestrictToDetector : AbstractAnnotationDetector(), SourceCodeScanner {
             }
         }
 
-        // If this error message changes, you need to also update ResourceTypeInspection#guessLintIssue
+        // If this error message changes, you need to also update
+        // ResourceTypeInspection#guessLintIssue
         var message: String
         if (where == null) {
             message = "$api is marked as internal and should not be accessed from apps"
@@ -357,7 +350,8 @@ class RestrictToDetector : AbstractAnnotationDetector(), SourceCodeScanner {
             val refType = if (member is PsiMethod) "called" else "accessed"
             message = "$api can only be $refType $where"
 
-            // Most users will encounter this for the support library; let's have a clearer error message
+            // Most users will encounter this for the support library; let's have a clearer error
+            // message
             // for that specific scenario
             if (where == "from within the same library (groupId=com.android.support)") {
                 // If this error message changes, you need to also update
@@ -370,7 +364,8 @@ class RestrictToDetector : AbstractAnnotationDetector(), SourceCodeScanner {
 
         val location =
             if (locationNode is UCallExpression) {
-                context.getCallLocation(locationNode,
+                context.getCallLocation(
+                    locationNode,
                     includeReceiver = false,
                     includeArguments = false
                 )
@@ -424,14 +419,16 @@ class RestrictToDetector : AbstractAnnotationDetector(), SourceCodeScanner {
                     val resolved = expression.resolve()
                     if (resolved is PsiField) {
                         val name = resolved.name
-                        scope = when (name) {
-                            "GROUP_ID", "LIBRARY_GROUP" -> RESTRICT_TO_LIBRARY_GROUP
-                            "SUBCLASSES" -> RESTRICT_TO_SUBCLASSES
-                            "TESTS" -> RESTRICT_TO_TESTS
-                            "LIBRARY" -> RESTRICT_TO_LIBRARY
-                            "LIBRARY_GROUP_PREFIX" -> RESTRICT_TO_LIBRARY_GROUP_PREFIX
-                            else -> 0
-                        }
+                        scope =
+                            when (name) {
+                                "GROUP_ID",
+                                "LIBRARY_GROUP" -> RESTRICT_TO_LIBRARY_GROUP
+                                "SUBCLASSES" -> RESTRICT_TO_SUBCLASSES
+                                "TESTS" -> RESTRICT_TO_TESTS
+                                "LIBRARY" -> RESTRICT_TO_LIBRARY
+                                "LIBRARY_GROUP_PREFIX" -> RESTRICT_TO_LIBRARY_GROUP_PREFIX
+                                else -> 0
+                            }
                     }
                 } else if (expression is UastEmptyExpression) {
                     // See JavaUAnnotation.findDeclaredAttributeValue
@@ -487,7 +484,7 @@ class RestrictToDetector : AbstractAnnotationDetector(), SourceCodeScanner {
                 id = "RestrictedApiAndroidX",
                 briefDescription = "Restricted API",
                 explanation =
-                """
+                    """
                 This API has been flagged with a restriction that has not been met.
 
                 Examples of API restrictions:
@@ -502,4 +499,19 @@ class RestrictToDetector : AbstractAnnotationDetector(), SourceCodeScanner {
                 implementation = IMPLEMENTATION
             )
     }
+}
+
+/** Attempts to parse an unversioned Maven name from the library identifier. */
+internal fun LintModelLibrary.getMavenNameFromIdentifier(): LintModelMavenName? {
+    val indexOfSentinel = identifier.indexOf(":@@:")
+    if (indexOfSentinel < 0) return null
+
+    // May be suffixed with something like ::debug.
+    val project = identifier.substring(indexOfSentinel + 4).substringBefore("::")
+    val indexOfLastSeparator = project.lastIndexOf(':')
+    if (indexOfLastSeparator < 0) return null
+
+    val groupId = project.substring(0, indexOfLastSeparator).replace(':', '.')
+    val artifactId = project.substring(indexOfLastSeparator + 1)
+    return DefaultLintModelMavenName("androidx.$groupId", artifactId)
 }

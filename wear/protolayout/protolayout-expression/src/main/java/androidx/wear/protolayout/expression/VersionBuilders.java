@@ -16,11 +16,14 @@
 
 package androidx.wear.protolayout.expression;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.annotation.RestrictTo;
 import androidx.annotation.RestrictTo.Scope;
 import androidx.wear.protolayout.expression.proto.VersionProto;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
+
+import java.util.Objects;
 
 /** Builders for the schema version information of a layout (or an expression). */
 public final class VersionBuilders {
@@ -29,12 +32,11 @@ public final class VersionBuilders {
     /**
      * Version information. This is used to encode the schema version of a payload (e.g. inside of a
      * layout).
-     *
-     * @since 1.0
      */
-    public static final class VersionInfo {
+    @RequiresSchemaVersion(major = 1, minor = 0)
+    public static final class VersionInfo implements Comparable<VersionInfo> {
         private final VersionProto.VersionInfo mImpl;
-        @Nullable private final Fingerprint mFingerprint;
+        private final @Nullable Fingerprint mFingerprint;
 
         VersionInfo(VersionProto.VersionInfo impl, @Nullable Fingerprint fingerprint) {
             this.mImpl = impl;
@@ -44,8 +46,6 @@ public final class VersionBuilders {
         /**
          * Gets major version. Incremented on breaking changes (i.e. compatibility is not guaranteed
          * across major versions).
-         *
-         * @since 1.0
          */
         public int getMajor() {
             return mImpl.getMajor();
@@ -54,8 +54,6 @@ public final class VersionBuilders {
         /**
          * Gets minor version. Incremented on non-breaking changes (e.g. schema additions). Anything
          * consuming a payload can safely consume anything with a lower minor version.
-         *
-         * @since 1.0
          */
         public int getMinor() {
             return mImpl.getMinor();
@@ -63,16 +61,14 @@ public final class VersionBuilders {
 
         /** Get the fingerprint for this object, or null if unknown. */
         @RestrictTo(Scope.LIBRARY_GROUP)
-        @Nullable
-        public Fingerprint getFingerprint() {
+        public @Nullable Fingerprint getFingerprint() {
             return mFingerprint;
         }
 
         /** Creates a new wrapper instance from the proto. */
         @RestrictTo(Scope.LIBRARY_GROUP)
-        @NonNull
-        public static VersionInfo fromProto(
-                @NonNull VersionProto.VersionInfo proto, @Nullable Fingerprint fingerprint) {
+        public static @NonNull VersionInfo fromProto(
+                VersionProto.@NonNull VersionInfo proto, @Nullable Fingerprint fingerprint) {
             return new VersionInfo(proto, fingerprint);
         }
 
@@ -81,22 +77,41 @@ public final class VersionBuilders {
          * object created using this method can't be added to any other wrapper.
          */
         @RestrictTo(Scope.LIBRARY_GROUP)
-        @NonNull
-        public static VersionInfo fromProto(@NonNull VersionProto.VersionInfo proto) {
+        public static @NonNull VersionInfo fromProto(VersionProto.@NonNull VersionInfo proto) {
             return fromProto(proto, null);
         }
 
         /** Returns the internal proto instance. */
         @RestrictTo(Scope.LIBRARY_GROUP)
-        @NonNull
-        public VersionProto.VersionInfo toProto() {
+        public VersionProto.@NonNull VersionInfo toProto() {
             return mImpl;
         }
 
         @Override
-        @NonNull
-        public String toString() {
+        public @NonNull String toString() {
             return "VersionInfo{" + "major=" + getMajor() + ", minor=" + getMinor() + "}";
+        }
+
+        @Override
+        public int compareTo(@NonNull VersionInfo other) {
+            if (this.getMajor() == other.getMajor()) {
+                return Integer.compare(this.getMinor(), other.getMinor());
+            }
+            return Integer.compare(this.getMajor(), other.getMajor());
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(getMajor(), getMinor());
+        }
+
+        @Override
+        public boolean equals(@Nullable Object obj) {
+            if (obj instanceof VersionInfo) {
+                VersionInfo that = (VersionInfo) obj;
+                return this.getMajor() == that.getMajor() && this.getMinor() == that.getMinor();
+            }
+            return false;
         }
 
         /** Builder for {@link VersionInfo} */
@@ -110,11 +125,9 @@ public final class VersionBuilders {
             /**
              * Sets major version. Incremented on breaking changes (i.e. compatibility is not
              * guaranteed across major versions).
-             *
-             * @since 1.0
              */
-            @NonNull
-            public Builder setMajor(int major) {
+            @RequiresSchemaVersion(major = 1, minor = 0)
+            public @NonNull Builder setMajor(int major) {
                 mImpl.setMajor(major);
                 mFingerprint.recordPropertyUpdate(1, major);
                 return this;
@@ -123,19 +136,16 @@ public final class VersionBuilders {
             /**
              * Sets minor version. Incremented on non-breaking changes (e.g. schema additions).
              * Anything consuming a payload can safely consume anything with a lower minor version.
-             *
-             * @since 1.0
              */
-            @NonNull
-            public Builder setMinor(int minor) {
+            @RequiresSchemaVersion(major = 1, minor = 0)
+            public @NonNull Builder setMinor(int minor) {
                 mImpl.setMinor(minor);
                 mFingerprint.recordPropertyUpdate(2, minor);
                 return this;
             }
 
             /** Builds an instance from accumulated values. */
-            @NonNull
-            public VersionInfo build() {
+            public @NonNull VersionInfo build() {
                 return new VersionInfo(mImpl.build(), mFingerprint);
             }
         }

@@ -38,19 +38,19 @@ class PlayPredefinedEffectSignalTest(
     private val expectedFallbackPattern: LongArray,
 ) {
     private val fakeVibrator = PredefinedEffectsAndAmplitudeVibrator()
-    private val hapticManager = HapticManager.createForVibrator(fakeVibrator)
+    private val hapticManager = requireNotNull(HapticManager.createForVibrator(fakeVibrator))
 
     @SdkSuppress(minSdkVersion = Build.VERSION_CODES.Q)
     @Test
     fun play_api29AndAbove_vibratesWithPredefinedEffect() {
-        hapticManager.play(effect)
+        hapticManager.play(effect, HapticAttributes(HapticAttributes.USAGE_TOUCH))
         assertThat(fakeVibrator).vibratedExactly(vibration(effect))
     }
 
     @SdkSuppress(maxSdkVersion = Build.VERSION_CODES.P)
     @Test
     fun play_belowApi29_vibratesWithFallbackPattern() {
-        hapticManager.play(effect)
+        hapticManager.play(effect, HapticAttributes(HapticAttributes.USAGE_TOUCH))
         assertThat(fakeVibrator).vibratedExactly(vibration(expectedFallbackPattern))
     }
 
@@ -58,11 +58,12 @@ class PlayPredefinedEffectSignalTest(
 
         @JvmStatic
         @Parameterized.Parameters(name = "effect:{0}, expectedFallbackPattern:{1}")
-        fun data(): Collection<Array<Any>> = listOf(
-            arrayOf(predefinedTick(), longArrayOf(0, 10)),
-            arrayOf(predefinedClick(), longArrayOf(0, 20)),
-            arrayOf(predefinedHeavyClick(), longArrayOf(0, 30)),
-            arrayOf(predefinedDoubleClick(), longArrayOf(0, 30, 100, 30)),
-        )
+        fun data(): Collection<Array<Any>> =
+            listOf(
+                arrayOf(predefinedTick(), longArrayOf(0, 10)),
+                arrayOf(predefinedClick(), longArrayOf(0, 20)),
+                arrayOf(predefinedHeavyClick(), longArrayOf(0, 30)),
+                arrayOf(predefinedDoubleClick(), longArrayOf(0, 30, 100, 30)),
+            )
     }
 }

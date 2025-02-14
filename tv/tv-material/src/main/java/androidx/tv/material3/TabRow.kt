@@ -31,7 +31,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,11 +40,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.DpRect
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
@@ -53,6 +54,7 @@ import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.util.fastForEachIndexed
 import androidx.compose.ui.util.fastMap
 import androidx.compose.ui.util.fastMaxOfOrNull
+import androidx.compose.ui.util.fastSumBy
 import androidx.compose.ui.zIndex
 
 /**
@@ -68,20 +70,23 @@ import androidx.compose.ui.zIndex
  * are placed off screen.
  *
  * Examples:
- * @sample androidx.tv.samples.PillIndicatorTabRow
- * @sample androidx.tv.samples.UnderlinedIndicatorTabRow
- * @sample androidx.tv.samples.TabRowWithDebounce
- * @sample androidx.tv.samples.OnClickNavigation
  *
+ * @sample androidx.tv.material3.samples.PillIndicatorTabRow
+ * @sample androidx.tv.material3.samples.UnderlinedIndicatorTabRow
+ * @sample androidx.tv.material3.samples.TabRowWithDebounce
+ * @sample androidx.tv.material3.samples.OnClickNavigation
  * @param selectedTabIndex the index of the currently selected tab
  * @param modifier the [Modifier] to be applied to this tab row
  * @param containerColor the color used for the background of this tab row
  * @param contentColor the primary color used in the tabs
  * @param separator use this composable to add a separator between the tabs
- * @param indicator used to indicate which tab is currently selected and/or focused
+ * @param indicator used to indicate which tab is currently selected and/or focused. This lambda
+ *   provides 2 values:
+ * * tabPositions: list of [DpRect] which provides the position of each tab
+ * * doesTabRowHaveFocus: whether any [Tab] within [TabRow] is focused
+ *
  * @param tabs a composable which will render all the tabs
  */
-@ExperimentalTvMaterial3Api // TODO (b/263353219): Remove this before launching beta
 @Composable
 fun TabRow(
     selectedTabIndex: Int,
@@ -89,37 +94,37 @@ fun TabRow(
     containerColor: Color = TabRowDefaults.ContainerColor,
     contentColor: Color = TabRowDefaults.contentColor(),
     separator: @Composable () -> Unit = { TabRowDefaults.TabSeparator() },
-    indicator: @Composable (tabPositions: List<DpRect>, isActivated: Boolean) -> Unit =
-        @Composable { tabPositions, isActivated ->
+    indicator: @Composable (tabPositions: List<DpRect>, doesTabRowHaveFocus: Boolean) -> Unit =
+        @Composable { tabPositions, doesTabRowHaveFocus ->
             tabPositions.getOrNull(selectedTabIndex)?.let { currentTabPosition ->
                 TabRowDefaults.PillIndicator(
                     currentTabPosition = currentTabPosition,
-                    isActivated = isActivated
+                    doesTabRowHaveFocus = doesTabRowHaveFocus
                 )
             }
         },
     tabs: @Composable TabRowScope.() -> Unit
 ) {
     val scrollState = rememberScrollState()
-    var isActivated by remember { mutableStateOf(false) }
+    var doesTabRowHaveFocus by remember { mutableStateOf(false) }
 
-    CompositionLocalProvider(LocalContentColor provides contentColor) {
-
-        SubcomposeLayout(
-            modifier =
+    Surface(
+        modifier =
             modifier
-                .background(containerColor)
                 .clipToBounds()
                 .horizontalScroll(scrollState)
-                .onFocusChanged { isActivated = it.hasFocus }
-                .selectableGroup()
-        ) { constraints ->
+                .onFocusChanged { doesTabRowHaveFocus = it.hasFocus }
+                .selectableGroup(),
+        colors =
+            SurfaceDefaults.colors(containerColor = containerColor, contentColor = contentColor),
+        shape = RectangleShape,
+    ) {
+        SubcomposeLayout { constraints ->
             // Tab measurables
-            val tabMeasurables = subcompose(TabRowSlots.Tabs) {
-                TabRowScopeImpl(isActivated).apply {
-                    tabs()
+            val tabMeasurables =
+                subcompose(TabRowSlots.Tabs) {
+                    TabRowScopeImpl(doesTabRowHaveFocus).apply { tabs() }
                 }
-            }
 
             // Tab placeables
             val tabPlaceables =
@@ -132,19 +137,13 @@ fun TabRow(
             val separatorMeasurables = subcompose(TabRowSlots.Separator, separators)
             val separatorPlaceables =
                 separatorMeasurables.fastMap {
-                    it.measure(
-                        constraints.copy(
-                            minWidth = 0,
-                            minHeight = 0
-                        )
-                    )
+                    it.measure(constraints.copy(minWidth = 0, minHeight = 0))
                 }
             val separatorWidth = separatorPlaceables.firstOrNull()?.width ?: 0
 
-            val layoutWidth = tabPlaceables.sumOf { it.width } + separatorsCount * separatorWidth
-            val layoutHeight = (tabMeasurables.fastMaxOfOrNull {
-                it.maxIntrinsicHeight(Constraints.Infinity)
-            } ?: 0).coerceAtLeast(0)
+            val layoutWidth =
+                tabPlaceables.fastSumBy { it.width } + separatorsCount * separatorWidth
+            val layoutHeight = tabPlaceables.fastMaxOfOrNull { it.height } ?: 0
 
             // Position the children
             layout(layoutWidth, layoutHeight) {
@@ -173,9 +172,7 @@ fun TabRow(
                 }
 
                 // Place the indicator
-                subcompose(TabRowSlots.Indicator) {
-                    indicator(tabPositions, isActivated)
-                }
+                subcompose(TabRowSlots.Indicator) { indicator(tabPositions, doesTabRowHaveFocus) }
                     .fastForEach {
                         it.measure(Constraints.fixed(layoutWidth, layoutHeight)).placeRelative(0, 0)
                     }
@@ -184,7 +181,6 @@ fun TabRow(
     }
 }
 
-@ExperimentalTvMaterial3Api // TODO (b/263353219): Remove this before launching beta
 object TabRowDefaults {
     /** Color of the background of a tab */
     val ContainerColor = Color.Transparent
@@ -196,14 +192,13 @@ object TabRowDefaults {
     }
 
     /** Default accent color for the TabRow */
-    @Composable
-    fun contentColor(): Color = MaterialTheme.colorScheme.onSurface
+    @Composable fun contentColor(): Color = MaterialTheme.colorScheme.onSurface
 
     /**
      * Adds a pill indicator behind the tab
      *
      * @param currentTabPosition position of the current selected tab
-     * @param isActivated whether any tab in TabRow is focused
+     * @param doesTabRowHaveFocus whether any tab in TabRow is focused
      * @param modifier modifier to be applied to the indicator
      * @param activeColor color of indicator when [TabRow] is active
      * @param inactiveColor color of indicator when [TabRow] is inactive
@@ -211,33 +206,35 @@ object TabRowDefaults {
     @Composable
     fun PillIndicator(
         currentTabPosition: DpRect,
-        isActivated: Boolean,
+        doesTabRowHaveFocus: Boolean,
         modifier: Modifier = Modifier,
         activeColor: Color = MaterialTheme.colorScheme.onSurface,
         inactiveColor: Color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
     ) {
-        val width by animateDpAsState(
-            targetValue = currentTabPosition.width,
-            label = "PillIndicator.width",
-        )
+        val width by
+            animateDpAsState(
+                targetValue = currentTabPosition.width,
+                label = "PillIndicator.width",
+            )
         val height = currentTabPosition.height
-        val leftOffset by animateDpAsState(
-            targetValue = currentTabPosition.left,
-            label = "PillIndicator.leftOffset"
-        )
+        val leftOffset by
+            animateDpAsState(
+                targetValue = currentTabPosition.left,
+                label = "PillIndicator.leftOffset"
+            )
         val topOffset = currentTabPosition.top
 
         val pillColor by
-        animateColorAsState(
-            targetValue = if (isActivated) activeColor else inactiveColor,
-            label = "PillIndicator.pillColor"
-        )
+            animateColorAsState(
+                targetValue = if (doesTabRowHaveFocus) activeColor else inactiveColor,
+                label = "PillIndicator.pillColor"
+            )
 
         Box(
             modifier
                 .fillMaxWidth()
                 .wrapContentSize(Alignment.BottomStart)
-                .offset(x = leftOffset, y = topOffset)
+                .offset { IntOffset(x = leftOffset.roundToPx(), y = topOffset.roundToPx()) }
                 .width(width)
                 .height(height)
                 .background(color = pillColor, shape = RoundedCornerShape(50))
@@ -249,7 +246,7 @@ object TabRowDefaults {
      * Adds an underlined indicator below the tab
      *
      * @param currentTabPosition position of the current selected tab
-     * @param isActivated whether any tab in TabRow is focused
+     * @param doesTabRowHaveFocus whether any tab in TabRow is focused
      * @param modifier modifier to be applied to the indicator
      * @param activeColor color of indicator when [TabRow] is active
      * @param inactiveColor color of indicator when [TabRow] is inactive
@@ -257,7 +254,7 @@ object TabRowDefaults {
     @Composable
     fun UnderlinedIndicator(
         currentTabPosition: DpRect,
-        isActivated: Boolean,
+        doesTabRowHaveFocus: Boolean,
         modifier: Modifier = Modifier,
         activeColor: Color = MaterialTheme.colorScheme.primary,
         inactiveColor: Color = MaterialTheme.colorScheme.secondary,
@@ -265,37 +262,34 @@ object TabRowDefaults {
         val unfocusedUnderlineWidth = 10.dp
         val indicatorHeight = 2.dp
         val width by
-        animateDpAsState(
-            targetValue =
-            if (isActivated)
-                currentTabPosition.width
-            else
-                unfocusedUnderlineWidth,
-            label = "UnderlinedIndicator.width",
-        )
+            animateDpAsState(
+                targetValue =
+                    if (doesTabRowHaveFocus) currentTabPosition.width else unfocusedUnderlineWidth,
+                label = "UnderlinedIndicator.width",
+            )
         val leftOffset by
-        animateDpAsState(
-            targetValue =
-            if (isActivated) {
-                currentTabPosition.left
-            } else {
-                val tabCenter = currentTabPosition.left + currentTabPosition.width / 2
-                tabCenter - unfocusedUnderlineWidth / 2
-            },
-            label = "UnderlinedIndicator.leftOffset",
-        )
+            animateDpAsState(
+                targetValue =
+                    if (doesTabRowHaveFocus) {
+                        currentTabPosition.left
+                    } else {
+                        val tabCenter = currentTabPosition.left + currentTabPosition.width / 2
+                        tabCenter - unfocusedUnderlineWidth / 2
+                    },
+                label = "UnderlinedIndicator.leftOffset",
+            )
 
         val underlineColor by
-        animateColorAsState(
-            targetValue = if (isActivated) activeColor else inactiveColor,
-            label = "UnderlinedIndicator.underlineColor",
-        )
+            animateColorAsState(
+                targetValue = if (doesTabRowHaveFocus) activeColor else inactiveColor,
+                label = "UnderlinedIndicator.underlineColor",
+            )
 
         Box(
             modifier
                 .fillMaxWidth()
                 .wrapContentSize(Alignment.BottomStart)
-                .offset(x = leftOffset)
+                .offset { IntOffset(x = leftOffset.roundToPx(), y = 0) }
                 .width(width)
                 .height(indicatorHeight)
                 .background(color = underlineColor)

@@ -2,6 +2,7 @@ package com.example.appsearch;
 
 import androidx.appsearch.app.AppSearchSchema;
 import androidx.appsearch.app.DocumentClassFactory;
+import androidx.appsearch.app.DocumentClassMappingContext;
 import androidx.appsearch.app.GenericDocument;
 import androidx.appsearch.exceptions.AppSearchException;
 import java.lang.Class;
@@ -98,7 +99,7 @@ public final class $$__AppSearch__Gift implements DocumentClassFactory<Gift> {
     Integer[] arrBoxIntCopy = document.arrBoxInt;
     if (arrBoxIntCopy != null) {
       long[] arrBoxIntConv = new long[arrBoxIntCopy.length];
-      for (int i = 0 ; i < arrBoxIntCopy.length ; i++) {
+      for (int i = 0; i < arrBoxIntCopy.length; i++) {
         arrBoxIntConv[i] = arrBoxIntCopy[i];
       }
       builder.setPropertyLong("arrBoxInt", arrBoxIntConv);
@@ -106,7 +107,7 @@ public final class $$__AppSearch__Gift implements DocumentClassFactory<Gift> {
     int[] arrUnboxIntCopy = document.arrUnboxInt;
     if (arrUnboxIntCopy != null) {
       long[] arrUnboxIntConv = new long[arrUnboxIntCopy.length];
-      for (int i = 0 ; i < arrUnboxIntCopy.length ; i++) {
+      for (int i = 0; i < arrUnboxIntCopy.length; i++) {
         arrUnboxIntConv[i] = arrUnboxIntCopy[i];
       }
       builder.setPropertyLong("arrUnboxInt", arrUnboxIntConv);
@@ -114,7 +115,7 @@ public final class $$__AppSearch__Gift implements DocumentClassFactory<Gift> {
     Long[] arrBoxLongCopy = document.arrBoxLong;
     if (arrBoxLongCopy != null) {
       long[] arrBoxLongConv = new long[arrBoxLongCopy.length];
-      for (int i = 0 ; i < arrBoxLongCopy.length ; i++) {
+      for (int i = 0; i < arrBoxLongCopy.length; i++) {
         arrBoxLongConv[i] = arrBoxLongCopy[i];
       }
       builder.setPropertyLong("arrBoxLong", arrBoxLongConv);
@@ -127,9 +128,10 @@ public final class $$__AppSearch__Gift implements DocumentClassFactory<Gift> {
   }
 
   @Override
-  public Gift fromGenericDocument(GenericDocument genericDoc) throws AppSearchException {
-    String idConv = genericDoc.getId();
+  public Gift fromGenericDocument(GenericDocument genericDoc,
+      DocumentClassMappingContext documentClassMappingContext) throws AppSearchException {
     String namespaceConv = genericDoc.getNamespace();
+    String idConv = genericDoc.getId();
     long[] defaultIndexNoneCopy = genericDoc.getPropertyLongArray("defaultIndexNone");
     Long defaultIndexNoneConv = null;
     if (defaultIndexNoneCopy != null && defaultIndexNoneCopy.length != 0) {

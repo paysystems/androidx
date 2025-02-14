@@ -15,13 +15,20 @@
  */
 package androidx.collection
 
-import kotlin.math.roundToInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
+
+// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// DO NOT MAKE CHANGES to the kotlin source file.
+//
+// This file was generated from a template in the template directory.
+// Make a change to the original template and run the generateCollections.sh script
+// to ensure the change is available on all versions of the map.
+// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 class FloatListTest {
     private val list: MutableFloatList = mutableFloatListOf(1f, 2f, 3f, 4f, 5f)
@@ -81,8 +88,32 @@ class FloatListTest {
 
     @Test
     fun string() {
-        assertEquals("[1.0, 2.0, 3.0, 4.0, 5.0]", list.toString())
+        assertEquals("[${1f}, ${2f}, ${3f}, ${4f}, ${5f}]", list.toString())
         assertEquals("[]", mutableFloatListOf().toString())
+    }
+
+    @Test
+    fun joinToString() {
+        assertEquals("${1f}, ${2f}, ${3f}, ${4f}, ${5f}", list.joinToString())
+        assertEquals(
+            "x${1f}, ${2f}, ${3f}...",
+            list.joinToString(prefix = "x", postfix = "y", limit = 3)
+        )
+        assertEquals(
+            ">${1f}-${2f}-${3f}-${4f}-${5f}<",
+            list.joinToString(separator = "-", prefix = ">", postfix = "<")
+        )
+        assertEquals(
+            "one, two, three...",
+            list.joinToString(limit = 3) {
+                when (it.toInt()) {
+                    1 -> "one"
+                    2 -> "two"
+                    3 -> "three"
+                    else -> "whoops"
+                }
+            }
+        )
     }
 
     @Test
@@ -107,46 +138,47 @@ class FloatListTest {
 
     @Test
     fun getOutOfBounds() {
-        assertFailsWith(IndexOutOfBoundsException::class) {
-            list[5]
-        }
+        assertFailsWith(IndexOutOfBoundsException::class) { list[5] }
     }
 
     @Test
     fun getOutOfBoundsNegative() {
-        assertFailsWith(IndexOutOfBoundsException::class) {
-            list[-1]
-        }
+        assertFailsWith(IndexOutOfBoundsException::class) { list[-1] }
     }
 
     @Test
     fun elementAtOfBounds() {
-        assertFailsWith(IndexOutOfBoundsException::class) {
-            list.elementAt(5)
-        }
+        assertFailsWith(IndexOutOfBoundsException::class) { list.elementAt(5) }
     }
 
     @Test
     fun elementAtOfBoundsNegative() {
-        assertFailsWith(IndexOutOfBoundsException::class) {
-            list.elementAt(-1)
-        }
+        assertFailsWith(IndexOutOfBoundsException::class) { list.elementAt(-1) }
     }
 
     @Test
     fun elementAtOrElse() {
-        assertEquals(1f, list.elementAtOrElse(0) {
-            assertEquals(0, it)
-            0f
-        })
-        assertEquals(0f, list.elementAtOrElse(-1) {
-            assertEquals(-1, it)
-            0f
-        })
-        assertEquals(0f, list.elementAtOrElse(5) {
-            assertEquals(5, it)
-            0f
-        })
+        assertEquals(
+            1f,
+            list.elementAtOrElse(0) {
+                assertEquals(0, it)
+                0f
+            }
+        )
+        assertEquals(
+            0f,
+            list.elementAtOrElse(-1) {
+                assertEquals(-1, it)
+                0f
+            }
+        )
+        assertEquals(
+            0f,
+            list.elementAtOrElse(5) {
+                assertEquals(5, it)
+                0f
+            }
+        )
     }
 
     @Test
@@ -290,9 +322,7 @@ class FloatListTest {
 
     @Test
     fun firstException() {
-        assertFailsWith(NoSuchElementException::class) {
-            mutableFloatListOf().first()
-        }
+        assertFailsWith(NoSuchElementException::class) { mutableFloatListOf().first() }
     }
 
     @Test
@@ -303,9 +333,7 @@ class FloatListTest {
 
     @Test
     fun firstWithPredicateException() {
-        assertFailsWith(NoSuchElementException::class) {
-            mutableFloatListOf().first { it == 8f }
-        }
+        assertFailsWith(NoSuchElementException::class) { mutableFloatListOf().first { it == 8f } }
     }
 
     @Test
@@ -315,9 +343,7 @@ class FloatListTest {
 
     @Test
     fun lastException() {
-        assertFailsWith(NoSuchElementException::class) {
-            mutableFloatListOf().last()
-        }
+        assertFailsWith(NoSuchElementException::class) { mutableFloatListOf().last() }
     }
 
     @Test
@@ -328,38 +354,32 @@ class FloatListTest {
 
     @Test
     fun lastWithPredicateException() {
-        assertFailsWith(NoSuchElementException::class) {
-            mutableFloatListOf().last { it == 8f }
-        }
+        assertFailsWith(NoSuchElementException::class) { mutableFloatListOf().last { it == 8f } }
     }
 
     @Test
     fun fold() {
-        assertEquals("12345", list.fold("") { acc, i -> acc + i.roundToInt().toString() })
+        assertEquals("12345", list.fold("") { acc, i -> acc + i.toInt().toString() })
     }
 
     @Test
     fun foldIndexed() {
         assertEquals(
             "01-12-23-34-45-",
-            list.foldIndexed("") { index, acc, i ->
-                "$acc$index${i.roundToInt()}-"
-            }
+            list.foldIndexed("") { index, acc, i -> "$acc$index${i.toInt()}-" }
         )
     }
 
     @Test
     fun foldRight() {
-        assertEquals("54321", list.foldRight("") { i, acc -> acc + i.roundToInt().toString() })
+        assertEquals("54321", list.foldRight("") { i, acc -> acc + i.toInt().toString() })
     }
 
     @Test
     fun foldRightIndexed() {
         assertEquals(
             "45-34-23-12-01-",
-            list.foldRightIndexed("") { index, i, acc ->
-                "$acc$index${i.roundToInt()}-"
-            }
+            list.foldRightIndexed("") { index, i, acc -> "$acc$index${i.toInt()}-" }
         )
     }
 
@@ -378,12 +398,8 @@ class FloatListTest {
         l.add(0, 1f)
         l.add(2, 3f)
         assertEquals(list, l)
-        assertFailsWith(IndexOutOfBoundsException::class) {
-            l.add(-1, 2f)
-        }
-        assertFailsWith(IndexOutOfBoundsException::class) {
-            l.add(6, 2f)
-        }
+        assertFailsWith(IndexOutOfBoundsException::class) { l.add(-1, 2f) }
+        assertFailsWith(IndexOutOfBoundsException::class) { l.add(6, 2f) }
     }
 
     @Test
@@ -397,12 +413,8 @@ class FloatListTest {
         assertTrue(l4.addAll(3, l))
         assertFalse(l4.addAll(0, mutableFloatListOf()))
         assertEquals(list, l4)
-        assertFailsWith(IndexOutOfBoundsException::class) {
-            l4.addAll(6, mutableFloatListOf())
-        }
-        assertFailsWith(IndexOutOfBoundsException::class) {
-            l4.addAll(-1, mutableFloatListOf())
-        }
+        assertFailsWith(IndexOutOfBoundsException::class) { l4.addAll(6, mutableFloatListOf()) }
+        assertFailsWith(IndexOutOfBoundsException::class) { l4.addAll(-1, mutableFloatListOf()) }
     }
 
     @Test
@@ -439,12 +451,8 @@ class FloatListTest {
         assertTrue(l.addAll(3, a1))
         assertFalse(l.addAll(0, floatArrayOf()))
         assertEquals(list, l)
-        assertFailsWith(IndexOutOfBoundsException::class) {
-            l.addAll(6, floatArrayOf())
-        }
-        assertFailsWith(IndexOutOfBoundsException::class) {
-            l.addAll(-1, floatArrayOf())
-        }
+        assertFailsWith(IndexOutOfBoundsException::class) { l.addAll(6, floatArrayOf()) }
+        assertFailsWith(IndexOutOfBoundsException::class) { l.addAll(-1, floatArrayOf()) }
     }
 
     @Test
@@ -511,12 +519,8 @@ class FloatListTest {
         val l = mutableFloatListOf(1f, 2f, 3f, 4f, 5f)
         l.removeAt(2)
         assertEquals(mutableFloatListOf(1f, 2f, 4f, 5f), l)
-        assertFailsWith(IndexOutOfBoundsException::class) {
-            l.removeAt(6)
-        }
-        assertFailsWith(IndexOutOfBoundsException::class) {
-            l.removeAt(-1)
-        }
+        assertFailsWith(IndexOutOfBoundsException::class) { l.removeAt(6) }
+        assertFailsWith(IndexOutOfBoundsException::class) { l.removeAt(-1) }
     }
 
     @Test
@@ -528,13 +532,9 @@ class FloatListTest {
         l[1] = 2f
         l[3] = 4f
         assertEquals(list, l)
-        assertFailsWith<IndexOutOfBoundsException> {
-            l.set(-1, 1f)
-        }
-        assertFailsWith<IndexOutOfBoundsException> {
-            l.set(6, 1f)
-        }
-        assertEquals(4f, l.set(3, 1f));
+        assertFailsWith<IndexOutOfBoundsException> { l.set(-1, 1f) }
+        assertFailsWith<IndexOutOfBoundsException> { l.set(6, 1f) }
+        assertEquals(4f, l.set(3, 1f))
     }
 
     @Test
@@ -602,18 +602,10 @@ class FloatListTest {
         val l = mutableFloatListOf(1f, 9f, 7f, 6f, 2f, 3f, 4f, 5f)
         l.removeRange(1, 4)
         assertEquals(list, l)
-        assertFailsWith<IndexOutOfBoundsException> {
-            l.removeRange(6, 6)
-        }
-        assertFailsWith<IndexOutOfBoundsException> {
-            l.removeRange(100, 200)
-        }
-        assertFailsWith<IndexOutOfBoundsException> {
-            l.removeRange(-1, 0)
-        }
-        assertFailsWith<IllegalArgumentException> {
-            l.removeRange(3, 2)
-        }
+        assertFailsWith<IndexOutOfBoundsException> { l.removeRange(6, 6) }
+        assertFailsWith<IndexOutOfBoundsException> { l.removeRange(100, 200) }
+        assertFailsWith<IndexOutOfBoundsException> { l.removeRange(-1, 0) }
+        assertFailsWith<IllegalArgumentException> { l.removeRange(3, 2) }
     }
 
     @Test
@@ -628,6 +620,14 @@ class FloatListTest {
         val l = mutableFloatListOf(1f, 4f, 2f, 5f, 3f)
         l.sortDescending()
         assertEquals(mutableFloatListOf(5f, 4f, 3f, 2f, 1f), l)
+    }
+
+    @Test
+    fun sortEmpty() {
+        val l = MutableFloatList(0)
+        l.sort()
+        l.sortDescending()
+        assertEquals(MutableFloatList(0), l)
     }
 
     @Test
@@ -712,5 +712,47 @@ class FloatListTest {
         assertEquals(10f, l[1])
         assertEquals(-1f, l[2])
         assertEquals(10f, l[3])
+    }
+
+    @Test
+    fun buildFloatListFunction() {
+        val contract: Boolean
+        val l = buildFloatList {
+            contract = true
+            add(2f)
+            add(10f)
+        }
+        assertTrue(contract)
+        assertEquals(2, l.size)
+        assertEquals(2f, l[0])
+        assertEquals(10f, l[1])
+    }
+
+    @Test
+    fun buildFloatListWithCapacityFunction() {
+        val contract: Boolean
+        val l =
+            buildFloatList(20) {
+                contract = true
+                add(2f)
+                add(10f)
+            }
+        assertTrue(contract)
+        assertEquals(2, l.size)
+        assertTrue(l.content.size >= 20)
+        assertEquals(2f, l[0])
+        assertEquals(10f, l[1])
+    }
+
+    @Test
+    fun binarySearchFloatList() {
+        val l = mutableFloatListOf(-2f, -1f, 2f, 10f, 10f)
+        assertEquals(0, l.binarySearch(-2))
+        assertEquals(2, l.binarySearch(2))
+        assertEquals(3, l.binarySearch(10))
+
+        assertEquals(-1, l.binarySearch(-20))
+        assertEquals(-4, l.binarySearch(3))
+        assertEquals(-6, l.binarySearch(20))
     }
 }

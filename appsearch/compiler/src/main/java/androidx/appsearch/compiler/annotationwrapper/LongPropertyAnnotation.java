@@ -16,38 +16,71 @@
 
 package androidx.appsearch.compiler.annotationwrapper;
 
+import static androidx.appsearch.compiler.IntrospectionHelper.APPSEARCH_SCHEMA_CLASS;
 import static androidx.appsearch.compiler.IntrospectionHelper.DOCUMENT_ANNOTATION_CLASS;
 
-import androidx.annotation.NonNull;
+import static com.google.auto.common.MoreTypes.asElement;
+
+import androidx.appsearch.compiler.IntrospectionHelper;
+import androidx.appsearch.compiler.ProcessingException;
 
 import com.google.auto.value.AutoValue;
+import com.squareup.javapoet.ClassName;
+import com.squareup.javapoet.TypeName;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Map;
+
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.TypeMirror;
 
 /**
  * An instance of the {@code @Document.LongProperty} annotation.
  */
 @AutoValue
 public abstract class LongPropertyAnnotation extends DataPropertyAnnotation {
-    public static final String SIMPLE_CLASS_NAME = "LongProperty";
-    public static final String CLASS_NAME = DOCUMENT_ANNOTATION_CLASS + "." + SIMPLE_CLASS_NAME;
+    public static final ClassName CLASS_NAME =
+            DOCUMENT_ANNOTATION_CLASS.nestedClass("LongProperty");
+
+    public static final ClassName CONFIG_CLASS =
+            APPSEARCH_SCHEMA_CLASS.nestedClass("LongPropertyConfig");
+
+    private static final ClassName DEFAULT_SERIALIZER_CLASS =
+            CLASS_NAME.nestedClass("DefaultSerializer");
 
     public LongPropertyAnnotation() {
-        super(SIMPLE_CLASS_NAME);
+        super(
+                CLASS_NAME,
+                CONFIG_CLASS,
+                /* genericDocGetterName= */"getPropertyLong",
+                /* genericDocArrayGetterName= */"getPropertyLongArray",
+                /* genericDocSetterName= */"setPropertyLong");
     }
 
     /**
      * @param defaultName The name to use for the annotated property in case the annotation
      *                    params do not mention an explicit name.
+     * @throws ProcessingException If the annotation points to an Illegal serializer class.
      */
-    @NonNull
-    static LongPropertyAnnotation parse(
-            @NonNull Map<String, Object> annotationParams, @NonNull String defaultName) {
+    static @NonNull LongPropertyAnnotation parse(
+            @NonNull Map<String, Object> annotationParams,
+            @NonNull String defaultName) throws ProcessingException {
         String name = (String) annotationParams.get("name");
+        SerializerClass customSerializer = null;
+        TypeMirror serializerInAnnotation = (TypeMirror) annotationParams.get("serializer");
+        String typeName = TypeName.get(serializerInAnnotation).toString();
+        if (!typeName.equals(DEFAULT_SERIALIZER_CLASS.canonicalName())) {
+            customSerializer = SerializerClass.create(
+                    (TypeElement) asElement(serializerInAnnotation),
+                    SerializerClass.Kind.LONG_SERIALIZER);
+        }
         return new AutoValue_LongPropertyAnnotation(
                 name.isEmpty() ? defaultName : name,
                 (boolean) annotationParams.get("required"),
-                (int) annotationParams.get("indexingType"));
+                (int) annotationParams.get("indexingType"),
+                customSerializer);
     }
 
     /**
@@ -55,9 +88,24 @@ public abstract class LongPropertyAnnotation extends DataPropertyAnnotation {
      */
     public abstract int getIndexingType();
 
-    @NonNull
+    /**
+     * An optional {@link androidx.appsearch.app.LongSerializer}.
+     *
+     * <p>This is specified in the annotation when the annotated getter/field is of some custom
+     * type that should boil down to a long in the database.
+     *
+     * @see androidx.appsearch.annotation.Document.LongProperty#serializer()
+     */
+    public abstract @Nullable SerializerClass getCustomSerializer();
+
     @Override
-    public final Kind getDataPropertyKind() {
+    public final @NonNull Kind getDataPropertyKind() {
         return Kind.LONG_PROPERTY;
+    }
+
+    @Override
+    public @NonNull TypeMirror getUnderlyingTypeWithinGenericDoc(
+            @NonNull IntrospectionHelper helper) {
+        return helper.mLongPrimitiveType;
     }
 }

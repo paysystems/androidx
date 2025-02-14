@@ -1,17 +1,23 @@
 // Baseline format: 1.0
-ChangedType: androidx.compose.ui.draw.DrawModifierKt#CacheDrawModifierNode(kotlin.jvm.functions.Function1<? super androidx.compose.ui.draw.CacheDrawScope,androidx.compose.ui.draw.DrawResult>):
-    Method androidx.compose.ui.draw.DrawModifierKt.CacheDrawModifierNode has changed return type from androidx.compose.ui.node.CacheDrawModifierNode to androidx.compose.ui.draw.CacheDrawModifierNode
+AddedAbstractMethod: androidx.compose.ui.focus.FocusTargetModifierNode#getFocusability():
+    Added method androidx.compose.ui.focus.FocusTargetModifierNode.getFocusability()
+AddedAbstractMethod: androidx.compose.ui.focus.FocusTargetModifierNode#requestFocus():
+    Added method androidx.compose.ui.focus.FocusTargetModifierNode.requestFocus()
+AddedAbstractMethod: androidx.compose.ui.focus.FocusTargetModifierNode#requestFocus(int):
+    Added method androidx.compose.ui.focus.FocusTargetModifierNode.requestFocus(int)
+AddedAbstractMethod: androidx.compose.ui.focus.FocusTargetModifierNode#setFocusability(int):
+    Added method androidx.compose.ui.focus.FocusTargetModifierNode.setFocusability(int)
 
 
-RemovedClass: androidx.compose.ui.focus.FocusTargetNode:
-    Removed class androidx.compose.ui.focus.FocusTargetNode
+BecameUnchecked: androidx.compose.ui.platform.AbstractComposeView#showLayoutBounds:
+    Removed property AbstractComposeView.showLayoutBounds from compatibility checked API surface
 
 
-RemovedInterface: androidx.compose.ui.node.CacheDrawModifierNode:
-    Removed class androidx.compose.ui.node.CacheDrawModifierNode
-
-
-RemovedMethod: androidx.compose.ui.semantics.SemanticsActions#getPerformImeAction():
-    Removed method androidx.compose.ui.semantics.SemanticsActions.getPerformImeAction()
-RemovedMethod: androidx.compose.ui.semantics.SemanticsPropertiesKt#performImeAction(androidx.compose.ui.semantics.SemanticsPropertyReceiver, int, String, kotlin.jvm.functions.Function0<java.lang.Boolean>):
-    Removed method androidx.compose.ui.semantics.SemanticsPropertiesKt.performImeAction(androidx.compose.ui.semantics.SemanticsPropertyReceiver,int,String,kotlin.jvm.functions.Function0<java.lang.Boolean>)
+RemovedMethod: androidx.compose.ui.graphics.TransformOrigin#getPivotFractionX():
+    Removed method androidx.compose.ui.graphics.TransformOrigin.getPivotFractionX()
+RemovedMethod: androidx.compose.ui.graphics.TransformOrigin#getPivotFractionY():
+    Removed method androidx.compose.ui.graphics.TransformOrigin.getPivotFractionY()
+RemovedMethod: androidx.compose.ui.layout.ScaleFactor#getScaleX():
+    Removed method androidx.compose.ui.layout.ScaleFactor.getScaleX()
+RemovedMethod: androidx.compose.ui.layout.ScaleFactor#getScaleY():
+    Removed method androidx.compose.ui.layout.ScaleFactor.getScaleY()

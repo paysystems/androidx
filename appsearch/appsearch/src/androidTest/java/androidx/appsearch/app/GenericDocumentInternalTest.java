@@ -18,10 +18,9 @@ package androidx.appsearch.app;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import static org.junit.Assert.assertThrows;
-
-import android.os.Bundle;
 import android.os.Parcel;
+
+import androidx.appsearch.safeparcel.GenericDocumentParcel;
 
 import org.junit.Test;
 
@@ -46,7 +45,7 @@ public class GenericDocumentInternalTest {
 
         // Serialize the document
         Parcel inParcel = Parcel.obtain();
-        inParcel.writeBundle(inDoc.getBundle());
+        inParcel.writeParcelable(inDoc.getDocumentParcel(), /*parcelableFlags=*/ 0);
         byte[] data = inParcel.marshall();
         inParcel.recycle();
 
@@ -54,11 +53,13 @@ public class GenericDocumentInternalTest {
         Parcel outParcel = Parcel.obtain();
         outParcel.unmarshall(data, 0, data.length);
         outParcel.setDataPosition(0);
-        Bundle outBundle = outParcel.readBundle();
+        @SuppressWarnings("deprecation")
+        GenericDocumentParcel documentParcel =
+                outParcel.readParcelable(GenericDocumentParcel.class.getClassLoader());
         outParcel.recycle();
 
         // Compare results
-        GenericDocument outDoc = new GenericDocument(outBundle);
+        GenericDocument outDoc = new GenericDocument(documentParcel);
         assertThat(inDoc).isEqualTo(outDoc);
         assertThat(outDoc.getPropertyString("propString")).isEqualTo("Hello");
         assertThat(outDoc.getPropertyBytesArray("propBytes")).isEqualTo(new byte[][]{{1, 2}});
@@ -69,6 +70,7 @@ public class GenericDocumentInternalTest {
     }
 
     @Test
+    @SuppressWarnings("deprecation")
     public void testRecreateFromParcelWithParentTypes() {
         GenericDocument inDoc = new GenericDocument.Builder<>("namespace", "id1", "schema1")
                 .setParentTypes(new ArrayList<>(Arrays.asList("Class1", "Class2")))
@@ -85,7 +87,7 @@ public class GenericDocumentInternalTest {
 
         // Serialize the document
         Parcel inParcel = Parcel.obtain();
-        inParcel.writeBundle(inDoc.getBundle());
+        inParcel.writeParcelable(inDoc.getDocumentParcel(), /*parcelableFlags=*/ 0);
         byte[] data = inParcel.marshall();
         inParcel.recycle();
 
@@ -93,11 +95,13 @@ public class GenericDocumentInternalTest {
         Parcel outParcel = Parcel.obtain();
         outParcel.unmarshall(data, 0, data.length);
         outParcel.setDataPosition(0);
-        Bundle outBundle = outParcel.readBundle();
+        @SuppressWarnings("deprecation")
+        GenericDocumentParcel documentParcel =
+                outParcel.readParcelable(GenericDocumentParcel.class.getClassLoader());
         outParcel.recycle();
 
         // Compare results
-        GenericDocument outDoc = new GenericDocument(outBundle);
+        GenericDocument outDoc = new GenericDocument(documentParcel);
         assertThat(inDoc).isEqualTo(outDoc);
         assertThat(outDoc.getParentTypes()).isEqualTo(Arrays.asList("Class1", "Class2"));
         assertThat(outDoc.getPropertyString("propString")).isEqualTo("Hello");
@@ -109,46 +113,29 @@ public class GenericDocumentInternalTest {
     }
 
     @Test
-    public void testPropertyParcel_onePropertySet_success() {
-        String[] stringValues = {"a", "b"};
-        long[] longValues = {1L, 2L};
-        double[] doubleValues = {1.0, 2.0};
-        boolean[] booleanValues = {true, false};
-        byte[][] bytesValues = {new byte[1]};
-        Bundle[] bundleValues = {new Bundle()};
+    @SuppressWarnings("deprecation")
+    public void testGenericDocumentBuilderDoesNotMutateOriginal() {
+        GenericDocument oldDoc = new GenericDocument.Builder<>("namespace", "id1", "schema1")
+                .setParentTypes(new ArrayList<>(Arrays.asList("Class1", "Class2")))
+                .setScore(42)
+                .setPropertyString("propString", "Hello")
+                .build();
 
-        assertThat(new PropertyParcel.Builder("name").setStringValues(
-                stringValues).build().getStringValues()).isEqualTo(
-                Arrays.copyOf(stringValues, stringValues.length));
-        assertThat(new PropertyParcel.Builder("name").setLongValues(
-                longValues).build().getLongValues()).isEqualTo(
-                Arrays.copyOf(longValues, longValues.length));
-        assertThat(new PropertyParcel.Builder("name").setDoubleValues(
-                doubleValues).build().getDoubleValues()).isEqualTo(
-                Arrays.copyOf(doubleValues, doubleValues.length));
-        assertThat(new PropertyParcel.Builder("name").setBooleanValues(
-                booleanValues).build().getBooleanValues()).isEqualTo(
-                Arrays.copyOf(booleanValues, booleanValues.length));
-        assertThat(new PropertyParcel.Builder("name").setBytesValues(
-                bytesValues).build().getBytesValues()).isEqualTo(
-                Arrays.copyOf(bytesValues, bytesValues.length));
-        assertThat(new PropertyParcel.Builder("name").setDocumentValues(
-                bundleValues).build().getDocumentValues()).isEqualTo(
-                Arrays.copyOf(bundleValues, bundleValues.length));
-    }
+        GenericDocument newDoc = new GenericDocument.Builder<>(oldDoc)
+                .setParentTypes(new ArrayList<>(Arrays.asList("Class3", "Class4")))
+                .setPropertyString("propString", "Bye")
+                .build();
 
-    @Test
-    public void testPropertyParcel_moreThanOnePropertySet_exceptionThrown() {
-        String[] stringValues = {"a", "b"};
-        long[] longValues = {1L, 2L};
-        PropertyParcel.Builder propertyParcelBuilder =
-                new PropertyParcel.Builder("name")
-                        .setStringValues(stringValues)
-                        .setLongValues(longValues);
+        // Check that the original GenericDocument is unmodified.
+        assertThat(oldDoc.getParentTypes()).isEqualTo(Arrays.asList("Class1", "Class2"));
+        assertThat(oldDoc.getScore()).isEqualTo(42);
+        assertThat(oldDoc.getPropertyString("propString")).isEqualTo("Hello");
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                () -> propertyParcelBuilder.build());
+        // Check that the new GenericDocument has modified the original fields correctly.
+        assertThat(newDoc.getParentTypes()).isEqualTo(Arrays.asList("Class3", "Class4"));
+        assertThat(newDoc.getPropertyString("propString")).isEqualTo("Bye");
 
-        assertThat(exception.getMessage()).contains("One and only one type array");
+        // Check that the new GenericDocument copies fields that aren't set.
+        assertThat(oldDoc.getScore()).isEqualTo(newDoc.getScore());
     }
 }

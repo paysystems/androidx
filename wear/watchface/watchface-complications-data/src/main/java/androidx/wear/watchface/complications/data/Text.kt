@@ -26,6 +26,7 @@ import android.support.wearable.complications.ComplicationText.TimeDifferenceBui
 import android.support.wearable.complications.ComplicationText.TimeFormatBuilder as WireComplicationTextTimeFormatBuilder
 import android.support.wearable.complications.TimeDependentText as WireTimeDependentText
 import android.support.wearable.complications.TimeDifferenceText
+import android.support.wearable.complications.TimeFormatText
 import android.text.style.ForegroundColorSpan
 import android.text.style.LocaleSpan
 import android.text.style.StrikethroughSpan
@@ -37,6 +38,12 @@ import android.text.style.UnderlineSpan
 import androidx.annotation.RequiresApi
 import androidx.annotation.RestrictTo
 import androidx.wear.protolayout.expression.DynamicBuilders.DynamicString
+import com.google.wear.expression.ProtoLayoutDynamicString as WearSdkDynamicString
+import com.google.wear.services.complications.ComplicationText as WearSdkComplicationText
+import com.google.wear.services.complications.DynamicComplicationText as WearSdkDynamicComplicationText
+import com.google.wear.services.complications.PlainComplicationText as WearSdkPlainComplicationText
+import com.google.wear.services.complications.TimeDifferenceComplicationText as WearSdkTimeDifferenceComplicationText
+import com.google.wear.services.complications.TimeFormatComplicationText as WearSdkTimeFormatComplicationText
 import java.time.Instant
 import java.util.concurrent.TimeUnit
 
@@ -603,6 +610,49 @@ private class DelegatingTimeDependentText(private val delegate: WireTimeDependen
     override fun toString() = delegate.toString()
 }
 
+internal fun ComplicationText.asWearSdkComplicationText(): WearSdkComplicationText {
+    val wireFormat = this.toWireComplicationText()
+    val input = this
+    return when (input) {
+        is PlainComplicationText -> WearSdkPlainComplicationText(wireFormat.surroundingText ?: "")
+        is DynamicComplicationText ->
+            WearSdkDynamicComplicationText(
+                WearSdkDynamicString.fromBytes(
+                    wireFormat.dynamicValue?.toDynamicStringByteArray() ?: ByteArray(0)
+                )
+            )
+        is TimeDifferenceComplicationText ->
+            WearSdkTimeDifferenceComplicationText.Builder()
+                .apply {
+                    setSurroundingText(wireFormat.surroundingText)
+                    setStyle((wireFormat.timeDependentText as TimeDifferenceText).style)
+                    setReferencePeriodStartMillis(
+                        (wireFormat.timeDependentText as TimeDifferenceText).referencePeriodStart
+                    )
+                    setReferencePeriodEndMillis(
+                        (wireFormat.timeDependentText as TimeDifferenceText).referencePeriodEnd
+                    )
+                    setMinimumUnit((wireFormat.timeDependentText as TimeDifferenceText).minimumUnit)
+                    setShowNowText(
+                        (wireFormat.timeDependentText as TimeDifferenceText).shouldShowNowText()
+                    )
+                }
+                .build()
+        is TimeFormatComplicationText ->
+            WearSdkTimeFormatComplicationText.Builder()
+                .apply {
+                    setSurroundingText(wireFormat.surroundingText)
+                    setStyle((wireFormat.timeDependentText as TimeFormatText).style)
+                    setFormat((wireFormat.timeDependentText as TimeFormatText).formatString)
+                    setTimeZone(
+                        (wireFormat.timeDependentText as TimeFormatText).timeZone as TimeZone?
+                    )
+                }
+                .build()
+        else -> WearSdkPlainComplicationText("")
+    }
+}
+
 @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
 public fun WireTimeDependentText.toApiComplicationText(): ComplicationText =
     DelegatingTimeDependentText(this)
@@ -612,10 +662,13 @@ public fun WireTimeDependentText.toApiComplicationText(): ComplicationText =
  * watch face's Renderer, it'll have been converted to a plain ComplicationText.
  *
  * @param dynamicValue The [DynamicString] which will be evaluated into a value dynamically.
- * @param fallbackValue Used when the system does not support dynamic values.
+ * @param fallbackValue Used when the system does not support [dynamicValue].
  *
- *   IMPORTANT: This is only used when the system does not support dynamic values _at all_. See
- *   [ComplicationData.dynamicValueInvalidationFallback] for the situation where the dynamic value
+ *   This is only relevant before [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], use the no-fallback
+ *   constructor if you target an equal or higher API level.
+ *
+ *   IMPORTANT: This is only used when the system does not support [dynamicValue] _at all_. See
+ *   [ComplicationData.dynamicValueInvalidationFallback] for the situation where the [dynamicValue]
  *   cannot be evaluated, e.g. when a data source is not available.
  */
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
@@ -623,6 +676,13 @@ public class DynamicComplicationText(
     public val dynamicValue: DynamicString,
     public val fallbackValue: CharSequence,
 ) : ComplicationText {
+    /**
+     * Creates a [DynamicComplicationText] with no [fallbackValue] for API levels that are known to
+     * support dynamic values.
+     */
+    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    public constructor(dynamicValue: DynamicString) : this(dynamicValue, "")
+
     private val delegate =
         DelegatingComplicationText(WireComplicationText(fallbackValue, dynamicValue))
 

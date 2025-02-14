@@ -16,21 +16,19 @@
 
 package androidx.camera.extensions.internal;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.RequiresApi;
 import androidx.annotation.VisibleForTesting;
+
+import org.jspecify.annotations.NonNull;
 
 /**
  * The client version of the Extensions-Interface that CameraX extension library uses.
  */
-@RequiresApi(21) // TODO(b/200306659): Remove and replace with annotation on package-info.java
 public class ClientVersion {
     // Current version of vendor library implementation that the CameraX extension supports. This
     // needs to be increased along with the version of vendor library interface.
-    private static ClientVersion sCurrent = new ClientVersion("1.3.0");
+    private static ClientVersion sCurrent = new ClientVersion("1.5.0");
 
-    @NonNull
-    public static ClientVersion getCurrentVersion() {
+    public static @NonNull ClientVersion getCurrentVersion() {
         return sCurrent;
     }
 
@@ -44,8 +42,7 @@ public class ClientVersion {
 
     private final Version mVersion;
 
-    @NonNull
-    public Version getVersion() {
+    public @NonNull Version getVersion() {
         return mVersion;
     }
 
@@ -70,12 +67,27 @@ public class ClientVersion {
     }
 
     /**
+     * Check if the client version meets the maximum compatible version requirement. This implies
+     * that the client version is equal to or older than the version.
+     *
+     * <p> The compatible version is comprised of the major and minor version numbers. The patch
+     * number is ignored.
+     *
+     * @param version The minimum compatible version required
+     * @return True if the client version meets the maximum version requirement and False
+     * otherwise.
+     */
+    public static boolean isMaximumCompatibleVersion(@NonNull Version version) {
+        return ClientVersion.getCurrentVersion().mVersion
+                .compareTo(version.getMajor(), version.getMinor()) <= 0;
+    }
+
+    /**
      * Gets this version number as string.
      *
      * @return the string of the version in a form of MAJOR.MINOR.PATCH-description.
      */
-    @NonNull
-    public String toVersionString() {
+    public @NonNull String toVersionString() {
         return mVersion.toString();
     }
 }

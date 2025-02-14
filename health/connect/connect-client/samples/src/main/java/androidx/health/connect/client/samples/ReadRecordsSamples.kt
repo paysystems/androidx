@@ -21,16 +21,54 @@ package androidx.health.connect.client.samples
 import androidx.activity.result.ActivityResultCaller
 import androidx.annotation.Sampled
 import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.HealthConnectFeatures
 import androidx.health.connect.client.contracts.ExerciseRouteRequestContract
+import androidx.health.connect.client.permission.HealthPermission
+import androidx.health.connect.client.permission.HealthPermission.Companion.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND
+import androidx.health.connect.client.readRecord
 import androidx.health.connect.client.records.ExerciseRoute
 import androidx.health.connect.client.records.ExerciseRouteResult
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.records.SkinTemperatureRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import java.time.Instant
+
+@Sampled
+suspend fun ReadSkinTemperatureRecord(
+    healthConnectClient: HealthConnectClient,
+    startTime: Instant,
+    endTime: Instant
+) {
+    if (
+        healthConnectClient.features.getFeatureStatus(
+            HealthConnectFeatures.FEATURE_SKIN_TEMPERATURE
+        ) == HealthConnectFeatures.FEATURE_STATUS_AVAILABLE
+    ) {
+        if (
+            healthConnectClient.permissionController
+                .getGrantedPermissions()
+                .contains(HealthPermission.getReadPermission(SkinTemperatureRecord::class))
+        ) {
+            val response =
+                healthConnectClient.readRecords(
+                    ReadRecordsRequest<SkinTemperatureRecord>(
+                        timeRangeFilter = TimeRangeFilter.between(startTime, endTime)
+                    )
+                )
+            for (skinTemperatureRecord in response.records) {
+                // Process each skin temperature record
+            }
+        } else {
+            // Permission hasn't been granted. Request permission to read skin temperature.
+        }
+    } else {
+        // Feature is not available. It is not possible to read skin temperature.
+    }
+}
 
 @Sampled
 suspend fun ReadStepsRange(
@@ -40,8 +78,7 @@ suspend fun ReadStepsRange(
 ) {
     val response =
         healthConnectClient.readRecords(
-            ReadRecordsRequest(
-                StepsRecord::class,
+            ReadRecordsRequest<StepsRecord>(
                 timeRangeFilter = TimeRangeFilter.between(startTime, endTime)
             )
         )
@@ -58,8 +95,7 @@ suspend fun ReadExerciseSessions(
 ) {
     val response =
         healthConnectClient.readRecords(
-            ReadRecordsRequest(
-                ExerciseSessionRecord::class,
+            ReadRecordsRequest<ExerciseSessionRecord>(
                 timeRangeFilter = TimeRangeFilter.between(startTime, endTime)
             )
         )
@@ -69,8 +105,7 @@ suspend fun ReadExerciseSessions(
         val heartRateRecords =
             healthConnectClient
                 .readRecords(
-                    ReadRecordsRequest(
-                        HeartRateRecord::class,
+                    ReadRecordsRequest<HeartRateRecord>(
                         timeRangeFilter =
                             TimeRangeFilter.between(
                                 exerciseRecord.startTime,
@@ -103,7 +138,7 @@ suspend fun ReadExerciseRoute(
 
     // Show exercise route, based on user action
     val exerciseSessionRecord =
-        healthConnectClient.readRecord(ExerciseSessionRecord::class, recordId).record
+        healthConnectClient.readRecord<ExerciseSessionRecord>(recordId).record
 
     when (val exerciseRouteResult = exerciseSessionRecord.exerciseRouteResult) {
         is ExerciseRouteResult.Data -> displayExerciseRoute(exerciseRouteResult.exerciseRoute)
@@ -121,12 +156,36 @@ suspend fun ReadSleepSessions(
 ) {
     val response =
         healthConnectClient.readRecords(
-            ReadRecordsRequest(
-                SleepSessionRecord::class,
+            ReadRecordsRequest<SleepSessionRecord>(
                 timeRangeFilter = TimeRangeFilter.between(startTime, endTime)
             )
         )
     for (sleepRecord in response.records) {
         // Process each sleep record
+    }
+}
+
+@Sampled
+suspend fun ReadRecordsInBackground(
+    healthConnectClient: HealthConnectClient,
+    startTime: Instant,
+    endTime: Instant,
+) {
+    val grantedPermissions = healthConnectClient.permissionController.getGrantedPermissions()
+
+    // The permission should be requested and granted beforehand when the app is in foreground
+    if (PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND !in grantedPermissions) {
+        return
+    }
+
+    val response =
+        healthConnectClient.readRecords(
+            ReadRecordsRequest<StepsRecord>(
+                timeRangeFilter = TimeRangeFilter.between(startTime, endTime),
+            )
+        )
+
+    for (stepsRecord in response.records) {
+        // Process each record
     }
 }

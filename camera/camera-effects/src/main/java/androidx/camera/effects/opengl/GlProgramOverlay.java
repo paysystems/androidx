@@ -26,19 +26,19 @@ import static androidx.camera.effects.opengl.Utils.drawArrays;
 import static androidx.core.util.Preconditions.checkArgument;
 
 import android.graphics.Bitmap;
+import android.opengl.GLES11Ext;
 import android.opengl.GLES20;
 import android.view.Surface;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.RequiresApi;
 import androidx.camera.core.Logger;
+
+import org.jspecify.annotations.NonNull;
 
 import java.nio.ByteBuffer;
 
 /**
  * A GL program that copies the source while overlaying a texture on top of it.
  */
-@RequiresApi(21)
 class GlProgramOverlay extends GlProgram {
 
     private static final String TAG = "GlProgramOverlay";
@@ -58,24 +58,18 @@ class GlProgramOverlay extends GlProgram {
             + TEXTURE_ATTRIBUTE + ").xy;\n"
             + "}";
 
-    private static final String FRAGMENT_SHADER = "#extension GL_OES_EGL_image_external : require\n"
-            + "precision mediump float;\n"
-            + "varying vec2 " + TEXTURE_COORDINATES + ";\n"
-            + "uniform samplerExternalOES " + INPUT_SAMPLER + ";\n"
-            + "uniform sampler2D " + OVERLAY_SAMPLER + ";\n"
-            + "void main() {\n"
-            + "    vec4 inputColor = texture2D(" + INPUT_SAMPLER + ", "
-            + TEXTURE_COORDINATES + ");\n"
-            + "    vec4 overlayColor = texture2D(" + OVERLAY_SAMPLER + ", "
-            + TEXTURE_COORDINATES + ");\n"
-            + "    gl_FragColor = inputColor * (1.0 - overlayColor.a) + overlayColor;\n"
-            + "}";
+    private static final String SAMPLER_EXTERNAL = "samplerExternalOES";
+    private static final String SAMPLER_2D = "sampler2D";
 
     // Location of the texture matrix used in vertex shader.
     private int mTextureMatrixLoc = -1;
 
-    GlProgramOverlay() {
-        super(VERTEX_SHADER, FRAGMENT_SHADER);
+    GlProgramOverlay(int queueDepth) {
+        super(
+                VERTEX_SHADER,
+                // When the queue exists, the overlay program's input is the buffered 2D textures.
+                createFragmentShader(queueDepth > 0 ? SAMPLER_2D : SAMPLER_EXTERNAL)
+        );
     }
 
     @Override
@@ -117,7 +111,7 @@ class GlProgramOverlay extends GlProgram {
      * @param timestampNs        the timestamp of the frame in nanoseconds.
      */
     void draw(int inputTextureTarget, int inputTextureId, int overlayTextureId,
-            @NonNull float[] matrix, @NonNull GlContext glContext, @NonNull Surface surface,
+            float @NonNull [] matrix, @NonNull GlContext glContext, @NonNull Surface surface,
             long timestampNs) {
         use();
         uploadParameters(inputTextureTarget, inputTextureId, overlayTextureId, matrix);
@@ -141,9 +135,8 @@ class GlProgramOverlay extends GlProgram {
      * @param height             the height of the output bitmap.
      * @param matrix             the texture transformation matrix.
      */
-    @NonNull
-    Bitmap snapshot(int inputTextureTarget, int inputTextureId, int overlayTextureId, int width,
-            int height, @NonNull float[] matrix) {
+    @NonNull Bitmap snapshot(int inputTextureTarget, int inputTextureId, int overlayTextureId,
+            int width, int height, float @NonNull [] matrix) {
         use();
         // Allocate buffer.
         ByteBuffer byteBuffer = ByteBuffer.allocateDirect(width * height * SNAPSHOT_PIXEL_STRIDE);
@@ -157,12 +150,27 @@ class GlProgramOverlay extends GlProgram {
         return bitmap;
     }
 
+    private static @NonNull String createFragmentShader(@NonNull String inputSampler) {
+        return "#extension GL_OES_EGL_image_external : require\n"
+                + "precision mediump float;\n"
+                + "varying vec2 " + TEXTURE_COORDINATES + ";\n"
+                + "uniform " + inputSampler + " " + INPUT_SAMPLER + ";\n"
+                + "uniform samplerExternalOES " + OVERLAY_SAMPLER + ";\n"
+                + "void main() {\n"
+                + "    vec4 inputColor = texture2D(" + INPUT_SAMPLER + ", "
+                + TEXTURE_COORDINATES + ");\n"
+                + "    vec4 overlayColor = texture2D(" + OVERLAY_SAMPLER + ", "
+                + TEXTURE_COORDINATES + ");\n"
+                + "    gl_FragColor = inputColor * (1.0 - overlayColor.a) + overlayColor;\n"
+                + "}";
+    }
+
     /**
      * Draws the input texture and overlay to a FBO and download the bytes to the given ByteBuffer.
      */
     private void snapshot(int inputTextureTarget,
             int inputTextureId, int overlayTextureId, int width,
-            int height, @NonNull float[] textureTransform, @NonNull ByteBuffer byteBuffer) {
+            int height, float @NonNull [] textureTransform, @NonNull ByteBuffer byteBuffer) {
         checkArgument(byteBuffer.capacity() == width * height * 4,
                 "ByteBuffer capacity is not equal to width * height * 4.");
         checkArgument(byteBuffer.isDirect(), "ByteBuffer is not direct.");
@@ -204,7 +212,7 @@ class GlProgramOverlay extends GlProgram {
      * Uploads the parameters to the shader.
      */
     private void uploadParameters(int inputTextureTarget, int inputTextureId, int overlayTextureId,
-            @NonNull float[] matrix) {
+            float @NonNull [] matrix) {
         // Uploads the texture transformation matrix.
         GLES20.glUniformMatrix4fv(mTextureMatrixLoc, 1, false, matrix, 0);
         checkGlErrorOrThrow("glUniformMatrix4fv");
@@ -216,7 +224,7 @@ class GlProgramOverlay extends GlProgram {
 
         // Bind the overlay texture to TEXTURE1
         GLES20.glActiveTexture(GLES20.GL_TEXTURE1);
-        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, overlayTextureId);
+        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, overlayTextureId);
         checkGlErrorOrThrow("glBindTexture");
     }
 }

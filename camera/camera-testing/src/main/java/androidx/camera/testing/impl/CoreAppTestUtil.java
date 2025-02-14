@@ -31,23 +31,24 @@ import android.os.Build;
 import android.os.RemoteException;
 import android.util.Log;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.annotation.RequiresApi;
 import androidx.camera.core.Logger;
 import androidx.camera.testing.impl.activity.ForegroundTestActivity;
 import androidx.test.espresso.Espresso;
 import androidx.test.espresso.IdlingRegistry;
+import androidx.test.espresso.idling.CountingIdlingResource;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.uiautomator.UiDevice;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.junit.AssumptionViolatedException;
 
 import java.io.IOException;
 
 /** Utility functions of tests on CoreTestApp. */
-@RequiresApi(21) // TODO(b/200306659): Remove and replace with annotation on package-info.java
 public final class CoreAppTestUtil {
+
+    private static final String TAG = "CoreAppTestUtil";
 
     /** ADB shell input key code for dismissing keyguard for device with API level <= 22. */
     private static final int DISMISS_LOCK_SCREEN_CODE = 82;
@@ -153,8 +154,11 @@ public final class CoreAppTestUtil {
         }
 
         device.pressHome();
-        device.waitForIdle(MAX_TIMEOUT_MS);
-
+        try {
+            device.waitForIdle(MAX_TIMEOUT_MS);
+        } catch (IllegalStateException e) {
+            Logger.d(TAG, "Fail to waitForIdle", e);
+        }
         // Close system dialogs first to avoid interrupt.
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.R) {
             instrumentation.getTargetContext().sendBroadcast(
@@ -205,7 +209,7 @@ public final class CoreAppTestUtil {
             instrumentation.waitForIdleSync();
 
             if (activityRef == null) {
-                Logger.d("CoreAppTestUtil", String.format("Activity %s, failed to launch",
+                Logger.d(TAG, String.format("Activity %s, failed to launch",
                         startIntent.getComponent()) + ", ignore the foreground checking");
                 return;
             }
@@ -216,7 +220,7 @@ public final class CoreAppTestUtil {
             Espresso.onIdle();
             return;
         } catch (Exception e) {
-            Logger.d("CoreAppTestUtil", "Fail to get foreground", e);
+            Logger.d(TAG, "Fail to get foreground", e);
         } finally {
             if (activityRef != null) {
                 IdlingRegistry.getInstance().unregister(activityRef.getViewReadyIdlingResource());
@@ -252,9 +256,9 @@ public final class CoreAppTestUtil {
      * @param <T>             The Activity class under test
      * @return Returns the reference to the activity for test.
      */
-    @Nullable
-    public static <T extends Activity> T launchActivity(@NonNull Instrumentation instrumentation,
-            @NonNull Class<T> activityClass, @Nullable Intent startIntent) {
+    public static <T extends Activity> @Nullable T launchActivity(
+            @NonNull Instrumentation instrumentation, @NonNull Class<T> activityClass,
+            @Nullable Intent startIntent) {
         Context context = instrumentation.getTargetContext();
 
         // inject custom intent, if provided
@@ -276,5 +280,36 @@ public final class CoreAppTestUtil {
         instrumentation.waitForIdleSync();
 
         return activityRef;
+    }
+
+    /**
+     * Launch a auto-closed {@link ForegroundTestActivity}.
+     *
+     * <p>The launched activity will make the callee activity enter PAUSE state and return to
+     * RESUME state after the activity is closed.
+     *
+     * <p>If the <code>countingIdlingResource</code> is specified, the activity will wait for it
+     * becoming idle to close the activity. This can be used to control the activity close speed to
+     * make it work more like the real user behavior.
+     */
+    public static void launchAutoClosedForegroundActivity(
+            @NonNull Context context,
+            @NonNull Instrumentation instrumentation,
+            @Nullable CountingIdlingResource countingIdlingResource
+    ) {
+        ForegroundTestActivity foregroundTestActivity = launchActivity(
+                instrumentation,
+                ForegroundTestActivity.class,
+                new Intent(context, ForegroundTestActivity.class)
+        );
+        try {
+            if (countingIdlingResource != null) {
+                IdlingRegistry.getInstance().register(countingIdlingResource);
+                Espresso.onIdle();
+                IdlingRegistry.getInstance().unregister(countingIdlingResource);
+            }
+        } finally {
+            foregroundTestActivity.finish();
+        }
     }
 }

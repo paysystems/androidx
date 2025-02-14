@@ -24,16 +24,16 @@ import static androidx.core.util.Preconditions.checkState;
 import android.opengl.GLES20;
 
 import androidx.annotation.CallSuper;
-import androidx.annotation.NonNull;
-import androidx.annotation.RequiresApi;
+import androidx.annotation.VisibleForTesting;
 import androidx.camera.core.Logger;
+
+import org.jspecify.annotations.NonNull;
 
 import java.nio.FloatBuffer;
 
 /**
  * A base class that represents an OpenGL program.
  */
-@RequiresApi(21)
 public abstract class GlProgram {
 
     private static final String TAG = "GlProgram";
@@ -199,5 +199,10 @@ public abstract class GlProgram {
             );
         }
         return shader;
+    }
+
+    @VisibleForTesting
+    @NonNull String getFragmentShader() {
+        return mFragmentShader;
     }
 }

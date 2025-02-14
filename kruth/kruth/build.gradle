@@ -14,23 +14,51 @@
  * limitations under the License.
  */
 
-import androidx.build.LibraryType
+/**
+ * This file was created using the `create_project.py` script located in the
+ * `<AndroidX root>/development/project-creator` directory.
+ *
+ * Please use that script when creating a new project, rather than copying an existing project and
+ * modifying its settings.
+ */
+
+
+import androidx.build.KotlinTarget
+import androidx.build.SoftwareType
 import androidx.build.PlatformIdentifier
-import androidx.build.Publish
-import androidx.build.RunApiTasks
+import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 
 plugins {
     id("AndroidXPlugin")
 }
 
 androidXMultiplatform {
-    jvm {}
+    jvm {
+        withJava()
+    }
     mac()
     linux()
     ios()
+    watchos()
+    tvos()
+    androidNative()
+    mingwX64()
+    wasmJs()
+    js()
 
     defaultPlatform(PlatformIdentifier.JVM)
 
+    // Source Structure
+    //            commonMain
+    //    ┌────────────────────────┐
+    //    ▼                        ▼
+    // jvmMain                nonJvmMain
+    //                    ┌────────────────┐
+    //                    ▼                ▼
+    //                nativeMain        webMain
+    //                               ┌───────────┐
+    //                               ▼           ▼
+    //                             jsMain   wasmJsMain
     sourceSets {
         commonMain {
             dependencies {
@@ -41,30 +69,94 @@ androidXMultiplatform {
 
         commonTest {
             dependencies {
-                implementation(libs.kotlinTestCommon)
                 implementation(libs.kotlinTestAnnotationsCommon)
             }
         }
 
         jvmMain {
+            dependsOn(commonMain)
             dependencies {
                 api(libs.kotlinStdlib)
                 api(libs.kotlinTest)
+                implementation(libs.guavaAndroid)
+                implementation(libs.junit)
             }
         }
 
         jvmTest {
+            dependsOn(commonTest)
             dependencies {
-                implementation(libs.kotlinStdlib)
+                api(libs.kotlinCoroutinesTest)
+            }
+        }
+
+        nonJvmMain {
+            dependsOn(commonMain)
+        }
+
+        nonJvmTest {
+            dependsOn(commonTest)
+        }
+
+        webMain {
+            dependsOn(nonJvmMain)
+            dependencies {
                 implementation(libs.kotlinTest)
             }
+        }
+        webTest {
+            dependsOn(nonJvmTest)
+            dependencies {
+                // https://youtrack.jetbrains.com/issue/KT-71032
+                implementation(libs.kotlinTestForWasmTests)
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+            }
+        }
+
+        jsMain {
+            dependsOn(webMain)
+        }
+        jsTest {
+            dependsOn(webTest)
+        }
+
+        wasmJsMain {
+            dependsOn(webMain)
+        }
+        wasmJsTest {
+            dependsOn(webTest)
+        }
+
+        nativeMain {
+            dependsOn(nonJvmMain)
+        }
+        nativeTest {
+            dependsOn(nonJvmTest)
+        }
+
+        targets.configureEach { target ->
+            if (target.platformType == KotlinPlatformType.native) {
+                target.compilations["main"].defaultSourceSet {
+                    dependsOn(nativeMain)
+                }
+                target.compilations["test"].defaultSourceSet {
+                    dependsOn(nativeTest)
+                }
+            }
+        }
+
+        // Workaround for https://youtrack.jetbrains.com/issue/KT-51763
+        // Make sure commonization runs before any compilation task.
+        tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinNativeCompile).configureEach {
+            it.dependsOn(tasks.named("commonize"))
         }
     }
 }
 
 androidx {
     legacyDisableKotlinStrictApiMode = true // Temporarily enabled to allow API tracking
-    publish = Publish.SNAPSHOT_ONLY
-    runApiTasks = new RunApiTasks.Yes() // Used to diff against Google Truth
-    type = LibraryType.INTERNAL_TEST_LIBRARY
+    type = SoftwareType.SNAPSHOT_ONLY_TEST_LIBRARY_WITH_API_TASKS // Used to diff against Google Truth
+    doNotDocumentReason = "Not shipped externally"
+    kotlinTarget = KotlinTarget.KOTLIN_1_9
 }

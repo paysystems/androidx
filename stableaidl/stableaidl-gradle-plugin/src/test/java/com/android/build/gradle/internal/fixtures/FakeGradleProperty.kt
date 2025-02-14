@@ -20,6 +20,7 @@ import java.util.function.BiFunction
 import org.gradle.api.Transformer
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
+import org.gradle.api.specs.Spec
 
 class FakeGradleProperty<T>(private var value: T? = null) : Property<T> {
 
@@ -46,6 +47,10 @@ class FakeGradleProperty<T>(private var value: T? = null) : Property<T> {
         value ?: valueProvider?.get() ?: convention ?: throw IllegalStateException("Value not set")
 
     override fun getOrNull() = value ?: valueProvider?.get() ?: convention
+
+    override fun filter(spec: Spec<in T>): Provider<T> {
+        throw NotImplementedError()
+    }
 
     override fun value(value: T?): Property<T> {
         this.value = value
@@ -87,6 +92,7 @@ class FakeGradleProperty<T>(private var value: T? = null) : Property<T> {
         throw NotImplementedError()
     }
 
+    @Suppress("WRONG_NULLABILITY_FOR_JAVA_OVERRIDE")
     override fun orElse(p0: T): Provider<T> {
         throw NotImplementedError()
     }
@@ -96,6 +102,14 @@ class FakeGradleProperty<T>(private var value: T? = null) : Property<T> {
     }
 
     override fun disallowUnsafeRead() {
+        throw NotImplementedError()
+    }
+
+    override fun unset(): Property<T> {
+        throw NotImplementedError()
+    }
+
+    override fun unsetConvention(): Property<T> {
         throw NotImplementedError()
     }
 

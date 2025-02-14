@@ -17,6 +17,7 @@
 package androidx.build.testConfiguration
 
 import androidx.build.getDistributionDirectory
+import androidx.build.getSupportRootFolder
 import com.google.gson.GsonBuilder
 import java.io.File
 import org.gradle.api.DefaultTask
@@ -41,9 +42,13 @@ abstract class ModuleInfoGenerator : DefaultTask() {
         // media service/client tests are created from multiple projects, so we get multiple
         // entries with the same TestModule.name. This code merges all the TestModule.path entries
         // across the test modules with the same name.
-        val data = testModules.groupBy { it.name }.map {
-            TestModule(name = it.key, path = it.value.flatMap { module -> module.path })
-        }.associateBy { it.name }
+        val data =
+            testModules
+                .groupBy { it.name }
+                .map {
+                    TestModule(name = it.key, path = it.value.flatMap { module -> module.path })
+                }
+                .associateBy { it.name }
         return gson.toJson(data)
     }
 
@@ -68,12 +73,29 @@ internal fun Project.registerOwnersServiceTasks() {
         task.include("**/OWNERS")
         task.exclude("buildSrc/.gradle/**")
         task.exclude(".gradle/**")
+        task.exclude("build/reports/**")
         task.includeEmptyDirs = false
     }
 
-    tasks.register("createModuleInfo", ModuleInfoGenerator::class.java) { task ->
+    tasks.register(CREATE_MODULE_INFO, ModuleInfoGenerator::class.java) { task ->
         task.outputFile.set(File(getDistributionDirectory(), "module-info.json"))
     }
 }
 
+internal fun Project.addToModuleInfo(testName: String, projectIsolationEnabled: Boolean) {
+    if (!projectIsolationEnabled) {
+        rootProject.tasks.named(CREATE_MODULE_INFO).configure {
+            it as ModuleInfoGenerator
+            it.testModules.add(
+                TestModule(
+                    name = testName,
+                    path = listOf(projectDir.toRelativeString(getSupportRootFolder()))
+                )
+            )
+        }
+    }
+}
+
 data class TestModule(val name: String, val path: List<String>)
+
+private const val CREATE_MODULE_INFO = "createModuleInfo"

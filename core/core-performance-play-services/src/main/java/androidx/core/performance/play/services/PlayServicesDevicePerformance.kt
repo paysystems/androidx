@@ -18,45 +18,54 @@ package androidx.core.performance.play.services
 
 import android.content.Context
 import android.util.Log
-import androidx.annotation.VisibleForTesting
 import androidx.core.performance.DefaultDevicePerformance
 import androidx.core.performance.DevicePerformance
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
+import androidx.datastore.preferences.preferencesDataStoreFile
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.deviceperformance.DevicePerformanceClient
 import kotlin.math.max
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
+private const val MPC_PREFERENCE_KEY = "mpc_value"
+
 /**
  * A DevicePerformance that uses Google Play Services to retrieve media performance class data.
  *
  * @param context The application context value to use.
  */
-class PlayServicesDevicePerformance(private val context: Context) : DevicePerformance {
+public class PlayServicesDevicePerformance
+internal constructor(
+    private val context: Context,
+    client: DevicePerformanceClient,
+    private val performanceStore: DataStore<Preferences>
+) : DevicePerformance {
     private val tag = "PlayServicesDevicePerformance"
 
     private val defaultMpc = DefaultDevicePerformance()
-    private val playServicesValueStoredDeferred = CompletableDeferred<Boolean>()
+    private val mpcKey = intPreferencesKey(MPC_PREFERENCE_KEY)
 
-    override val mediaPerformanceClass get() = lazyMpc.value
-    private val lazyMpc =
-        lazy {
-            runBlocking {
-                val storedMpc = getPerformanceClass().first()
-                Log.v(tag, "Stored mpc is $storedMpc")
-                Log.v(tag, "Default mpc is ${defaultMpc.mediaPerformanceClass}")
-                val returnedMpc = max(storedMpc ?: 0, defaultMpc.mediaPerformanceClass)
-                Log.v(tag, "Mpc value used $returnedMpc")
-                return@runBlocking returnedMpc
-            }
+    override val mediaPerformanceClass: Int
+        get() = lazyMpc.value
+
+    private val lazyMpc = lazy {
+        runBlocking {
+            val storedMpc = getPerformanceClass().first()
+            Log.v(tag, "Stored mpc is $storedMpc")
+            Log.v(tag, "Default mpc is ${defaultMpc.mediaPerformanceClass}")
+            val returnedMpc = max(storedMpc ?: 0, defaultMpc.mediaPerformanceClass)
+            Log.v(tag, "Mpc value used $returnedMpc")
+            return@runBlocking returnedMpc
         }
+    }
 
     init {
         Log.v(
@@ -64,67 +73,54 @@ class PlayServicesDevicePerformance(private val context: Context) : DevicePerfor
             "Getting mediaPerformanceClass from " +
                 "com.google.android.gms.deviceperformance.DevicePerformanceClient"
         )
-        updatePerformanceStore(
-            com.google.android.gms.deviceperformance.DevicePerformance.getClient(context)
-        )
-    }
-
-    @VisibleForTesting
-    internal constructor(context: Context, client: DevicePerformanceClient) : this(context) {
-        // mock client should wait for the playServices client to finish,
-        // so the test results are determined by the mock client.
-        runBlocking {
-            playServicesValueStoredDeferred.await()
-        }
         updatePerformanceStore(client)
     }
 
-    private val mpcKey = intPreferencesKey("mpc_value")
-
-    internal companion object {
-        // To avoid creating multiple instance of datastore
-        private val Context.performanceStore by
-        preferencesDataStore(name = "media_performance_class")
-
-        @VisibleForTesting
-        suspend fun clearPerformanceClass(context: Context) {
-            context.performanceStore.edit {
-                it.clear()
-            }
-        }
-    }
+    /**
+     * A DevicePerformance that uses Google Play Services to retrieve media performance class data.
+     *
+     * @param context The application context value to use.
+     */
+    public constructor(
+        context: Context
+    ) : this(
+        context,
+        com.google.android.gms.deviceperformance.DevicePerformance.getClient(context),
+        PreferenceDataStoreFactory.create(
+            produceFile = { context.preferencesDataStoreFile("media_performance_class") }
+        )
+    )
 
     private fun getPerformanceClass(): Flow<Int?> {
-        return context.performanceStore.data.map { values ->
+        return performanceStore.data.map { values ->
             // No type safety.
             values[mpcKey]
         }
     }
 
     private suspend fun savePerformanceClass(value: Int) {
-        context.performanceStore.edit { values ->
-            values[mpcKey] = value
-        }
+        performanceStore.edit { values -> values[mpcKey] = value }
     }
 
     private fun updatePerformanceStore(client: DevicePerformanceClient) {
-        client.mediaPerformanceClass().addOnSuccessListener { result ->
-            runBlocking {
-                Log.v(tag, "Got mediaPerformanceClass $result")
-                val storedVal = max(result, defaultMpc.mediaPerformanceClass)
-                launch {
-                    savePerformanceClass(storedVal)
-                    Log.v(tag, "Saved mediaPerformanceClass $storedVal")
-                    playServicesValueStoredDeferred.complete(true)
+        client
+            .mediaPerformanceClass()
+            .addOnSuccessListener { result ->
+                runBlocking {
+                    Log.v(tag, "Got mediaPerformanceClass $result")
+                    val storedVal = max(result, defaultMpc.mediaPerformanceClass)
+                    launch {
+                        savePerformanceClass(storedVal)
+                        Log.v(tag, "Saved mediaPerformanceClass $storedVal")
+                    }
                 }
             }
-        }.addOnFailureListener { e: Exception ->
-            if (e is ApiException) {
-                Log.e(tag, "Error saving mediaPerformanceClass: $e")
-            } else if (e is IllegalStateException) {
-                Log.e(tag, "Error saving mediaPerformanceClass: $e")
+            .addOnFailureListener { e: Exception ->
+                if (e is ApiException) {
+                    Log.e(tag, "Error saving mediaPerformanceClass", e)
+                } else if (e is IllegalStateException) {
+                    Log.e(tag, "Error saving mediaPerformanceClass", e)
+                }
             }
-            playServicesValueStoredDeferred.complete(true)
-        }
     }
 }
