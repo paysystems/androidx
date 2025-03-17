@@ -97,7 +97,7 @@ dependencies {
     androidTestImplementation(libs.rxjava2)
     androidTestImplementation(libs.kotlinCoroutinesTest)
     androidTestImplementation("androidx.collection:collection")
-    androidTestImplementation("androidx.sqlite:sqlite-bundled:2.5.0-rc02")
+    androidTestImplementation("androidx.sqlite:sqlite-bundled:2.5.0-rc03")
 }
 
 room {
