@@ -106,7 +106,7 @@ androidXMultiplatform {
             dependencies {
                 api(libs.kotlinStdlib)
                 api(project(":room:room-common"))
-                api("androidx.sqlite:sqlite:2.5.0")
+                api("androidx.sqlite:sqlite:2.5.1")
                 api("androidx.collection:collection:1.4.2")
                 api("androidx.annotation:annotation:1.8.1")
                 api(libs.kotlinCoroutinesCore)
@@ -132,7 +132,7 @@ androidXMultiplatform {
         jvmTest {
             dependsOn(commonTest)
             dependencies {
-                implementation("androidx.sqlite:sqlite-bundled:2.5.0")
+                implementation("androidx.sqlite:sqlite-bundled:2.5.1")
                 implementation(libs.kotlinTestJunit)
             }
         }
@@ -140,7 +140,7 @@ androidXMultiplatform {
             dependsOn(jvmAndroidMain)
             dependencies {
                 api(libs.jspecify)
-                api("androidx.sqlite:sqlite-framework:2.5.0")
+                api("androidx.sqlite:sqlite-framework:2.5.1")
                 api(libs.kotlinCoroutinesAndroid)
                 implementation("androidx.arch.core:core-runtime:2.2.0")
                 compileOnly("androidx.lifecycle:lifecycle-livedata-core:2.0.0")
@@ -163,7 +163,7 @@ androidXMultiplatform {
         androidInstrumentedTest {
             dependsOn(commonTest)
             dependencies {
-                implementation("androidx.sqlite:sqlite-bundled:2.5.0")
+                implementation("androidx.sqlite:sqlite-bundled:2.5.1")
                 implementation(libs.junit)
                 implementation(libs.testExtJunit)
                 implementation(libs.testCore)
@@ -179,14 +179,14 @@ androidXMultiplatform {
         nativeMain {
             dependsOn(jvmNativeMain)
             dependencies {
-                api("androidx.sqlite:sqlite-framework:2.5.0")
+                api("androidx.sqlite:sqlite-framework:2.5.1")
                 implementation(libs.atomicFu)
             }
         }
         nativeTest {
             dependsOn(commonTest)
             dependencies {
-                implementation("androidx.sqlite:sqlite-bundled:2.5.0")
+                implementation("androidx.sqlite:sqlite-bundled:2.5.1")
                 implementation(libs.okio)
             }
         }
