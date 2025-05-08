@@ -92,8 +92,8 @@ class PropertyProcessor(
                         nonNull
                     ),
                 parent = propertyParent,
-                indexed = columnInfoAnnotation?.get("index")?.asBoolean() == true,
-                nonNull = nonNull
+                indexed = columnInfoAnnotation?.get("index")?.asBoolean() ?: false,
+                nonNull = nonNull,
             )
 
         // TODO(b/273592453): Figure out a way to detect value classes in KAPT and guard against it.
