@@ -25,6 +25,7 @@ import android.database.Cursor.FIELD_TYPE_STRING
 import android.database.sqlite.SQLiteCursor
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteProgram
+import androidx.annotation.VisibleForTesting
 import androidx.sqlite.SQLITE_DATA_BLOB
 import androidx.sqlite.SQLITE_DATA_FLOAT
 import androidx.sqlite.SQLITE_DATA_INTEGER
@@ -52,7 +53,12 @@ internal sealed class AndroidSQLiteStatement(
 
     companion object {
         fun create(db: SQLiteDatabase, sql: String): AndroidSQLiteStatement {
-            return if (isRowStatement(sql)) {
+            val sqlString = sql.trim().uppercase()
+            val sqlPrefix = getStatementPrefix(sqlString)
+            if (sqlPrefix == null) {
+                return OtherAndroidSQLiteStatement(db, sql)
+            }
+            return if (isRowStatement(sqlPrefix)) {
                 // Statements that return rows (SQLITE_ROW)
                 SelectAndroidSQLiteStatement(db, sql)
             } else {
@@ -61,17 +67,60 @@ internal sealed class AndroidSQLiteStatement(
             }
         }
 
-        private fun isRowStatement(sql: String): Boolean {
-            val prefix = sql.trim()
-            if (prefix.length < 3) {
-                return false
-            }
-            return when (prefix.substring(0, 3).uppercase()) {
+        private fun isRowStatement(prefix: String) =
+            when (prefix) {
                 "SEL",
                 "PRA",
                 "WIT" -> true
                 else -> false
             }
+
+        /**
+         * Returns the 3-character prefix of the SQL statement or null if the statement is
+         * malformed.
+         */
+        @VisibleForTesting
+        internal fun getStatementPrefix(sql: String): String? {
+            val index = getStatementPrefixIndex(sql)
+            if (index < 0 || index > sql.length) {
+                // Bad comment syntax or incomplete statement
+                return null
+            }
+            return sql.substring(index, minOf(index + 3, sql.length))
+        }
+
+        /**
+         * Return the index of the first character past comments and whitespace.
+         *
+         * Taken from SQLiteDatabase.getSqlStatementPrefixOffset() implementation.
+         */
+        private fun getStatementPrefixIndex(s: String): Int {
+            val limit: Int = s.length - 2
+            if (limit < 0) return -1
+            var i = 0
+            while (i < limit) {
+                val c = s[i]
+                when {
+                    c <= ' ' -> i++
+                    c == '-' -> {
+                        if (s[i + 1] != '-') return i
+                        i = s.indexOf('\n', i + 2)
+                        if (i < 0) return -1
+                        i++
+                    }
+                    c == '/' -> {
+                        if (s[i + 1] != '*') return i
+                        i++
+                        do {
+                            i = s.indexOf('*', i + 1)
+                            if (i < 0) return -1
+                        } while (i + 1 < limit && s[i + 1] != '/')
+                        i += 2
+                    }
+                    else -> return i
+                }
+            }
+            return -1
         }
     }
 
