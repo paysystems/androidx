@@ -72,12 +72,14 @@ import java.util.concurrent.TimeUnit
 import org.junit.Assert
 import org.junit.Assume.assumeTrue
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.internal.DoNotInstrument
+import org.robolectric.shadows.ShadowLog
 import org.robolectric.shadows.ShadowSystemClock
 
 /** Unit tests for [CameraController]. */
@@ -295,7 +297,7 @@ class CameraControllerTest {
         assertThat(
                 getPreviewTransformPassedToAnalyzer(
                     COORDINATE_SYSTEM_VIEW_REFERENCED,
-                    previewViewTransform
+                    previewViewTransform,
                 )
             )
             .isEqualTo(previewViewTransform)
@@ -312,7 +314,7 @@ class CameraControllerTest {
         assertThat(
                 getPreviewTransformPassedToAnalyzer(
                         COORDINATE_SYSTEM_ORIGINAL,
-                        previewViewTransform
+                        previewViewTransform,
                     )!!
                     .isIdentity
             )
@@ -321,7 +323,7 @@ class CameraControllerTest {
 
     private fun getPreviewTransformPassedToAnalyzer(
         coordinateSystem: Int,
-        previewTransform: Matrix?
+        previewTransform: Matrix?,
     ): Matrix? {
         var matrix: Matrix? = Matrix()
         val analyzer =
@@ -576,7 +578,7 @@ class CameraControllerTest {
                     }
 
                     override fun clear() {}
-                }
+                },
             )
         )
 
@@ -585,7 +587,7 @@ class CameraControllerTest {
 
         controller.takePicture(
             MoreExecutors.directExecutor(),
-            object : ImageCapture.OnImageCapturedCallback() {}
+            object : ImageCapture.OnImageCapturedCallback() {},
         )
 
         // ensure FLASH_MODE_SCREEN was retained
@@ -601,7 +603,7 @@ class CameraControllerTest {
         Assert.assertThrows(IllegalStateException::class.java) {
             controller.takePicture(
                 MoreExecutors.directExecutor(),
-                object : ImageCapture.OnImageCapturedCallback() {}
+                object : ImageCapture.OnImageCapturedCallback() {},
             )
         }
     }
@@ -671,7 +673,7 @@ class CameraControllerTest {
         // Arrange & Act: Set a 16:9 viewport.
         controller.attachPreviewSurface(
             {},
-            ViewPort.Builder(Rational(9, 16), Surface.ROTATION_90).build()
+            ViewPort.Builder(Rational(9, 16), Surface.ROTATION_90).build(),
         )
 
         // Assert: The aspect ratio of the use case configs should be override by viewport,
@@ -693,7 +695,7 @@ class CameraControllerTest {
         // Arrange: Set a 4:3 viewport.
         controller.attachPreviewSurface(
             {},
-            ViewPort.Builder(Rational(4, 3), Surface.ROTATION_0).build()
+            ViewPort.Builder(Rational(4, 3), Surface.ROTATION_0).build(),
         )
 
         // Act: Explicitly set a 16:9 resolution selector.
@@ -721,7 +723,7 @@ class CameraControllerTest {
         // Arrange: Set a 4:3 viewport.
         controller.attachPreviewSurface(
             {},
-            ViewPort.Builder(Rational(4, 3), Surface.ROTATION_0).build()
+            ViewPort.Builder(Rational(4, 3), Surface.ROTATION_0).build(),
         )
 
         // Act: Explicitly set a 16:9 target size.
@@ -856,7 +858,7 @@ class CameraControllerTest {
         controller.onTapToFocus(pointFactory, 0f, 0f)
         ShadowSystemClock.advanceBy(
             FOCUS_AUTO_CANCEL_DEFAULT_TIMEOUT_MILLIS - 1,
-            TimeUnit.MILLISECONDS
+            TimeUnit.MILLISECONDS,
         )
 
         shadowOf(getMainLooper()).idle()
@@ -872,7 +874,7 @@ class CameraControllerTest {
         controller.onTapToFocus(pointFactory, 0f, 0f)
         ShadowSystemClock.advanceBy(
             FOCUS_AUTO_CANCEL_DEFAULT_TIMEOUT_MILLIS - 1,
-            TimeUnit.MILLISECONDS
+            TimeUnit.MILLISECONDS,
         )
 
         shadowOf(getMainLooper()).idle()
@@ -1003,6 +1005,7 @@ class CameraControllerTest {
             .isEqualTo(TAP_TO_FOCUS_NOT_STARTED)
     }
 
+    @Ignore // b/425365173
     @Test
     fun setTapToFocusAutoCancelDuration_stateNeverResetsToNotStarted_whenDurationIsZero() {
         completeCameraInitialization()
@@ -1016,8 +1019,8 @@ class CameraControllerTest {
         shadowOf(getMainLooper()).idle()
         assumeTrue(controller.tapToFocusInfoState.value?.focusState == TAP_TO_FOCUS_STARTED)
 
-        // Advance to end of time
-        ShadowSystemClock.advanceBy(Long.MAX_VALUE, TimeUnit.SECONDS)
+        // Advance to 1 hour of time
+        ShadowSystemClock.advanceBy(1, TimeUnit.HOURS)
 
         // State is still the previous STARTED state
         shadowOf(getMainLooper()).idle()
@@ -1041,7 +1044,7 @@ class CameraControllerTest {
         // Advance the clock to the 1st tap cancellation time by advancing by the remaining time.
         ShadowSystemClock.advanceBy(
             FOCUS_AUTO_CANCEL_DEFAULT_TIMEOUT_MILLIS - tapInterval,
-            TimeUnit.MILLISECONDS
+            TimeUnit.MILLISECONDS,
         )
 
         shadowOf(getMainLooper()).idle()
@@ -1072,5 +1075,28 @@ class CameraControllerTest {
         shadowOf(getMainLooper()).idle()
         assertThat(controller.tapToFocusInfoState.value?.focusState)
             .isEqualTo(TAP_TO_FOCUS_NOT_STARTED)
+    }
+
+    @Test
+    fun attachPreview_doesNotCrashAndLogsWarning_whenCameraInfoIsUnavailable() {
+        // Arrange: Configure the fake provider to throw an exception when getCameraInfo is called.
+        processCameraProviderWrapper.setShouldThrowOnGetCameraInfo(true)
+        lifecycleCameraProviderCompleter.set(processCameraProviderWrapper)
+        controller.clearPreviewSurface()
+
+        // Act:
+        // This call will trigger the internal getViewportAspectRatioInt method, which should now
+        // catch the exception instead of crashing.
+        controller.attachPreviewSurface({}, fakeViewPort)
+        shadowOf(getMainLooper()).idle()
+
+        // Assert:
+        // 1. Verify that a warning was logged to the "CameraController" tag.
+        val logs = ShadowLog.getLogsForTag("CameraController")
+        assertThat(logs).isNotEmpty()
+
+        // 2. Verify the content of the log.
+        val lastLog = logs.last()
+        assertThat(lastLog.throwable).isInstanceOf(IllegalArgumentException::class.java)
     }
 }

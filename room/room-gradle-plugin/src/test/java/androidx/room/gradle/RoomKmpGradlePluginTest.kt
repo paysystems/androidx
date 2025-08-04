@@ -68,7 +68,7 @@ class RoomKmpGradlePluginTest {
             |  }
             |
             |  compilerOptions {
-            |    languageVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0
+            |    languageVersion = org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_1
             |  }
             |}
             |
@@ -116,7 +116,7 @@ class RoomKmpGradlePluginTest {
                 CLEAN_TASK,
                 ANDROID_COMPILE_TASK,
                 NATIVE_COMPILE_TASK,
-                projectDir = projectSetup.rootDir
+                projectSetup = projectSetup,
             )
             .let { result ->
                 result.assertTaskOutcome(ANDROID_COMPILE_TASK, TaskOutcome.SUCCESS)
@@ -141,31 +141,31 @@ class RoomKmpGradlePluginTest {
         setup(generateKotlin = "false")
 
         // Common should fail with Kotlin codegen off as there are JVM and Native targets from it
-        runGradle(COMMON_KSP_TASK, projectDir = projectSetup.rootDir, expectFailure = true).let {
-            result ->
+        runGradle(COMMON_KSP_TASK, projectSetup = projectSetup, expectFailure = true).let { result
+            ->
             assertThat(result.output)
                 .contains("Cannot generate Java targeting a non-Android platform")
             result.assertTaskOutcome(COMMON_KSP_TASK, TaskOutcome.FAILED)
         }
 
         // Native should fail with Kotlin codegen off
-        runGradle(NATIVE_COMPILE_TASK, projectDir = projectSetup.rootDir, expectFailure = true)
-            .let { result ->
-                assertThat(result.output)
-                    .contains("Cannot generate Java targeting a non-Android platform")
-                result.assertTaskOutcome(NATIVE_KSP_TASK, TaskOutcome.FAILED)
-            }
+        runGradle(NATIVE_COMPILE_TASK, projectSetup = projectSetup, expectFailure = true).let {
+            result ->
+            assertThat(result.output)
+                .contains("Cannot generate Java targeting a non-Android platform")
+            result.assertTaskOutcome(NATIVE_KSP_TASK, TaskOutcome.FAILED)
+        }
 
         // JVM should fail with Kotlin codegen off
-        runGradle(JVM_COMPILE_TASK, projectDir = projectSetup.rootDir, expectFailure = true).let {
-            result ->
+        runGradle(JVM_COMPILE_TASK, projectSetup = projectSetup, expectFailure = true).let { result
+            ->
             assertThat(result.output)
                 .contains("Cannot generate Java targeting a non-Android platform")
             result.assertTaskOutcome(JVM_KSP_TASK, TaskOutcome.FAILED)
         }
 
         // Android is OK when Kotlin codegen is off
-        runGradle(ANDROID_COMPILE_TASK, projectDir = projectSetup.rootDir, expectFailure = false)
+        runGradle(ANDROID_COMPILE_TASK, projectSetup = projectSetup, expectFailure = false)
             .assertTaskOutcome(ANDROID_KSP_TASK, TaskOutcome.SUCCESS)
     }
 
@@ -181,17 +181,16 @@ class RoomKmpGradlePluginTest {
                 @Query("SELECT * FROM NativeEntity")
                 fun blockingQuery(): NativeEntity
             """
-                    .trimIndent()
+                    .trimIndent(),
         )
 
-        runGradle(NATIVE_COMPILE_TASK, projectDir = projectSetup.rootDir, expectFailure = true)
-            .let { result ->
-                result.assertTaskOutcome(NATIVE_KSP_TASK, TaskOutcome.FAILED)
-                result.output.contains(
-                    "Only suspend functions are allowed in DAOs" +
-                        " declared in non-Android platforms."
-                )
-            }
+        runGradle(NATIVE_COMPILE_TASK, projectSetup = projectSetup, expectFailure = true).let {
+            result ->
+            result.assertTaskOutcome(NATIVE_KSP_TASK, TaskOutcome.FAILED)
+            result.output.contains(
+                "Only suspend functions are allowed in DAOs" + " declared in non-Android platforms."
+            )
+        }
     }
 
     @Test
@@ -206,17 +205,16 @@ class RoomKmpGradlePluginTest {
                 @Insert
                 fun blockingInsert(entity: NativeEntity)
             """
-                    .trimIndent()
+                    .trimIndent(),
         )
 
-        runGradle(NATIVE_COMPILE_TASK, projectDir = projectSetup.rootDir, expectFailure = true)
-            .let { result ->
-                result.assertTaskOutcome(NATIVE_KSP_TASK, TaskOutcome.FAILED)
-                result.output.contains(
-                    "Only suspend functions are allowed in DAOs" +
-                        " declared in non-Android platforms."
-                )
-            }
+        runGradle(NATIVE_COMPILE_TASK, projectSetup = projectSetup, expectFailure = true).let {
+            result ->
+            result.assertTaskOutcome(NATIVE_KSP_TASK, TaskOutcome.FAILED)
+            result.output.contains(
+                "Only suspend functions are allowed in DAOs" + " declared in non-Android platforms."
+            )
+        }
     }
 
     @Test
@@ -231,17 +229,16 @@ class RoomKmpGradlePluginTest {
                 @Transaction
                 fun blockingTransaction() { }
             """
-                    .trimIndent()
+                    .trimIndent(),
         )
 
-        runGradle(NATIVE_COMPILE_TASK, projectDir = projectSetup.rootDir, expectFailure = true)
-            .let { result ->
-                result.assertTaskOutcome(NATIVE_KSP_TASK, TaskOutcome.FAILED)
-                result.output.contains(
-                    "Only suspend functions are allowed in DAOs" +
-                        " declared in non-Android platforms."
-                )
-            }
+        runGradle(NATIVE_COMPILE_TASK, projectSetup = projectSetup, expectFailure = true).let {
+            result ->
+            result.assertTaskOutcome(NATIVE_KSP_TASK, TaskOutcome.FAILED)
+            result.output.contains(
+                "Only suspend functions are allowed in DAOs" + " declared in non-Android platforms."
+            )
+        }
     }
 
     companion object {

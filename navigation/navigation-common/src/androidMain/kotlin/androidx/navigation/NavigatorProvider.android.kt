@@ -25,7 +25,7 @@ import androidx.annotation.RestrictTo
 import kotlin.reflect.KClass
 
 @SuppressLint("TypeParameterUnusedInFormals")
-public actual open class NavigatorProvider {
+public actual open class NavigatorProvider actual constructor() {
     private val _navigators: MutableMap<String, Navigator<out NavDestination>> = mutableMapOf()
     @get:RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
     public actual val navigators: Map<String, Navigator<out NavDestination>>
@@ -70,7 +70,7 @@ public actual open class NavigatorProvider {
     @CallSuper
     public actual open fun addNavigator(
         name: String,
-        navigator: Navigator<out NavDestination>
+        navigator: Navigator<out NavDestination>,
     ): Navigator<out NavDestination>? {
         require(validateName(name)) { "navigator name cannot be an empty string" }
         val previousNavigator = _navigators[name]

@@ -47,6 +47,9 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 
+internal const val THROW_TIMEOUT_EXCEPTION = 1
+internal const val LOG_TIMEOUT_EXCEPTION = 2
+
 internal class ConnectionPoolImpl : ConnectionPool {
     private val driver: SQLiteDriver
     private val readers: Pool
@@ -63,7 +66,7 @@ internal class ConnectionPoolImpl : ConnectionPool {
     // to the busy handler.
     // TODO(b/404380974): Allow public configuration
     internal var timeout = 30.seconds
-    internal var throwOnTimeout = false
+    internal var onTimeout = LOG_TIMEOUT_EXCEPTION
 
     constructor(driver: SQLiteDriver, fileName: String) {
         this.driver = driver
@@ -88,7 +91,7 @@ internal class ConnectionPoolImpl : ConnectionPool {
                         // Enforce to be read only (might be disabled by a YOLO developer)
                         newConnection.execSQL("PRAGMA query_only = 1")
                     }
-                }
+                },
             )
         this.writers =
             Pool(capacity = maxNumOfWriters, connectionFactory = { driver.open(fileName) })
@@ -96,7 +99,7 @@ internal class ConnectionPoolImpl : ConnectionPool {
 
     override suspend fun <R> useConnection(
         isReadOnly: Boolean,
-        block: suspend (Transactor) -> R
+        block: suspend (Transactor) -> R,
     ): R {
         if (isClosed) {
             throwSQLiteException(SQLITE_MISUSE, "Connection pool is closed")
@@ -107,7 +110,7 @@ internal class ConnectionPoolImpl : ConnectionPool {
             if (!isReadOnly && confinedConnection.isReadOnly) {
                 throwSQLiteException(
                     SQLITE_ERROR,
-                    "Cannot upgrade connection from reader to writer"
+                    "Cannot upgrade connection from reader to writer",
                 )
             }
             return if (coroutineContext[ConnectionElement] == null) {
@@ -151,8 +154,8 @@ internal class ConnectionPoolImpl : ConnectionPool {
                     usedConnection.delegate.markReleased()
                     pool.recycle(usedConnection.delegate)
                 }
-            } catch (error: Throwable) {
-                exception?.addSuppressed(error)
+            } catch (recycleException: Throwable) {
+                exception?.addSuppressed(recycleException) ?: throw recycleException
             }
         }
         return result
@@ -174,10 +177,9 @@ internal class ConnectionPoolImpl : ConnectionPool {
         try {
             throwSQLiteException(SQLITE_BUSY, message)
         } catch (ex: SQLiteException) {
-            if (throwOnTimeout) {
-                throw ex
-            } else {
-                ex.printStackTrace()
+            when (onTimeout) {
+                THROW_TIMEOUT_EXCEPTION -> throw ex
+                LOG_TIMEOUT_EXCEPTION -> ex.printStackTrace()
             }
         }
     }
@@ -278,9 +280,7 @@ private class Pool(val capacity: Int, val connectionFactory: () -> SQLiteConnect
             builder.append("\t" + super.toString() + " (")
             builder.append("capacity=$capacity, ")
             builder.append("permits=${connectionPermits.availablePermits}, ")
-            builder.append(
-                "queue=(size=${availableQueue.size})[${availableQueue.joinToString()}], "
-            )
+            builder.append("queue=(size=${availableQueue.size})[${availableQueue.joinToString()}]")
             builder.appendLine(")")
             connections.forEachIndexed { index, connection ->
                 builder.appendLine("\t\t[${index + 1}] - ${connection?.toString()}")
@@ -291,7 +291,7 @@ private class Pool(val capacity: Int, val connectionFactory: () -> SQLiteConnect
 
 private class ConnectionWithLock(
     private val delegate: SQLiteConnection,
-    private val lock: Mutex = Mutex()
+    private val lock: Mutex = Mutex(),
 ) : SQLiteConnection by delegate, Mutex by lock {
 
     private var acquireCoroutineContext: CoroutineContext? = null
@@ -343,10 +343,8 @@ private class ConnectionElement(val connectionWrapper: PooledConnectionImpl) :
  * statement and using it is serialized as to prevent a coroutine from concurrently using the
  * statement between multiple different threads.
  */
-private class PooledConnectionImpl(
-    val delegate: ConnectionWithLock,
-    val isReadOnly: Boolean,
-) : Transactor, RawConnectionAccessor {
+private class PooledConnectionImpl(val delegate: ConnectionWithLock, val isReadOnly: Boolean) :
+    Transactor, RawConnectionAccessor {
     private val transactionStack = ArrayDeque<TransactionItem>()
 
     private val _isRecycled = AtomicBoolean(false)
@@ -365,32 +363,26 @@ private class PooledConnectionImpl(
 
     override suspend fun <R> withTransaction(
         type: SQLiteTransactionType,
-        block: suspend TransactionScope<R>.() -> R
+        block: suspend TransactionScope<R>.() -> R,
     ): R = withStateCheck { transaction(type, block) }
 
     override suspend fun inTransaction(): Boolean = withStateCheck {
-        return transactionStack.isNotEmpty()
+        return transactionStack.isNotEmpty() || delegate.inTransaction()
     }
 
     fun markRecycled() {
         if (_isRecycled.compareAndSet(expect = false, update = true)) {
             // Perform a rollback in case there is an active transaction so that the connection
-            // is in a clean state when it is recycled. We don't know for sure if there is an
-            // unfinished transaction, hence we always try the rollback.
-            // TODO(b/319627988): Try to *really* check if there is an active transaction with the
-            //     C APIs sqlite3_txn_state or sqlite3_get_autocommit and possibly throw an error
-            //     if there is an unfinished transaction.
-            try {
+            // is in a clean state when it is recycled.
+            if (delegate.inTransaction()) {
                 delegate.execSQL("ROLLBACK TRANSACTION")
-            } catch (_: SQLiteException) {
-                // ignored
             }
         }
     }
 
     private suspend fun <R> transaction(
         type: SQLiteTransactionType?,
-        block: suspend TransactionScope<R>.() -> R
+        block: suspend TransactionScope<R>.() -> R,
     ): R {
         beginTransaction(type ?: SQLiteTransactionType.DEFERRED)
         var success = true
@@ -402,7 +394,8 @@ private class PooledConnectionImpl(
             if (ex is ConnectionPool.RollbackException) {
                 // Type arguments in exception subclasses is not allowed but the exception is always
                 // created with the correct type.
-                @Suppress("UNCHECKED_CAST") return (ex.result as R)
+                @Suppress("UNCHECKED_CAST")
+                return (ex.result as R)
             } else {
                 exception = ex
                 throw ex
@@ -485,15 +478,13 @@ private class PooledConnectionImpl(
         if (connectionElement == null || connectionElement.connectionWrapper !== this) {
             throwSQLiteException(
                 SQLITE_MISUSE,
-                "Attempted to use connection on a different coroutine"
+                "Attempted to use connection on a different coroutine",
             )
         }
         return block.invoke()
     }
 
-    private inner class StatementWrapper(
-        private val delegate: SQLiteStatement,
-    ) : SQLiteStatement {
+    private inner class StatementWrapper(private val delegate: SQLiteStatement) : SQLiteStatement {
 
         private val threadId = currentThreadId()
 
@@ -546,7 +537,7 @@ private class PooledConnectionImpl(
             if (threadId != currentThreadId()) {
                 throwSQLiteException(
                     SQLITE_MISUSE,
-                    "Attempted to use statement on a different thread"
+                    "Attempted to use statement on a different thread",
                 )
             }
             return block.invoke()

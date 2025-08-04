@@ -1,6 +1,6 @@
 package com.testdata
 
-import androidx.appfunctions.AppFunction
+import androidx.appfunctions.service.AppFunction
 import androidx.appfunctions.AppFunctionContext
 import androidx.appfunctions.AppFunctionSerializable
 
@@ -11,19 +11,31 @@ class SerializableInputFunctions {
     @AppFunction
     fun simpleFunctionSerializableList(
         appFunctionContext: AppFunctionContext,
-        serializable: List<SampleSerializable>
+        serializable: List<SampleSerializable>,
     ) {}
 
     @AppFunction
     fun simpleFunctionNullableSerializableList(
         appFunctionContext: AppFunctionContext,
-        serializable: List<SampleSerializable>?
+        serializable: List<SampleSerializable>?,
     ) {}
 
     @AppFunction
     fun simpleFunctionNullableSerializable(
         appFunctionContext: AppFunctionContext,
-        serializable: SampleSerializable?
+        serializable: SampleSerializable?,
+    ) {}
+
+    @AppFunction
+    fun simpleFunctionSerializableListItemNullable(
+        appFunctionContext: AppFunctionContext,
+        serializable: List<SampleSerializable?>,
+    ) {}
+
+    @AppFunction
+    fun simpleFunctionBothSerializableListAndListItemNullable(
+        appFunctionContext: AppFunctionContext,
+        serializable: List<SampleSerializable?>?,
     ) {}
 }
 

@@ -19,7 +19,7 @@ package androidx.appfunctions.compiler.processors
 import androidx.appfunctions.compiler.AppFunctionCompiler
 import androidx.appfunctions.compiler.AppFunctionCompilerOptions
 import androidx.appfunctions.compiler.core.AppFunctionSymbolResolver
-import androidx.appfunctions.compiler.core.IntrospectionHelper.APP_FUNCTIONS_INTERNAL_PACKAGE_NAME
+import androidx.appfunctions.compiler.core.IntrospectionHelper.APP_FUNCTIONS_SERVICE_INTERNAL_PACKAGE_NAME
 import androidx.appfunctions.compiler.core.IntrospectionHelper.APP_FUNCTION_INVENTORY_CLASS
 import androidx.appfunctions.compiler.core.IntrospectionHelper.AggregatedAppFunctionInventoryClass
 import androidx.appfunctions.compiler.core.IntrospectionHelper.AggregatedAppFunctionInvokerClass
@@ -69,6 +69,7 @@ class AppFunctionAggregateProcessor(
 
         generateAggregatedAppFunctionInventory(resolver)
         generateAggregatedAppFunctionInvoker(resolver)
+        generateAggregatedIndexXml(resolver)
 
         hasProcessed = true
         return emptyList()
@@ -86,7 +87,10 @@ class AppFunctionAggregateProcessor(
         aggregatedInventoryClassBuilder.addProperty(buildInventoriesProperty(generatedInventories))
 
         val fileSpec =
-            FileSpec.builder(APP_FUNCTIONS_INTERNAL_PACKAGE_NAME, aggregatedInventoryClassName)
+            FileSpec.builder(
+                    APP_FUNCTIONS_SERVICE_INTERNAL_PACKAGE_NAME,
+                    aggregatedInventoryClassName,
+                )
                 .addType(aggregatedInventoryClassBuilder.build())
                 .build()
 
@@ -94,8 +98,8 @@ class AppFunctionAggregateProcessor(
             .createNewFile(
                 // TODO: Collect all AppFunction files as source files set
                 Dependencies.ALL_FILES,
-                APP_FUNCTIONS_INTERNAL_PACKAGE_NAME,
-                aggregatedInventoryClassName
+                APP_FUNCTIONS_SERVICE_INTERNAL_PACKAGE_NAME,
+                aggregatedInventoryClassName,
             )
             .bufferedWriter()
             .use { fileSpec.writeTo(it) }
@@ -106,7 +110,7 @@ class AppFunctionAggregateProcessor(
     ): PropertySpec {
         return PropertySpec.builder(
                 AggregatedAppFunctionInventoryClass.PROPERTY_INVENTORIES_NAME,
-                List::class.asClassName().parameterizedBy(APP_FUNCTION_INVENTORY_CLASS)
+                List::class.asClassName().parameterizedBy(APP_FUNCTION_INVENTORY_CLASS),
             )
             .addModifiers(KModifier.OVERRIDE)
             .initializer(
@@ -135,7 +139,10 @@ class AppFunctionAggregateProcessor(
         aggregatedInvokerClassBuilder.addProperty(buildInvokersProperty(generatedInvokers))
 
         val fileSpec =
-            FileSpec.builder(APP_FUNCTIONS_INTERNAL_PACKAGE_NAME, aggregatedInvokerClassName)
+            FileSpec.builder(
+                    APP_FUNCTIONS_SERVICE_INTERNAL_PACKAGE_NAME,
+                    aggregatedInvokerClassName,
+                )
                 .addType(aggregatedInvokerClassBuilder.build())
                 .build()
 
@@ -143,8 +150,8 @@ class AppFunctionAggregateProcessor(
             .createNewFile(
                 // TODO: Collect all AppFunction files as source files set
                 Dependencies.ALL_FILES,
-                APP_FUNCTIONS_INTERNAL_PACKAGE_NAME,
-                aggregatedInvokerClassName
+                APP_FUNCTIONS_SERVICE_INTERNAL_PACKAGE_NAME,
+                aggregatedInvokerClassName,
             )
             .bufferedWriter()
             .use { fileSpec.writeTo(it) }
@@ -153,7 +160,7 @@ class AppFunctionAggregateProcessor(
     private fun buildInvokersProperty(generatedInvokers: List<KSClassDeclaration>): PropertySpec {
         return PropertySpec.builder(
                 AggregatedAppFunctionInvokerClass.PROPERTY_INVOKERS_NAME,
-                List::class.asClassName().parameterizedBy(AppFunctionInvokerClass.CLASS_NAME)
+                List::class.asClassName().parameterizedBy(AppFunctionInvokerClass.CLASS_NAME),
             )
             .addModifiers(KModifier.OVERRIDE)
             .initializer(
@@ -168,6 +175,17 @@ class AppFunctionAggregateProcessor(
                 }
             )
             .build()
+    }
+
+    private fun generateAggregatedIndexXml(resolver: Resolver) {
+        // We generate both XML formats supported by old and new AppSearch indexer respectively
+        // as it can't be guaranteed that the device will have the latest version of AppSearch.
+        // TODO: Add compiler option to disable legacy xml generator.
+        val legacyIndexProcessor = AppFunctionLegacyIndexXmlProcessor(codeGenerator)
+        legacyIndexProcessor.process(resolver)
+
+        val indexProcessor = AppFunctionIndexXmlProcessor(codeGenerator)
+        indexProcessor.process(resolver)
     }
 
     private fun shouldProcess(resolver: Resolver): Boolean {

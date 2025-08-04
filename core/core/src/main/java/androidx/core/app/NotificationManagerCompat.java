@@ -101,12 +101,6 @@ public final class NotificationManagerCompat {
     public static final String ACTION_BIND_SIDE_CHANNEL =
             "android.support.BIND_NOTIFICATION_SIDE_CHANNEL";
 
-    /**
-     * Maximum sdk build version which needs support for side channeled notifications.
-     * Currently the only needed use is for side channeling group children before KITKAT_WATCH.
-     */
-    static final int MAX_SIDE_CHANNEL_SDK_VERSION = 19;
-
     /** Base time delay for a side channel listener queue retry. */
     private static final int SIDE_CHANNEL_RETRY_BASE_INTERVAL_MS = 1000;
     /** Maximum retries for a side channel listener before dropping tasks. */
@@ -246,17 +240,11 @@ public final class NotificationManagerCompat {
      */
     public void cancel(@Nullable String tag, int id) {
         mNotificationManager.cancel(tag, id);
-        if (Build.VERSION.SDK_INT <= MAX_SIDE_CHANNEL_SDK_VERSION) {
-            pushSideChannelQueue(new CancelTask(mContext.getPackageName(), id, tag));
-        }
     }
 
     /** Cancel all previously shown notifications. */
     public void cancelAll() {
         mNotificationManager.cancelAll();
-        if (Build.VERSION.SDK_INT <= MAX_SIDE_CHANNEL_SDK_VERSION) {
-            pushSideChannelQueue(new CancelTask(mContext.getPackageName()));
-        }
     }
 
     /**
@@ -831,6 +819,22 @@ public final class NotificationManagerCompat {
         return Api34Impl.canUseFullScreenIntent(mNotificationManager);
     }
 
+     /**
+     * Returns whether the calling app's properly formatted notifications can appear in a promoted
+     * format, which may result in higher ranking, appearances on additional surfaces, and richer
+     * presentation.
+     *
+     * Apps can request this permission by sending the user to the activity that matches the system
+     * intent action {@link android.provider.Settings#ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS}.
+     */
+    public boolean canPostPromotedNotifications() {
+        if (Build.VERSION.SDK_INT >= 36) {
+            return Api36Impl.canPostPromotedNotifications(mNotificationManager);
+        } else {
+            return false;
+        }
+    }
+
     /**
      * Returns true if this notification should use the side channel for delivery.
      */
@@ -1377,6 +1381,20 @@ public final class NotificationManagerCompat {
 
         static boolean canUseFullScreenIntent(NotificationManager notificationManager) {
             return notificationManager.canUseFullScreenIntent();
+        }
+    }
+    /**
+     * A class for wrapping calls to {@link Notification.Builder} methods which
+     * were added in API 36; these calls must be wrapped to avoid performance issues.
+     * See the UnsafeNewApiCall lint rule for more details.
+     */
+    @RequiresApi(36)
+    static class Api36Impl {
+        private Api36Impl() { }
+
+        static boolean canPostPromotedNotifications(
+            @NonNull NotificationManager notificationManager) {
+            return notificationManager.canPostPromotedNotifications();
         }
     }
 }

@@ -22,20 +22,21 @@
  * modifying its settings.
  */
 
-
 import androidx.build.KotlinTarget
 import androidx.build.SoftwareType
 import androidx.build.PlatformIdentifier
+import com.android.build.api.dsl.KotlinMultiplatformAndroidHostTestCompilation
+import com.android.build.gradle.internal.lint.AndroidLintAnalysisTask
+import com.android.build.gradle.internal.lint.LintModelWriterTask
+import com.google.devtools.ksp.gradle.KspAATask
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.konan.target.Family
 
 plugins {
     id("AndroidXPlugin")
-    id("com.android.library")
     id("androidx.stableaidl")
     id("com.google.devtools.ksp")
 }
-
 
 configurations {
     // Configuration for resolving shared archive file of androidx's SQLite compilation
@@ -48,29 +49,31 @@ configurations {
     }
 }
 
-android {
-    sourceSets {
-        main {
-            // Align AGP main source set root with KMP
-            root = 'src/androidMain'
+
+androidXMultiplatform {
+    androidLibrary {
+        withJava()
+        namespace = "androidx.room"
+        optimization {
+            it.consumerKeepRules.publish = true
+            it.consumerKeepRules.files.add(
+                    new File(project.projectDir, "src/androidMain/proguard-rules.pro")
+            )
         }
-    }
-    buildFeatures {
-        aidl = true
-    }
-    buildTypes.configureEach {
-        consumerProguardFiles("src/androidMain/proguard-rules.pro")
         stableAidl {
             version = 1
         }
-    }
-    namespace = "androidx.room"
-    // TODO(b/345531033)
-    experimentalProperties["android.lint.useK2Uast"] = false
-}
+        compilations.withType(KotlinMultiplatformAndroidHostTestCompilation) {
+            it.returnDefaultValues = true
+        }
 
-androidXMultiplatform {
-    androidTarget()
+        // Needed for api tasks and docs generation
+        sourceSets {
+            androidMain {
+                kotlin.srcDirs += 'src/androidMain/java'
+            }
+        }
+    }
     ios() {
         // Link to sqlite3 available in iOS
         binaries.configureEach {
@@ -80,6 +83,8 @@ androidXMultiplatform {
     jvm()
     linux()
     mac()
+    tvos()
+    watchos()
 
     defaultPlatform(PlatformIdentifier.ANDROID)
 
@@ -106,9 +111,9 @@ androidXMultiplatform {
             dependencies {
                 api(libs.kotlinStdlib)
                 api(project(":room:room-common"))
-                api("androidx.sqlite:sqlite:2.5.1")
-                api("androidx.collection:collection:1.4.2")
-                api("androidx.annotation:annotation:1.8.1")
+                api(project(":sqlite:sqlite"))
+                api("androidx.collection:collection:1.5.0")
+                api("androidx.annotation:annotation:1.9.1")
                 api(libs.kotlinCoroutinesCore)
             }
         }
@@ -132,7 +137,7 @@ androidXMultiplatform {
         jvmTest {
             dependsOn(commonTest)
             dependencies {
-                implementation("androidx.sqlite:sqlite-bundled:2.5.1")
+                implementation(project(":sqlite:sqlite-bundled"))
                 implementation(libs.kotlinTestJunit)
             }
         }
@@ -140,12 +145,12 @@ androidXMultiplatform {
             dependsOn(jvmAndroidMain)
             dependencies {
                 api(libs.jspecify)
-                api("androidx.sqlite:sqlite-framework:2.5.1")
+                api(project(":sqlite:sqlite-framework"))
                 api(libs.kotlinCoroutinesAndroid)
                 implementation("androidx.arch.core:core-runtime:2.2.0")
                 compileOnly("androidx.lifecycle:lifecycle-livedata-core:2.0.0")
                 compileOnly("androidx.paging:paging-common:2.0.0")
-                implementation("androidx.annotation:annotation-experimental:1.4.1")
+                implementation("androidx.annotation:annotation-experimental:1.5.0")
             }
         }
         androidUnitTest {
@@ -163,7 +168,7 @@ androidXMultiplatform {
         androidInstrumentedTest {
             dependsOn(commonTest)
             dependencies {
-                implementation("androidx.sqlite:sqlite-bundled:2.5.1")
+                implementation(project(":sqlite:sqlite-bundled"))
                 implementation(libs.junit)
                 implementation(libs.testExtJunit)
                 implementation(libs.testCore)
@@ -179,14 +184,14 @@ androidXMultiplatform {
         nativeMain {
             dependsOn(jvmNativeMain)
             dependencies {
-                api("androidx.sqlite:sqlite-framework:2.5.1")
+                api(project(":sqlite:sqlite-framework"))
                 implementation(libs.atomicFu)
             }
         }
         nativeTest {
             dependsOn(commonTest)
             dependencies {
-                implementation("androidx.sqlite:sqlite-bundled:2.5.1")
+                implementation(project(":sqlite:sqlite-bundled"))
                 implementation(libs.okio)
             }
         }
@@ -217,7 +222,7 @@ androidXMultiplatform {
 dependencies {
     lintChecks(project(":room:room-runtime-lint"))
     sqliteSharedArchive(project(":sqlite:sqlite-bundled"))
-    add("kspAndroidAndroidTest", project(":room:room-compiler"))
+    add("kspAndroidInstrumentedTest", project(":room:room-compiler"))
 }
 
 androidx {
@@ -225,11 +230,17 @@ androidx {
     type = SoftwareType.PUBLISHED_LIBRARY
     inceptionYear = "2017"
     description = "Android Room-Runtime"
-    legacyDisableKotlinStrictApiMode = true
-    metalavaK2UastEnabled = false
-    kotlinTarget = KotlinTarget.KOTLIN_2_0
+    kotlinTarget = KotlinTarget.KOTLIN_2_1
 }
 
-ksp {
-    useKsp2 = true
+// TODO(https://github.com/google/ksp/issues/2250) Remove when KSP migrates to the new variants API
+// Without this, dependency introduced between lintAnalyzeAndroidInstrumentedTest and kspAndroidInstrumentedTest
+tasks.withType(AndroidLintAnalysisTask).configureEach {
+    mustRunAfter(tasks.withType(KspAATask))
+}
+
+// TODO(https://github.com/google/ksp/issues/2250) Remove when KSP migrates to the new variants API
+// Without this, dependency introduced between lintAnalyzeAndroidInstrumentedTest and kspAndroidInstrumentedTest
+tasks.withType(LintModelWriterTask).configureEach {
+    mustRunAfter(tasks.withType(KspAATask))
 }

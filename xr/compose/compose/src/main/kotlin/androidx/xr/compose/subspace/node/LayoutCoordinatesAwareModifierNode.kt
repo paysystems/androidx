@@ -21,6 +21,8 @@ import androidx.xr.compose.subspace.layout.SubspaceLayoutCoordinates
 /**
  * A [SubspaceModifier.Node] whose [onLayoutCoordinates] callback is invoked when the layout
  * coordinates of the layout node may have changed.
+ *
+ * @see SubspaceModifier#onGloballyPositioned
  */
 public interface LayoutCoordinatesAwareModifierNode {
     /**

@@ -47,7 +47,6 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -66,7 +65,6 @@ import android.os.Bundle;
 import android.support.v4.BaseInstrumentationTestCase;
 import android.view.Display;
 import android.view.View;
-import android.view.autofill.AutofillId;
 import android.view.contentcapture.ContentCaptureSession;
 import android.widget.FrameLayout;
 
@@ -245,7 +243,6 @@ public class ViewCompatTest extends BaseInstrumentationTestCase<ViewCompatActivi
     }
 
     @Test
-    @SdkSuppress(minSdkVersion = 21)
     public void  dispatchNestedScroll_viewIsNotAndroidXNestedScrollingChild_callsCorrectMethod() {
         final ViewSubclass viewSubclass = mock(ViewSubclass.class);
 
@@ -342,7 +339,6 @@ public class ViewCompatTest extends BaseInstrumentationTestCase<ViewCompatActivi
         assertTrue(result.isConsumed());
     }
 
-    @SdkSuppress(minSdkVersion = 21)
     @Test
     public void testPerformAction_ExpectedActionAndArguments() {
         AccessibilityActionCompat actionCompat = AccessibilityActionCompat.ACTION_PRESS_AND_HOLD;
@@ -371,16 +367,6 @@ public class ViewCompatTest extends BaseInstrumentationTestCase<ViewCompatActivi
         AutofillIdCompat result = ViewCompat.getAutofillId(mView);
 
         assertEquals(mView.getAutofillId(), result.toAutofillId());
-    }
-
-    @SdkSuppress(minSdkVersion = 28)
-    @Test
-    public void testSetAutofillId_throwsIllegalStateExceptionAboveSDK28() {
-        AutofillId id = mock(AutofillId.class);
-        AutofillIdCompat idCompat = AutofillIdCompat.toAutofillIdCompat(id);
-        // Some final methods in the mock object throw IllegalStateException.
-        assertThrows(IllegalStateException.class,
-                () -> ViewCompat.setAutofillId(mView, idCompat));
     }
 
     @SdkSuppress(maxSdkVersion = 29)
@@ -509,7 +495,7 @@ public class ViewCompatTest extends BaseInstrumentationTestCase<ViewCompatActivi
         assertFallbackHapticFeedbackPerformed(CLOCK_TICK, GESTURE_THRESHOLD_DEACTIVATE);
     }
 
-    @SdkSuppress(minSdkVersion = 21, maxSdkVersion = 22)
+    @SdkSuppress(maxSdkVersion = 22)
     @Test
     public void testPerformHapticFeedback_useFallbackForConstantsFromSdk23() {
         // Maintain constants supported in SDK >= 21

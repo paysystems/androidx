@@ -28,13 +28,13 @@ plugins {
     id("com.android.library")
     id("androidx.stableaidl")
     id("org.jetbrains.kotlin.android")
-    id("kotlin-android")
 }
 
 dependencies {
     api(libs.kotlinStdlib)
     api(project(":pdf:pdf-viewer"))
     api("androidx.core:core:1.13.1")
+    implementation(libs.gson)
 
     androidTestImplementation(libs.testExtJunit)
     androidTestImplementation(libs.junit)
@@ -54,7 +54,8 @@ android {
 
     defaultConfig {
         minSdk = 31
-        compileSdk = 35
+        compileSdk = 36
+        compileSdkExtension = 18
     }
 
     buildFeatures.aidl = true
@@ -64,9 +65,6 @@ android {
             version = 1
         }
     }
-
-    // Use Robolectric 4.+
-    testOptions.unitTests.includeAndroidResources = true
 }
 
 androidx {

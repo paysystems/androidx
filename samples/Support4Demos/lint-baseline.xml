@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<issues format="6" by="lint 8.8.0-alpha06" type="baseline" client="gradle" dependencies="false" name="AGP (8.8.0-alpha06)" variant="all" version="8.8.0-alpha06">
+<issues format="6" by="lint 8.13.0-alpha01" type="baseline" client="gradle" dependencies="false" name="AGP (8.13.0-alpha01)" variant="all" version="8.13.0-alpha01">
 
     <issue
         id="MissingPermission"
@@ -152,24 +152,6 @@
         errorLine2="                                                        ~">
         <location
             file="src/main/java/com/example/android/supportv4/app/FragmentReceiveResultSupport.java"/>
-    </issue>
-
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is always >= 21"
-        errorLine1="@RequiresApi(21)"
-        errorLine2="~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/example/android/supportv4/view/WindowInsetsControllerPlayground.kt"/>
-    </issue>
-
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is always >= 21"
-        errorLine1="        if (Build.VERSION.SDK_INT >= 21) {"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/example/android/supportv4/view/WindowInsetsPlayground.java"/>
     </issue>
 
     <issue
@@ -1926,8 +1908,8 @@
     <issue
         id="UnknownNullness"
         message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://developer.android.com/kotlin/interop#nullability_annotations"
-        errorLine1="        @Override public Loader&lt;List&lt;AppEntry>> onCreateLoader(int id, Bundle args) {"
-        errorLine2="                                                                       ~~~~~~">
+        errorLine1="        @Override public @NonNull Loader&lt;List&lt;AppEntry>> onCreateLoader(int id, Bundle args) {"
+        errorLine2="                                                                                ~~~~~~">
         <location
             file="src/main/java/com/example/android/supportv4/app/LoaderCustomSupport.java"/>
     </issue>
@@ -2160,8 +2142,8 @@
     <issue
         id="UnknownNullness"
         message="Unknown nullability; explicitly declare as `@Nullable` or `@NonNull` to improve Kotlin interoperability; see https://developer.android.com/kotlin/interop#nullability_annotations"
-        errorLine1="        public Loader&lt;Cursor> onCreateLoader(int id, Bundle args) {"
-        errorLine2="                                                     ~~~~~~">
+        errorLine1="        public @NonNull Loader&lt;Cursor> onCreateLoader(int id, Bundle args) {"
+        errorLine2="                                                              ~~~~~~">
         <location
             file="src/main/java/com/example/android/supportv4/app/LoaderThrottleSupport.java"/>
     </issue>

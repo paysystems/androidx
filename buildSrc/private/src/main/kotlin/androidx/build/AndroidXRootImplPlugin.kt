@@ -25,6 +25,7 @@ import androidx.build.gradle.isRoot
 import androidx.build.license.ValidateLicensesExistTask
 import androidx.build.logging.TERMINAL_RED
 import androidx.build.logging.TERMINAL_RESET
+import androidx.build.playground.ValidateIntegrationPatches
 import androidx.build.playground.VerifyPlaygroundGradleConfigurationTask
 import androidx.build.studio.StudioTask.Companion.registerStudioTask
 import androidx.build.testConfiguration.registerOwnersServiceTasks
@@ -49,7 +50,7 @@ import org.jetbrains.kotlin.gradle.targets.js.npm.tasks.KotlinNpmInstallTask
 
 abstract class AndroidXRootImplPlugin : Plugin<Project> {
     @get:Inject abstract val registry: BuildEventsListenerRegistry
-    @Suppress("UnstableApiUsage") @get:Inject abstract val buildFeatures: BuildFeatures
+    @get:Inject abstract val buildFeatures: BuildFeatures
 
     override fun apply(project: Project) {
         if (!project.isRoot) {
@@ -63,6 +64,7 @@ abstract class AndroidXRootImplPlugin : Plugin<Project> {
         tasks.register("listAndroidXProperties", ListAndroidXPropertiesTask::class.java)
         configureKtfmtCheckFile()
         maybeRegisterFilterableTask()
+        registerListAffectedProjectsTask()
 
         // If we're running inside Studio, validate the Android Gradle Plugin version.
         val expectedAgpVersion = System.getenv("EXPECTED_AGP_VERSION")
@@ -87,7 +89,7 @@ abstract class AndroidXRootImplPlugin : Plugin<Project> {
             if (!buildFeatures.isIsolatedProjectsEnabled()) {
                 tasks.register(
                     CREATE_AGGREGATE_BUILD_INFO_FILES_TASK,
-                    CreateAggregateLibraryBuildInfoFileTask::class.java
+                    CreateAggregateLibraryBuildInfoFileTask::class.java,
                 )
             } else null
 
@@ -139,9 +141,6 @@ abstract class AndroidXRootImplPlugin : Plugin<Project> {
             task.removePrefix(project.getCheckoutRoot().path)
         }
 
-        project.zipComposeCompilerMetrics()
-        project.zipComposeCompilerReports()
-
         TaskUpToDateValidator.setup(project, registry)
 
         /**
@@ -165,6 +164,10 @@ abstract class AndroidXRootImplPlugin : Plugin<Project> {
             it.baseline.set(layout.projectDirectory.file("license-baseline.txt"))
             it.cacheEvenIfNoOutputs()
         }
+
+        ValidateIntegrationPatches.createTask(project)
+
+        fetchDevelocityKeysIfNeeded()
     }
 
     private fun Project.configureTasksForKotlinWeb() {
@@ -172,7 +175,7 @@ abstract class AndroidXRootImplPlugin : Plugin<Project> {
             if (ProjectLayoutType.isPlayground(this)) {
                 project.file(
                     layout.buildDirectory.dir("javascript-for-playground").map {
-                        it.asFile.also { it.mkdirs() }
+                        it.asFile.also { file -> file.mkdirs() }
                     }
                 )
             } else {
@@ -181,7 +184,8 @@ abstract class AndroidXRootImplPlugin : Plugin<Project> {
         val createYarnRcFileTask =
             tasks.register("createYarnRcFile", CreateYarnRcFileTask::class.java) {
                 it.offlineMirrorStorage.set(offlineMirrorStorage)
-                it.yarnrcFile.set(layout.buildDirectory.file("js/.yarnrc"))
+                it.cacheStorage.set(layout.buildDirectory.dir("yarnCache"))
+                it.yarnrcFile.set(layout.buildDirectory.file(".yarnrc"))
             }
 
         tasks.withType<KotlinNpmInstallTask>().configureEach {

@@ -29,7 +29,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-@SdkSuppress(minSdkVersion = 21)
 @SmallTest
 class PersistableBundleTest {
     @Suppress("DEPRECATION")
@@ -46,7 +45,7 @@ class PersistableBundleTest {
                 "doubleArray" to doubleArrayOf(1.0, 2.0, 3.0),
                 "intArray" to intArrayOf(1, 2, 3),
                 "longArray" to longArrayOf(1L, 2L, 3L),
-                "stringArray" to arrayOf("hey")
+                "stringArray" to arrayOf("hey"),
             )
 
         assertEquals(10, bundle.size())
@@ -114,7 +113,7 @@ class PersistableBundleTest {
                 "doubleArray" to doubleArrayOf(1.0, 2.0, 3.0),
                 "intArray" to intArrayOf(1, 2, 3),
                 "longArray" to longArrayOf(1L, 2L, 3L),
-                "stringArray" to arrayOf("hey")
+                "stringArray" to arrayOf("hey"),
             )
         val bundle = map.toPersistableBundle()
 

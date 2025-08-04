@@ -76,7 +76,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         fun ThrowableSubject<SQLiteException>.assertMsg() {
             hasMessageThat()
@@ -108,7 +108,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         var count = 0
         pool.useReaderConnection { initialConnection ->
@@ -133,7 +133,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         var count = 0
         pool.useReaderConnection { initialConnection ->
@@ -163,7 +163,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         var count = 0
         pool.useReaderConnection { initialConnection ->
@@ -193,7 +193,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         var count = 0
         pool.useReaderConnection { initialConnection ->
@@ -220,7 +220,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         pool.useReaderConnection {
             assertThrows<SQLiteException> { pool.useWriterConnection {} }
@@ -251,7 +251,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         assertThrows<SQLiteException> { pool.useWriterConnection {} }
             .hasMessageThat()
@@ -277,7 +277,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         var leakedConnection: PooledConnection? = null
         pool.useReaderConnection { leakedConnection = it }
@@ -295,7 +295,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         var leakedRawStatement: SQLiteStatement? = null
         pool.useReaderConnection { connection ->
@@ -315,7 +315,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         pool.close()
         assertThrows<SQLiteException> { pool.useWriterConnection {} }
@@ -331,7 +331,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         pool.close()
         pool.close()
@@ -346,7 +346,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         pool.useReaderConnection { connection ->
             launch(singleThreadContext) {
@@ -371,7 +371,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         var leakedContext: CoroutineContext? = null
         var leakedConnection: PooledConnection? = null
@@ -408,7 +408,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         pool.useReaderConnection { connection ->
             connection.usePrepared("SELECT * FROM Pet") { statement ->
@@ -458,7 +458,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         var count = 0
         pool.useReaderConnection { connection ->
@@ -534,7 +534,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 4,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         repeat(5) {
             pool.useReaderConnection { connection ->
@@ -560,7 +560,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         val coroutineStartedMutex = Mutex(locked = true)
         var acquiredSecondConnection = false
@@ -589,7 +589,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         // This stress test is very non-deterministic, on purpose. It launches three coroutines, two
         // of them attempt to use the connection, but one of the coroutines is canceled shortly
@@ -628,10 +628,10 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         check(pool is ConnectionPoolImpl)
-        pool.throwOnTimeout = true
+        pool.onTimeout = THROW_TIMEOUT_EXCEPTION
         val coroutineStartedMutex = Mutex(locked = true)
         var acquiredSecondConnection = false
         val testContext = coroutineContext
@@ -669,18 +669,28 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         check(pool is ConnectionPoolImpl)
-        pool.throwOnTimeout = true
+        pool.onTimeout = THROW_TIMEOUT_EXCEPTION
         pool.timeout = 100.milliseconds
 
-        val barrier = CompletableDeferred<Unit>()
-        val busyJob = launch(multiThreadContext) { pool.useReaderConnection { barrier.await() } }
+        val firstBarrier = CompletableDeferred<Unit>()
+        val secondBarrier = CompletableDeferred<Unit>()
+        val busyJob =
+            launch(multiThreadContext) {
+                pool.useReaderConnection {
+                    firstBarrier.complete(Unit)
+                    secondBarrier.await()
+                }
+            }
 
         val timeoutJob =
             launch(multiThreadContext) {
-                assertThrows<SQLiteException> { pool.useReaderConnection {} }
+                assertThrows<SQLiteException> {
+                        firstBarrier.await()
+                        pool.useReaderConnection {}
+                    }
                     .hasMessageThat()
                     .contains(
                         "Error code: 5, message: Timed out attempting to acquire a reader connection"
@@ -688,7 +698,7 @@ abstract class BaseConnectionPoolTest {
             }
 
         timeoutJob.join()
-        barrier.complete(Unit)
+        secondBarrier.complete(Unit)
         busyJob.join()
 
         pool.useReaderConnection {
@@ -711,7 +721,7 @@ abstract class BaseConnectionPoolTest {
                 maxNumOfWriters = 1,
             )
         check(pool is ConnectionPoolImpl)
-        pool.throwOnTimeout = false
+        pool.onTimeout = 0 // do nothing
         pool.timeout = 100.milliseconds
 
         val items = mutableListOf<String>()
@@ -742,11 +752,16 @@ abstract class BaseConnectionPoolTest {
                 override fun open(fileName: String): SQLiteConnection {
                     openedConnections.incrementAndGet()
                     return object : SQLiteConnection {
+
+                        override fun inTransaction() = false
+
                         override fun prepare(sql: String): SQLiteStatement {
                             return FakeSQLiteStatement()
                         }
 
-                        override fun close() {}
+                        override fun close() {
+                            openedConnections.decrementAndGet()
+                        }
                     }
                 }
             }
@@ -755,10 +770,33 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 100,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
+
+        // prime the pool with connections
+        val barriers = List(100) { CompletableDeferred<Unit>() }
+        val latch = CompletableDeferred<Unit>()
+        List(100) { i ->
+                launch(Dispatchers.IO) {
+                    pool.useReaderConnection {
+                        barriers[i].complete(Unit)
+                        latch.await()
+                    }
+                }
+            }
+            .run {
+                barriers.awaitAll()
+                latch.complete(Unit)
+                joinAll() // wait for all coroutines to prime the pool
+            }
+
+        assertThat(openedConnections.get()).isEqualTo(100)
+
+        // create a lot of coroutines, some timeout, some don't, validating we are using withTimeout
+        // with resources correctly as recommended in
+        // https://kotlinlang.org/docs/cancellation-and-timeouts.html#asynchronous-timeout-and-resources
         check(pool is ConnectionPoolImpl)
-        pool.throwOnTimeout = true
+        pool.onTimeout = THROW_TIMEOUT_EXCEPTION
         pool.timeout = 20.milliseconds
         coroutineScope {
             repeat(10_000) {
@@ -785,8 +823,6 @@ abstract class BaseConnectionPoolTest {
             }
 
         pool.close()
-
-        assertThat(openedConnections.get()).isEqualTo(100)
     }
 
     @Test
@@ -797,7 +833,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         assertThrows<TimeoutCancellationException> {
             pool.useWriterConnection {
@@ -821,7 +857,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         assertThrows<IllegalStateException> { pool.useWriterConnection { error("BOOM") } }
             .hasMessageThat()
@@ -860,7 +896,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 4,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         val multiThreadContext = newFixedThreadPoolContext(4, "Test-Threads")
         val useLatches = List(4) { CompletableDeferred<Unit>() }
@@ -893,7 +929,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         pool.useWriterConnection { connection ->
             connection.exclusiveTransaction {
@@ -919,7 +955,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         pool.useWriterConnection { connection ->
             connection.execSQL("CREATE TEMP TABLE Cat (name)")
@@ -946,7 +982,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         pool.useWriterConnection { connection ->
             assertThrows<TestingRollbackException> {
@@ -974,7 +1010,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         pool.useWriterConnection { connection ->
             connection.exclusiveTransaction {
@@ -1003,7 +1039,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         pool.useWriterConnection { connection ->
             connection.exclusiveTransaction {
@@ -1031,7 +1067,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         pool.useWriterConnection { connection ->
             connection.exclusiveTransaction {
@@ -1066,7 +1102,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         pool.useWriterConnection { connection ->
             connection.exclusiveTransaction {
@@ -1097,7 +1133,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         pool.useWriterConnection { connection ->
             connection.exclusiveTransaction {
@@ -1130,7 +1166,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         pool.useWriterConnection { connection ->
             connection.exclusiveTransaction {
@@ -1154,7 +1190,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         var nestedTransactionBlockExecuted = false
         pool.useReaderConnection { connection ->
@@ -1179,7 +1215,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         pool.useWriterConnection { connection ->
             connection.exclusiveTransaction<Unit> {
@@ -1206,7 +1242,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         pool.useWriterConnection { connection ->
             connection.exclusiveTransaction<Unit> {
@@ -1237,7 +1273,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         pool.useWriterConnection { connection ->
             assertThrows<SQLiteException> {
@@ -1264,7 +1300,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         pool.useWriterConnection { connection ->
             assertThrows<SQLiteException> {
@@ -1291,7 +1327,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         pool.useWriterConnection { connection -> connection.execSQL("BEGIN EXCLUSIVE TRANSACTION") }
         pool.useWriterConnection { connection ->
@@ -1315,7 +1351,7 @@ abstract class BaseConnectionPoolTest {
                 driver = driver,
                 fileName = fileName,
                 maxNumOfReaders = 1,
-                maxNumOfWriters = 1
+                maxNumOfWriters = 1,
             )
         pool.useReaderConnection { connection ->
             coroutineScope {

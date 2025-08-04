@@ -36,6 +36,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
@@ -57,13 +58,13 @@ class FrameCaptureTests {
         CameraStream.Config.create(
             Size(640, 480),
             StreamFormat.YUV_420_888,
-            imageSourceConfig = ImageSourceConfig(capacity = 10)
+            imageSourceConfig = ImageSourceConfig(capacity = 10),
         )
 
     private val graphConfig =
         CameraGraph.Config(
             camera = cameraMetadata.camera,
-            streams = listOf(viewfinderStreamConfig, jpegStreamConfig)
+            streams = listOf(viewfinderStreamConfig, jpegStreamConfig),
         )
 
     private val cameraGraphSimulator = cameraPipeSimulator.createCameraGraphSimulator(graphConfig)
@@ -81,6 +82,11 @@ class FrameCaptureTests {
         cameraGraphSimulator.initializeSurfaces()
         cameraGraphSimulator.simulateCameraStarted() // Simulate the camera starting successfully
         assertThat(cameraGraph.graphState.value).isEqualTo(GraphStateStarted)
+    }
+
+    @After
+    fun tearDown() {
+        cameraPipeSimulator.close()
     }
 
     @Test
@@ -144,7 +150,7 @@ class FrameCaptureTests {
             // cameraGraph?
 
             advanceUntilIdle()
-            assertThat(frameCaptureJob.isCompleted) // Ensure verification is complete
+            assertThat(frameCaptureJob.isCompleted).isTrue() // Ensure verification is complete
             cameraGraphSimulator.close()
         }
 }

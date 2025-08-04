@@ -37,7 +37,7 @@ class AutoMigrationTest {
     var helper: MigrationTestHelper =
         MigrationTestHelper(
             InstrumentationRegistry.getInstrumentation(),
-            AutoMigrationDb::class.java
+            AutoMigrationDb::class.java,
         )
 
     // Run this to create the very 1st version of the db.
@@ -57,6 +57,7 @@ class AutoMigrationTest {
         val db = helper.runMigrationsAndValidate(TEST_DB, 2, true)
         val info = read(db, AutoMigrationDb.Entity1.TABLE_NAME)
         assertThat(info.columns.size).isEqualTo(3)
+        db.close()
     }
 
     @Test
@@ -66,6 +67,7 @@ class AutoMigrationTest {
         val db = helper.runMigrationsAndValidate(TEST_DB, 3, true)
         val info = read(db, AutoMigrationDb.Entity1.TABLE_NAME)
         assertThat(info.columns.size).isEqualTo(3)
+        db.close()
     }
 
     @Test
@@ -75,6 +77,7 @@ class AutoMigrationTest {
         val db = helper.runMigrationsAndValidate(TEST_DB, 4, true)
         val info = read(db, AutoMigrationDb.Entity1.TABLE_NAME)
         assertThat(info.columns.size).isEqualTo(3)
+        db.close()
     }
 
     @Test
@@ -93,16 +96,17 @@ class AutoMigrationTest {
         val embeddedHelper =
             MigrationTestHelper(
                 InstrumentationRegistry.getInstrumentation(),
-                EmbeddedAutoMigrationDb::class.java
+                EmbeddedAutoMigrationDb::class.java,
             )
         val db = embeddedHelper.createDatabase("embedded-auto-migration-test", 1)
         db.execSQL("INSERT INTO Entity1 (id, name) VALUES (1, 'row1')")
-        val info =
-            read(
-                embeddedHelper.runMigrationsAndValidate("embedded-auto-migration-test", 2, true),
-                EmbeddedAutoMigrationDb.EmbeddedEntity1.TABLE_NAME
-            )
+        db.close()
+
+        val migratedDb =
+            embeddedHelper.runMigrationsAndValidate("embedded-auto-migration-test", 2, true)
+        val info = read(migratedDb, EmbeddedAutoMigrationDb.EmbeddedEntity1.TABLE_NAME)
         assertThat(info.columns.size).isEqualTo(3)
+        migratedDb.close()
     }
 
     companion object {

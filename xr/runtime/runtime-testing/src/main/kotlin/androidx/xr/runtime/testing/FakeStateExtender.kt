@@ -16,11 +16,31 @@
 
 package androidx.xr.runtime.testing
 
+import androidx.annotation.RestrictTo
 import androidx.xr.runtime.CoreState
 import androidx.xr.runtime.StateExtender
 import androidx.xr.runtime.internal.Runtime
 
+@RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
 public class FakeStateExtender() : StateExtender {
+
+    /** Whether the [StateExtender] has been initialized or not. */
+    public var isInitialized: Boolean = false
+
+    /** List of [CoreState] instances that have been extended. */
+    public val extended: MutableList<CoreState> = mutableListOf<CoreState>()
+
+    override fun initialize(runtime: Runtime) {
+        isInitialized = true
+    }
+
+    override suspend fun extend(coreState: CoreState) {
+        extended.add(coreState)
+    }
+}
+
+@RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+public class AnotherFakeStateExtender() : StateExtender {
 
     /** Whether the [StateExtender] has been initialized or not. */
     public var isInitialized: Boolean = false

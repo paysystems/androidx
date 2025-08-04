@@ -16,23 +16,106 @@
 
 package androidx.privacysandbox.sdkruntime.integration.testsdk
 
+import android.content.Context
+import android.os.Bundle
+import android.os.Process
 import android.util.Log
+import androidx.privacysandbox.sdkruntime.core.LoadSdkCompatException
+import androidx.privacysandbox.sdkruntime.integration.callDoSomething
+import androidx.privacysandbox.sdkruntime.integration.testaidl.ILoadSdkCallback
 import androidx.privacysandbox.sdkruntime.integration.testaidl.ISdkApi
+import androidx.privacysandbox.sdkruntime.integration.testaidl.LoadedSdkInfo
+import androidx.privacysandbox.sdkruntime.provider.controller.SdkSandboxControllerCompat
+import java.io.DataInputStream
+import java.io.DataOutputStream
+import java.io.FileNotFoundException
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
 
-class TestSdk : ISdkApi.Stub() {
+class TestSdk(private val sdkContext: Context) : ISdkApi.Stub() {
 
-    override fun getMessage(): String {
-        Log.i(TAG, "TestSdk#getMessage()")
-        return MESSAGE
+    override fun doSomething(param: String): String {
+        Log.i(TAG, "TestSdk#doSomething($param)")
+        return "TestSdk result is $param"
     }
 
-    override fun invert(value: Boolean): Boolean {
-        Log.i(TAG, "TestSdk#invert($value)")
-        return !value
+    override fun loadSdk(sdkName: String, params: Bundle, callback: ILoadSdkCallback) {
+        MainScope().launch {
+            try {
+                val sdk = SdkSandboxControllerCompat.from(sdkContext).loadSdk(sdkName, params)
+                callback.onSuccess(
+                    LoadedSdkInfo(
+                        sdkInterface = sdk.getInterface()!!,
+                        sdkName = sdk.getSdkInfo()?.name,
+                        sdkVersion = sdk.getSdkInfo()?.version,
+                    )
+                )
+            } catch (ex: LoadSdkCompatException) {
+                callback.onFailure(ex.message)
+            }
+        }
+    }
+
+    override fun getSandboxedSdks(): List<LoadedSdkInfo> {
+        val sdks = SdkSandboxControllerCompat.from(sdkContext).getSandboxedSdks()
+        return sdks.map { sdk ->
+            LoadedSdkInfo(
+                sdkInterface = sdk.getInterface()!!,
+                sdkName = sdk.getSdkInfo()?.name,
+                sdkVersion = sdk.getSdkInfo()?.version,
+            )
+        }
+    }
+
+    override fun getAppOwnedSdks(): List<LoadedSdkInfo> {
+        val sdks = SdkSandboxControllerCompat.from(sdkContext).getAppOwnedSdkSandboxInterfaces()
+        return sdks.map { sdk ->
+            LoadedSdkInfo(
+                sdkInterface = sdk.getInterface(),
+                sdkName = sdk.getName(),
+                sdkVersion = sdk.getVersion(),
+            )
+        }
+    }
+
+    override fun callDoSomethingOnSandboxedSdks(param: String): List<String> {
+        return SdkSandboxControllerCompat.from(sdkContext).getSandboxedSdks().mapNotNull {
+            callDoSomething(it.getInterface(), param)
+        }
+    }
+
+    override fun callDoSomethingOnAppOwnedSdks(param: String): List<String> {
+        return SdkSandboxControllerCompat.from(sdkContext)
+            .getAppOwnedSdkSandboxInterfaces()
+            .mapNotNull { callDoSomething(it.getInterface(), param) }
+    }
+
+    override fun triggerSandboxDeath() {
+        Process.killProcess(Process.myPid())
+    }
+
+    override fun getClientPackageName(): String {
+        return SdkSandboxControllerCompat.from(sdkContext).getClientPackageName()
+    }
+
+    override fun writeToFile(filename: String, data: String) {
+        sdkContext.openFileOutput(filename, Context.MODE_PRIVATE).use { outputStream ->
+            DataOutputStream(outputStream).use { dataStream -> dataStream.writeUTF(data) }
+        }
+    }
+
+    override fun readFromFile(filename: String): String? {
+        try {
+            return sdkContext.openFileInput(filename).use { inputStream ->
+                inputStream
+                DataInputStream(inputStream).use { dataStream -> dataStream.readUTF() }
+            }
+        } catch (_: FileNotFoundException) {
+            return null
+        }
     }
 
     companion object {
         private const val TAG = "TestSdk"
-        private const val MESSAGE = "Message from TestSDK"
     }
 }

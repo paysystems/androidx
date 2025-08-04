@@ -88,6 +88,8 @@ public class FakeCamera implements CameraInternal {
 
     private CameraConfig mCameraConfig = CameraConfigs.defaultConfig();
 
+    private boolean mIsRemoved = false;
+
     public FakeCamera() {
         this(DEFAULT_CAMERA_ID, /*cameraControl=*/null,
                 new FakeCameraInfoInternal(DEFAULT_CAMERA_ID));
@@ -99,6 +101,11 @@ public class FakeCamera implements CameraInternal {
 
     public FakeCamera(@NonNull String cameraId) {
         this(cameraId, /*cameraControl=*/null, new FakeCameraInfoInternal(cameraId));
+    }
+
+    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+    public FakeCamera(@NonNull CameraInfoInternal cameraInfo) {
+        this(cameraInfo.getCameraId(), /*cameraControl=*/null, cameraInfo);
     }
 
     public FakeCamera(@Nullable CameraControlInternal cameraControl,
@@ -588,5 +595,22 @@ public class FakeCamera implements CameraInternal {
         }
         return CaptureSimulationKt.simulateCaptureFrameAsync(mSessionConfig.getSurfaces(),
                 executor);
+    }
+
+    /**
+     * Sets the internal state to disconnected. This can be checked with {@link #isRemoved()}.
+     */
+    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+    @Override
+    public void onRemoved() {
+        mIsRemoved = true;
+    }
+
+    /**
+     * Returns true if {@link #onRemoved()} has been called on this instance.
+     */
+    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+    public boolean isRemoved() {
+        return mIsRemoved;
     }
 }
