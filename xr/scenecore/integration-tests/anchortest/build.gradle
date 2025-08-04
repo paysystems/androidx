@@ -22,8 +22,8 @@
  * modifying its settings.
  */
 
+import androidx.build.AndroidXConfig
 import androidx.build.ApkCopyHelperKt
-import androidx.build.KotlinTarget
 import androidx.build.SoftwareType
 
 plugins {
@@ -36,7 +36,7 @@ android {
     defaultConfig {
         // TODO: This should be lower, possibly 21.
         //       Address API calls that require higher versions.
-        minSdkVersion 34
+        minSdk = 34
     }
     namespace = "androidx.xr.scenecore.samples.anchortest"
 
@@ -54,9 +54,6 @@ androidx {
     type = SoftwareType.TEST_APPLICATION
     inceptionYear = "2024"
     description = "Test app that exercises the SceneCore Anchor API."
-    kotlinTarget = KotlinTarget.KOTLIN_1_9
-    // TODO: b/326456246
-    optOutJSpecify = true
 }
 
 dependencies {
@@ -71,6 +68,7 @@ dependencies {
     implementation("androidx.core:core:1.9.0")
     implementation("androidx.lifecycle:lifecycle-common:2.8.7")
 
+    compileOnly(files(new File(AndroidXConfig.getPrebuiltsRoot(project), "androidx/xr/extensions/com.android.extensions.xr.jar")))
 }
 
 // Making this APK available via Android Build so the QA team can

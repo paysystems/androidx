@@ -16,18 +16,36 @@
 
 package androidx.tracing.driver
 
-import perfetto.protos.MutableTracePacket
+import androidx.annotation.RestrictTo
 
-/** Entities that we can attach traces to. */
+/**
+ * Tracks are a horizontal track of time in the trace that contains trace events - often counters
+ * (`setCounter`), or slices (`beginSection` / `endSection`) - which stack together to form the
+ * timeline view.
+ *
+ * Tracks can have parents/children, such as a [ProcessTrack] having several child [ThreadTrack]s.
+ * * Use [ProcessTrack] for trace slices and events scoped to a process, but not a specific thread.
+ * * Use [CounterTrack] (often created as a child of a [ProcessTrack]) to trace integer or floating
+ *   point values that can be updated over time.
+ * * Use [ThreadTrack] (generally created as a child of a [ProcessTrack]) to trace what is happening
+ *   on a specific thread. With synchronous (non-coroutine) code, this is where most trace events
+ *   should go.
+ */
+// False positive: https://youtrack.jetbrains.com/issue/KTIJ-22326
+@Suppress("OPTIONAL_DECLARATION_USAGE_IN_NON_COMMON_SOURCE")
 public abstract class Track(
     /** The [TraceContext] instance. */
     @JvmField // avoid getter generation
     internal val context: TraceContext,
-    /** The uuid for the track descriptor. */
+    /**
+     * The uuid for the track descriptor.
+     *
+     * This ID must be unique within all [Track]s in a given trace produced by [TraceDriver] - it is
+     * used to connect recorded trace events to the containing track.
+     */
     @JvmField // avoid getter generation
-    internal val uuid: Long
+    internal val uuid: Long,
 ) {
-    @JvmField internal val sequenceId = context.sequenceId
     /**
      * Any time we emit trace packets relevant to this process. We need to make sure the necessary
      * preamble packets that describe the process and threads are also emitted. This is used to make
@@ -50,9 +68,9 @@ public abstract class Track(
     }
 
     /** Emit is internal, but it must be sure to only access */
-    internal inline fun emitPacket(
+    internal inline fun emitTraceEvent(
         immediateDispatch: Boolean = false,
-        block: (MutableTracePacket) -> Unit
+        block: (TraceEvent) -> Unit,
     ) {
         currentPacketArray.apply {
             block(packets[fillCount])
@@ -65,5 +83,19 @@ public abstract class Track(
                 currentPacketArraySize = currentPacketArray.packets.size
             }
         }
+    }
+
+    /** Test API for benchmarking */
+    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+    public fun enqueueSingleUnmodifiedEvent() {
+        emitTraceEvent(immediateDispatch = true) {
+            // noop
+        }
+    }
+
+    /** Test API for benchmarking */
+    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
+    public fun resetFillCount() {
+        currentPacketArray.fillCount = 0
     }
 }

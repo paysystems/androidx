@@ -21,8 +21,7 @@ plugins {
 }
 
 android {
-    compileSdk = 35
-    compileSdkExtension = 14
+    compileSdk = 36
     namespace = "androidx.privacysandbox.ui.integration.testsdkprovider"
 
     buildTypes {
@@ -50,7 +49,6 @@ dependencies {
     api(libs.kotlinStdlib)
     api("androidx.annotation:annotation:1.8.1")
     implementation(project(":privacysandbox:sdkruntime:sdkruntime-provider"))
-    implementation(project(":privacysandbox:ui:integration-tests:testaidl"))
     implementation(project(":privacysandbox:ui:integration-tests:sdkproviderutils"))
     implementation(project(":privacysandbox:ui:ui-provider"))
     implementation(project(":webkit:webkit"))
@@ -58,8 +56,8 @@ dependencies {
 
     // Add library dependencies at head - to override the dependencies that will be added by
     // privacysandboxplugin.
-    implementation(project(':privacysandbox:tools:tools'))
     ksp(project(':privacysandbox:tools:tools-apicompiler'))
+    implementation(project(':privacysandbox:tools:tools'))
     implementation(project(":privacysandbox:ui:ui-core"))
     implementation(project(':privacysandbox:activity:activity-core'))
     implementation(project(':privacysandbox:activity:activity-provider'))

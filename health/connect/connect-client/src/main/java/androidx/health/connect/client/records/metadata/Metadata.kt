@@ -23,9 +23,7 @@ import java.time.Instant
 /** Set of shared metadata fields for [Record]. */
 @SuppressWarnings("NewApi") // Temporary until we can enable java8 desugaring effectively.
 public class Metadata
-// TODO(b/394783116) make the constructor internal
-@RestrictTo(RestrictTo.Scope.LIBRARY)
-public constructor(
+internal constructor(
     /**
      * Client supplied data recording method to help to understand how the data was recorded.
      *
@@ -36,9 +34,8 @@ public constructor(
     @param:RecordingMethod @property:RecordingMethod @get:RecordingMethod val recordingMethod: Int,
 
     /**
-     * Unique identifier of this data, assigned by the Android Health Platform at insertion time.
-     * When [Record] is created before insertion, this takes a sentinel value, any assigned value
-     * will be ignored.
+     * Unique identifier of this data, assigned by Health Connect at insertion time. When [Record]
+     * is created before insertion, this takes a sentinel value, any assigned value will be ignored.
      */
     public val id: String = EMPTY_ID,
 
@@ -150,7 +147,7 @@ public constructor(
             RECORDING_METHOD_UNKNOWN,
             RECORDING_METHOD_ACTIVELY_RECORDED,
             RECORDING_METHOD_AUTOMATICALLY_RECORDED,
-            RECORDING_METHOD_MANUAL_ENTRY
+            RECORDING_METHOD_MANUAL_ENTRY,
         )
         @Retention(AnnotationRetention.SOURCE)
         annotation class RecordingMethod
@@ -164,10 +161,7 @@ public constructor(
          */
         @JvmStatic
         fun activelyRecorded(device: Device): Metadata =
-            Metadata(
-                recordingMethod = RECORDING_METHOD_ACTIVELY_RECORDED,
-                device = device,
-            )
+            Metadata(recordingMethod = RECORDING_METHOD_ACTIVELY_RECORDED, device = device)
 
         /**
          * Creates Metadata for an actively recorded record with the provided client ID.
@@ -204,11 +198,7 @@ public constructor(
          */
         @JvmStatic
         fun activelyRecordedWithId(id: String, device: Device): Metadata =
-            Metadata(
-                recordingMethod = RECORDING_METHOD_ACTIVELY_RECORDED,
-                id = id,
-                device = device,
-            )
+            Metadata(recordingMethod = RECORDING_METHOD_ACTIVELY_RECORDED, id = id, device = device)
 
         /**
          * Creates Metadata for an automatically recorded record.
@@ -219,10 +209,7 @@ public constructor(
          */
         @JvmStatic
         fun autoRecorded(device: Device): Metadata =
-            Metadata(
-                recordingMethod = RECORDING_METHOD_AUTOMATICALLY_RECORDED,
-                device = device,
-            )
+            Metadata(recordingMethod = RECORDING_METHOD_AUTOMATICALLY_RECORDED, device = device)
 
         /**
          * Creates Metadata for an automatically recorded record with the provided client ID.
@@ -276,10 +263,7 @@ public constructor(
         @JvmStatic
         @JvmOverloads
         fun manualEntry(device: Device? = null): Metadata =
-            Metadata(
-                recordingMethod = RECORDING_METHOD_MANUAL_ENTRY,
-                device = device,
-            )
+            Metadata(recordingMethod = RECORDING_METHOD_MANUAL_ENTRY, device = device)
 
         /**
          * Creates Metadata for a manually entered record with the provided client ID. Developers
@@ -318,11 +302,7 @@ public constructor(
         @JvmStatic
         @JvmOverloads
         fun manualEntryWithId(id: String, device: Device? = null): Metadata =
-            Metadata(
-                recordingMethod = RECORDING_METHOD_MANUAL_ENTRY,
-                id = id,
-                device = device,
-            )
+            Metadata(recordingMethod = RECORDING_METHOD_MANUAL_ENTRY, id = id, device = device)
 
         /**
          * Creates Metadata with unknown recording method.
@@ -376,10 +356,6 @@ public constructor(
         @JvmStatic
         @JvmOverloads
         fun unknownRecordingMethodWithId(id: String, device: Device? = null): Metadata =
-            Metadata(
-                recordingMethod = RECORDING_METHOD_UNKNOWN,
-                id = id,
-                device = device,
-            )
+            Metadata(recordingMethod = RECORDING_METHOD_UNKNOWN, id = id, device = device)
     }
 }

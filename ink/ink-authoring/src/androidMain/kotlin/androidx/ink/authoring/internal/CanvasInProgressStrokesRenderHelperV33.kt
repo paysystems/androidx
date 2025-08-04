@@ -49,6 +49,7 @@ import androidx.hardware.SyncFenceCompat
 import androidx.ink.authoring.ExperimentalLatencyDataApi
 import androidx.ink.authoring.InProgressStrokeId
 import androidx.ink.authoring.latency.LatencyData
+import androidx.ink.brush.ExperimentalInkCustomBrushApi
 import androidx.ink.geometry.MutableBox
 import androidx.ink.rendering.android.canvas.CanvasStrokeRenderer
 import androidx.ink.strokes.InProgressStroke
@@ -75,7 +76,7 @@ import kotlin.math.floor
  */
 @Suppress("ObsoleteSdkInt") // TODO(b/262911421): Should not need to suppress.
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
-@OptIn(ExperimentalLatencyDataApi::class)
+@OptIn(ExperimentalLatencyDataApi::class, ExperimentalInkCustomBrushApi::class)
 internal class CanvasInProgressStrokesRenderHelperV33(
     private val mainView: ViewGroup,
     private val callback: InProgressStrokesRenderHelper.Callback,
@@ -135,7 +136,7 @@ internal class CanvasInProgressStrokesRenderHelperV33(
                 holder: SurfaceHolder,
                 format: Int,
                 width: Int,
-                height: Int
+                height: Int,
             ) {
                 if (width == 0 || height == 0) {
                     onViewHiddenOrNoBounds()
@@ -184,13 +185,12 @@ internal class CanvasInProgressStrokesRenderHelperV33(
             blendMode = BlendMode.CLEAR
         }
 
-    private val offScreenFrameBufferPaint =
-        Paint().apply {
-            // The SRC blend mode ensures that the modified region of the offscreen frame buffer
-            // completely
-            // replaces the matching region of the front buffer.
-            blendMode = BlendMode.SRC
-        }
+    /**
+     * Used for a call to [RenderNode.setUseCompositingLayer] and [Canvas.drawRenderNode] to
+     * overwrite the contents of the front buffer with the offscreen frame buffer (limited to the
+     * clip region).
+     */
+    private val offScreenFrameBufferPaint = createPaintForUnscaledBlit()
 
     private var colorSpaceDataSpaceOverride: Pair<ColorSpace, Int>? = null
 
@@ -222,8 +222,13 @@ internal class CanvasInProgressStrokesRenderHelperV33(
     override fun drawInModifiedRegion(
         inProgressStroke: InProgressStroke,
         strokeToMainViewTransform: Matrix,
+        textureAnimationProgress: Float,
     ) {
-        currentViewport?.drawInModifiedRegion(inProgressStroke, strokeToMainViewTransform)
+        currentViewport?.drawInModifiedRegion(
+            inProgressStroke,
+            strokeToMainViewTransform,
+            textureAnimationProgress,
+        )
     }
 
     @WorkerThread
@@ -467,12 +472,12 @@ internal class CanvasInProgressStrokesRenderHelperV33(
             val offScreenRenderNode =
                 createRenderNode("$debugName-OffScreen").apply {
                     setHasOverlappingRendering(true)
-                    // Use BlendMode=SRC so that the contents of the offscreen frame buffer replace
-                    // the
+                    // The Paint ensures that the contents of the offscreen frame buffer will
+                    // replace the
                     // contents of the front buffer (restricted to the clip region).
                     setUseCompositingLayer(
                         /* forceToLayer= */ true,
-                        /* paint= */ offScreenFrameBufferPaint
+                        /* paint= */ offScreenFrameBufferPaint,
                     )
                 }
             val frontBufferRenderNode = createRenderNode("$debugName-Front")
@@ -502,7 +507,7 @@ internal class CanvasInProgressStrokesRenderHelperV33(
                         1,
                         HardwareBuffer.RGBA_8888,
                         1,
-                        DESIRED_USAGE_FLAGS
+                        DESIRED_USAGE_FLAGS,
                     )
                 ) {
                     DESIRED_USAGE_FLAGS
@@ -689,10 +694,16 @@ internal class CanvasInProgressStrokesRenderHelperV33(
         fun drawInModifiedRegion(
             inProgressStroke: InProgressStroke,
             strokeToMainViewTransform: Matrix,
+            textureAnimationProgress: Float,
         ) {
             val canvas = checkNotNull(renderThreadState.offScreenCanvas)
             canvas.withMatrix(strokeToMainViewTransform) {
-                renderer.draw(canvas, inProgressStroke, strokeToMainViewTransform)
+                renderer.draw(
+                    canvas,
+                    inProgressStroke,
+                    strokeToMainViewTransform,
+                    textureAnimationProgress,
+                )
             }
         }
 
@@ -752,7 +763,7 @@ internal class CanvasInProgressStrokesRenderHelperV33(
                 BuffersState(
                     active = state.inactive,
                     inactive = state.active,
-                    inactiveIsReady = false
+                    inactiveIsReady = false,
                 )
             buffersState.checkAndSet(state, newState)
             // Allow input to be resumed right away, because there is another buffer that is visible
@@ -796,7 +807,7 @@ internal class CanvasInProgressStrokesRenderHelperV33(
             uiThreadExecutor.executeDelayed(
                 inactiveBufferIsHiddenCallback,
                 500,
-                TimeUnit.MILLISECONDS
+                TimeUnit.MILLISECONDS,
             )
             // This will lead to onInactiveBufferHidden below.
         }

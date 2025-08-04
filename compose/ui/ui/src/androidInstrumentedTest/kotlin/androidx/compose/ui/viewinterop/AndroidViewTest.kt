@@ -79,13 +79,14 @@ import androidx.compose.ui.background
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.layout.SubcomposeLayoutState
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.platform.LocalSavedStateRegistryOwner
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.platform.findViewTreeCompositionContext
@@ -94,10 +95,12 @@ import androidx.compose.ui.test.TestActivity
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertLeftPositionInRootIsEqualTo
 import androidx.compose.ui.test.assertTopPositionInRootIsEqualTo
+import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.tests.R
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -132,6 +135,7 @@ import androidx.lifecycle.findViewTreeLifecycleOwner
 import androidx.lifecycle.testing.TestLifecycleOwner
 import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryOwner
+import androidx.savedstate.compose.LocalSavedStateRegistryOwner
 import androidx.savedstate.findViewTreeSavedStateRegistryOwner
 import androidx.test.espresso.Espresso
 import androidx.test.espresso.Espresso.onView
@@ -388,7 +392,7 @@ class AndroidViewTest {
         rule.setContent {
             AndroidView(
                 { LayoutInflater.from(it).inflate(R.layout.test_layout, null) },
-                Modifier.requiredSize(size)
+                Modifier.requiredSize(size),
             )
         }
         Espresso.onView(instanceOf(RelativeLayout::class.java))
@@ -440,7 +444,7 @@ class AndroidViewTest {
         rule.setContent {
             AndroidView(
                 { LayoutInflater.from(it).inflate(R.layout.test_layout, null) },
-                Modifier.requiredSize(size.value)
+                Modifier.requiredSize(size.value),
             )
         }
         Espresso.onView(instanceOf(RelativeLayout::class.java))
@@ -587,7 +591,7 @@ class AndroidViewTest {
                     { FrameLayout(it) },
                     Modifier.requiredSize(size).onGloballyPositioned {
                         assertThat(it.size).isEqualTo(IntSize(sizeIpx, sizeIpx))
-                    }
+                    },
                 )
             }
         }
@@ -653,8 +657,8 @@ class AndroidViewTest {
                                 },
                                 ViewGroup.LayoutParams(
                                     ViewGroup.LayoutParams.MATCH_PARENT,
-                                    ViewGroup.LayoutParams.MATCH_PARENT
-                                )
+                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                                ),
                             )
                         }
                     }
@@ -802,7 +806,7 @@ class AndroidViewTest {
                 AndroidView(
                     factory = { TextView(it) },
                     update = { it.text = "onRelease test" },
-                    onRelease = { releaseCount++ }
+                    onRelease = { releaseCount++ },
                 )
             }
         }
@@ -819,7 +823,7 @@ class AndroidViewTest {
             "onRelease() should be called exactly once after " +
                 "removing the view from the composition hierarchy",
             1,
-            releaseCount
+            releaseCount,
         )
     }
 
@@ -831,7 +835,7 @@ class AndroidViewTest {
         fun <T : Any> Navigation(
             currentScreen: T,
             modifier: Modifier = Modifier,
-            content: @Composable (T) -> Unit
+            content: @Composable (T) -> Unit,
         ) {
             val saveableStateHolder = rememberSaveableStateHolder()
             Box(modifier) {
@@ -847,7 +851,7 @@ class AndroidViewTest {
                         StateSavingView(
                             context = it,
                             value = "testValue",
-                            onRestoredValue = { restoredValue -> result = restoredValue }
+                            onRestoredValue = { restoredValue -> result = restoredValue },
                         )
                     })
                 } else {
@@ -902,7 +906,7 @@ class AndroidViewTest {
             ReusableContent("never-changes") {
                 ReusableAndroidViewWithLifecycleTracking(
                     factory = { TextView(it).apply { text = "Test" } },
-                    onLifecycleEvent = lifecycleEvents::add
+                    onLifecycleEvent = lifecycleEvents::add,
                 )
             }
         }
@@ -918,9 +922,9 @@ class AndroidViewTest {
                 OnViewAttach,
                 ViewLifecycleEvent(ON_CREATE),
                 ViewLifecycleEvent(ON_START),
-                ViewLifecycleEvent(ON_RESUME)
+                ViewLifecycleEvent(ON_RESUME),
             ),
-            lifecycleEvents
+            lifecycleEvents,
         )
     }
 
@@ -933,7 +937,7 @@ class AndroidViewTest {
                 ReusableAndroidViewWithLifecycleTracking(
                     factory = { TextView(it) },
                     update = { it.text = "Text $state" },
-                    onLifecycleEvent = lifecycleEvents::add
+                    onLifecycleEvent = lifecycleEvents::add,
                 )
             }
         }
@@ -951,9 +955,9 @@ class AndroidViewTest {
                 OnViewAttach,
                 ViewLifecycleEvent(ON_CREATE),
                 ViewLifecycleEvent(ON_START),
-                ViewLifecycleEvent(ON_RESUME)
+                ViewLifecycleEvent(ON_RESUME),
             ),
-            lifecycleEvents
+            lifecycleEvents,
         )
 
         lifecycleEvents.clear()
@@ -966,7 +970,7 @@ class AndroidViewTest {
         assertEquals(
             "AndroidView did not experience the expected lifecycle when recomposed",
             listOf(OnUpdate),
-            lifecycleEvents
+            lifecycleEvents,
         )
     }
 
@@ -978,7 +982,7 @@ class AndroidViewTest {
             ReusableContentHost(attached) {
                 ReusableAndroidViewWithLifecycleTracking(
                     factory = { TextView(it).apply { text = "Test" } },
-                    onLifecycleEvent = lifecycleEvents::add
+                    onLifecycleEvent = lifecycleEvents::add,
                 )
             }
         }
@@ -995,9 +999,9 @@ class AndroidViewTest {
                 OnViewAttach,
                 ViewLifecycleEvent(ON_CREATE),
                 ViewLifecycleEvent(ON_START),
-                ViewLifecycleEvent(ON_RESUME)
+                ViewLifecycleEvent(ON_RESUME),
             ),
-            lifecycleEvents
+            lifecycleEvents,
         )
 
         lifecycleEvents.clear()
@@ -1009,7 +1013,7 @@ class AndroidViewTest {
             "AndroidView did not experience the expected lifecycle when " +
                 "removed from the composition hierarchy and retained by Compose",
             listOf(OnReset, OnViewDetach),
-            lifecycleEvents
+            lifecycleEvents,
         )
     }
 
@@ -1021,7 +1025,7 @@ class AndroidViewTest {
             ReusableContentHost(attached) {
                 ReusableAndroidViewWithLifecycleTracking(
                     factory = { TextView(it).apply { text = "Test" } },
-                    onLifecycleEvent = lifecycleEvents::add
+                    onLifecycleEvent = lifecycleEvents::add,
                 )
             }
         }
@@ -1037,9 +1041,9 @@ class AndroidViewTest {
                 OnViewAttach,
                 ViewLifecycleEvent(ON_CREATE),
                 ViewLifecycleEvent(ON_START),
-                ViewLifecycleEvent(ON_RESUME)
+                ViewLifecycleEvent(ON_RESUME),
             ),
-            lifecycleEvents
+            lifecycleEvents,
         )
 
         lifecycleEvents.clear()
@@ -1051,7 +1055,7 @@ class AndroidViewTest {
             "AndroidView did not experience the expected lifecycle when " +
                 "removed from the composition hierarchy and retained by Compose",
             listOf(OnReset, OnViewDetach),
-            lifecycleEvents
+            lifecycleEvents,
         )
 
         lifecycleEvents.clear()
@@ -1063,7 +1067,7 @@ class AndroidViewTest {
             "AndroidView did not experience the expected lifecycle when " +
                 "reattached to the composition hierarchy",
             listOf(OnViewAttach, OnUpdate),
-            lifecycleEvents
+            lifecycleEvents,
         )
     }
 
@@ -1077,7 +1081,7 @@ class AndroidViewTest {
                 ReusableContentHost(active) {
                     ReusableAndroidViewWithLifecycleTracking(
                         factory = { TextView(it).apply { text = "Test" } },
-                        onLifecycleEvent = lifecycleEvents::add
+                        onLifecycleEvent = lifecycleEvents::add,
                     )
                 }
             }
@@ -1095,9 +1099,9 @@ class AndroidViewTest {
                 OnViewAttach,
                 ViewLifecycleEvent(ON_CREATE),
                 ViewLifecycleEvent(ON_START),
-                ViewLifecycleEvent(ON_RESUME)
+                ViewLifecycleEvent(ON_RESUME),
             ),
-            lifecycleEvents
+            lifecycleEvents,
         )
 
         lifecycleEvents.clear()
@@ -1109,7 +1113,7 @@ class AndroidViewTest {
             "AndroidView did not experience the expected lifecycle when " +
                 "removed from the composition hierarchy and retained by Compose",
             listOf(OnReset, OnViewDetach),
-            lifecycleEvents
+            lifecycleEvents,
         )
 
         lifecycleEvents.clear()
@@ -1121,7 +1125,7 @@ class AndroidViewTest {
             "AndroidView did not experience the expected lifecycle when " +
                 "removed from the composition hierarchy while deactivated",
             listOf(OnRelease),
-            lifecycleEvents
+            lifecycleEvents,
         )
     }
 
@@ -1133,7 +1137,7 @@ class AndroidViewTest {
             if (includeViewInComposition) {
                 ReusableAndroidViewWithLifecycleTracking(
                     factory = { TextView(it).apply { text = "Test" } },
-                    onLifecycleEvent = lifecycleEvents::add
+                    onLifecycleEvent = lifecycleEvents::add,
                 )
             }
         }
@@ -1149,9 +1153,9 @@ class AndroidViewTest {
                 OnViewAttach,
                 ViewLifecycleEvent(ON_CREATE),
                 ViewLifecycleEvent(ON_START),
-                ViewLifecycleEvent(ON_RESUME)
+                ViewLifecycleEvent(ON_RESUME),
             ),
-            lifecycleEvents
+            lifecycleEvents,
         )
 
         lifecycleEvents.clear()
@@ -1163,7 +1167,7 @@ class AndroidViewTest {
             "AndroidView did not experience the expected lifecycle when " +
                 "removed from composition while visible",
             listOf(OnViewDetach, OnRelease),
-            lifecycleEvents
+            lifecycleEvents,
         )
     }
 
@@ -1176,7 +1180,7 @@ class AndroidViewTest {
                 ReusableAndroidViewWithLifecycleTracking(
                     factory = { TextView(it) },
                     update = { it.text = "Test" },
-                    onLifecycleEvent = lifecycleEvents::add
+                    onLifecycleEvent = lifecycleEvents::add,
                 )
             }
         }
@@ -1194,9 +1198,9 @@ class AndroidViewTest {
                 OnViewAttach,
                 ViewLifecycleEvent(ON_CREATE),
                 ViewLifecycleEvent(ON_START),
-                ViewLifecycleEvent(ON_RESUME)
+                ViewLifecycleEvent(ON_RESUME),
             ),
-            lifecycleEvents
+            lifecycleEvents,
         )
 
         lifecycleEvents.clear()
@@ -1209,7 +1213,7 @@ class AndroidViewTest {
         assertEquals(
             "AndroidView did not experience the expected lifecycle when " + "reused in composition",
             listOf(OnReset, OnUpdate),
-            lifecycleEvents
+            lifecycleEvents,
         )
     }
 
@@ -1220,7 +1224,7 @@ class AndroidViewTest {
             ReusableContentHost(active = true) {
                 ReusableAndroidViewWithLifecycleTracking(
                     factory = { TextView(it).apply { text = "Test" } },
-                    onLifecycleEvent = lifecycleEvents::add
+                    onLifecycleEvent = lifecycleEvents::add,
                 )
             }
         }
@@ -1237,9 +1241,9 @@ class AndroidViewTest {
                 OnViewAttach,
                 ViewLifecycleEvent(ON_CREATE),
                 ViewLifecycleEvent(ON_START),
-                ViewLifecycleEvent(ON_RESUME)
+                ViewLifecycleEvent(ON_RESUME),
             ),
-            lifecycleEvents
+            lifecycleEvents,
         )
 
         lifecycleEvents.clear()
@@ -1251,7 +1255,7 @@ class AndroidViewTest {
             "AndroidView did not experience the expected lifecycle when " +
                 "its host transitioned from RESUMED to CREATED while the view was attached",
             listOf(ViewLifecycleEvent(ON_PAUSE), ViewLifecycleEvent(ON_STOP)),
-            lifecycleEvents
+            lifecycleEvents,
         )
 
         lifecycleEvents.clear()
@@ -1262,7 +1266,7 @@ class AndroidViewTest {
             "AndroidView did not experience the expected lifecycle when " +
                 "its host transitioned from CREATED to RESUMED while the view was attached",
             listOf(ViewLifecycleEvent(ON_START), ViewLifecycleEvent(ON_RESUME)),
-            lifecycleEvents
+            lifecycleEvents,
         )
     }
 
@@ -1276,7 +1280,7 @@ class AndroidViewTest {
                 ReusableContent(key = key) {
                     ReusableAndroidViewWithLifecycleTracking(
                         factory = { TextView(it).apply { text = "Test" } },
-                        onLifecycleEvent = lifecycleEvents::add
+                        onLifecycleEvent = lifecycleEvents::add,
                     )
                 }
             }
@@ -1294,9 +1298,9 @@ class AndroidViewTest {
                 OnViewAttach,
                 ViewLifecycleEvent(ON_CREATE),
                 ViewLifecycleEvent(ON_START),
-                ViewLifecycleEvent(ON_RESUME)
+                ViewLifecycleEvent(ON_RESUME),
             ),
-            lifecycleEvents
+            lifecycleEvents,
         )
 
         lifecycleEvents.clear()
@@ -1308,7 +1312,7 @@ class AndroidViewTest {
             "AndroidView did not experience the expected lifecycle when " +
                 "detached from the composition hierarchy",
             listOf(OnReset, OnViewDetach),
-            lifecycleEvents
+            lifecycleEvents,
         )
 
         lifecycleEvents.clear()
@@ -1325,7 +1329,7 @@ class AndroidViewTest {
             "AndroidView did not experience the expected lifecycle when " +
                 "simultaneously reactivating and changing reuse keys",
             listOf(OnViewAttach, OnUpdate),
-            lifecycleEvents
+            lifecycleEvents,
         )
     }
 
@@ -1339,7 +1343,7 @@ class AndroidViewTest {
                     @Composable {
                         ReusableAndroidViewWithLifecycleTracking(
                             factory = { TextView(it).apply { text = "Test" } },
-                            onLifecycleEvent = lifecycleEvents::add
+                            onLifecycleEvent = lifecycleEvents::add,
                         )
                     }
 
@@ -1369,9 +1373,9 @@ class AndroidViewTest {
                 OnViewAttach,
                 ViewLifecycleEvent(ON_CREATE),
                 ViewLifecycleEvent(ON_START),
-                ViewLifecycleEvent(ON_RESUME)
+                ViewLifecycleEvent(ON_RESUME),
             ),
-            lifecycleEvents
+            lifecycleEvents,
         )
 
         lifecycleEvents.clear()
@@ -1383,7 +1387,7 @@ class AndroidViewTest {
             "AndroidView did not experience the expected lifecycle when " +
                 "removed from the composition hierarchy and retained by Compose",
             listOf(OnReset, OnViewDetach),
-            lifecycleEvents
+            lifecycleEvents,
         )
         lifecycleEvents.clear()
 
@@ -1394,7 +1398,7 @@ class AndroidViewTest {
             "AndroidView did not receive callbacks when its host transitioned from " +
                 "RESUMED to CREATED while the view was detached",
             listOf(ViewLifecycleEvent(ON_PAUSE), ViewLifecycleEvent(ON_STOP)),
-            lifecycleEvents
+            lifecycleEvents,
         )
 
         lifecycleEvents.clear()
@@ -1405,7 +1409,7 @@ class AndroidViewTest {
             "AndroidView did not receive callbacks when its host transitioned from " +
                 "CREATED to RESUMED while the view was detached",
             listOf(ViewLifecycleEvent(ON_START), ViewLifecycleEvent(ON_RESUME)),
-            lifecycleEvents
+            lifecycleEvents,
         )
     }
 
@@ -1419,7 +1423,7 @@ class AndroidViewTest {
                 movableContentOf {
                     ReusableAndroidViewWithLifecycleTracking(
                         factory = { context -> StateSavingView(context, "") },
-                        onLifecycleEvent = lifecycleEvents::add
+                        onLifecycleEvent = lifecycleEvents::add,
                     )
                 }
             }
@@ -1452,9 +1456,9 @@ class AndroidViewTest {
                 OnViewAttach,
                 ViewLifecycleEvent(ON_CREATE),
                 ViewLifecycleEvent(ON_START),
-                ViewLifecycleEvent(ON_RESUME)
+                ViewLifecycleEvent(ON_RESUME),
             ),
-            lifecycleEvents
+            lifecycleEvents,
         )
         lifecycleEvents.clear()
         slotWithContent++
@@ -1465,7 +1469,7 @@ class AndroidViewTest {
             "AndroidView experienced unexpected lifecycle events when " +
                 "moved in the composition",
             listOf(OnViewDetach, OnViewAttach),
-            lifecycleEvents
+            lifecycleEvents,
         )
 
         // Check that the state of the view is retained
@@ -1488,7 +1492,7 @@ class AndroidViewTest {
                             },
                             update = {},
                             onReset = {},
-                            onRelease = {}
+                            onRelease = {},
                         )
                     }
                 }
@@ -1500,7 +1504,7 @@ class AndroidViewTest {
             assertEquals(
                 "View didn't have the expected initial value",
                 "screen1 first value",
-                view.value
+                view.value,
             )
             view.value = "screen1 new value"
         }
@@ -1511,7 +1515,7 @@ class AndroidViewTest {
         rule.activityRule.withActivity {
             assertNull(
                 findViewById<StateSavingView>(StateSavingView.ID),
-                "StateSavingView should be removed from the hierarchy"
+                "StateSavingView should be removed from the hierarchy",
             )
         }
 
@@ -1523,7 +1527,7 @@ class AndroidViewTest {
             assertEquals(
                 "View did not restore with the correct state",
                 "screen1 new value",
-                view.value
+                view.value,
             )
         }
     }
@@ -1537,7 +1541,7 @@ class AndroidViewTest {
             Column(Modifier.height(columnHeightDp).fillMaxWidth()) {
                 AndroidView(
                     factory = { View(it) },
-                    modifier = Modifier.weight(1f).onGloballyPositioned { viewSize = it.size }
+                    modifier = Modifier.weight(1f).onGloballyPositioned { viewSize = it.size },
                 )
 
                 Box(Modifier.height(columnHeightDp / 4))
@@ -1629,7 +1633,7 @@ class AndroidViewTest {
                     onReset = {
                         counter++
                         Snapshot.sendApplyNotifications()
-                    }
+                    },
                 )
             }
         }
@@ -1716,7 +1720,7 @@ class AndroidViewTest {
                         init(this)
                     }
                 },
-                modifier = modifier
+                modifier = modifier,
             )
         }
 
@@ -1728,7 +1732,7 @@ class AndroidViewTest {
             Column(modifier = Modifier.fillMaxSize()) {
                 GlobalLayoutAwareTextView(
                     init = { textView1 = it },
-                    modifier = Modifier.fillMaxWidth().height(100.dp)
+                    modifier = Modifier.fillMaxWidth().height(100.dp),
                 )
             }
         }
@@ -1778,7 +1782,7 @@ class AndroidViewTest {
                         init(this)
                     }
                 },
-                modifier = modifier
+                modifier = modifier,
             )
         }
 
@@ -1790,12 +1794,12 @@ class AndroidViewTest {
             Column(modifier = Modifier.fillMaxSize()) {
                 GlobalLayoutAwareTextView(
                     init = { textView1 = it },
-                    modifier = Modifier.fillMaxWidth().height(100.dp)
+                    modifier = Modifier.fillMaxWidth().height(100.dp),
                 )
 
                 GlobalLayoutAwareTextView(
                     init = { textView2 = it },
-                    modifier = Modifier.fillMaxWidth().height(100.dp)
+                    modifier = Modifier.fillMaxWidth().height(100.dp),
                 )
             }
         }
@@ -1865,7 +1869,7 @@ class AndroidViewTest {
                                 Box(Modifier.fillMaxSize().systemBarsPadding())
                             }
                         }
-                    }
+                    },
                 )
                 Box(Modifier.fillMaxSize().background(Color.White).safeContentPadding())
             }
@@ -1877,12 +1881,12 @@ class AndroidViewTest {
                 object : Callback(DISPATCH_MODE_CONTINUE_ON_SUBTREE) {
                     override fun onProgress(
                         insets: WindowInsetsCompat,
-                        runningAnimations: MutableList<WindowInsetsAnimationCompat>
+                        runningAnimations: MutableList<WindowInsetsAnimationCompat>,
                     ): WindowInsetsCompat = insets
 
                     override fun onStart(
                         animation: WindowInsetsAnimationCompat,
-                        bounds: BoundsCompat
+                        bounds: BoundsCompat,
                     ): BoundsCompat {
                         isAnimating = true
                         return super.onStart(animation, bounds)
@@ -1892,7 +1896,7 @@ class AndroidViewTest {
                         isAnimating = false
                         super.onEnd(animation)
                     }
-                }
+                },
             )
         }
 
@@ -1969,7 +1973,7 @@ class AndroidViewTest {
                                 )
                             }
                         }
-                    }
+                    },
                 )
                 Box(Modifier.fillMaxSize().background(Color.White).safeContentPadding())
             }
@@ -2062,7 +2066,7 @@ class AndroidViewTest {
                                         Box(Modifier.fillMaxSize().systemBarsPadding())
                                     }
                                 }
-                            }
+                            },
                         )
                         Box(Modifier.fillMaxSize().background(Color.White).safeContentPadding())
                     }
@@ -2120,7 +2124,7 @@ class AndroidViewTest {
                                 object : Callback(DISPATCH_MODE_CONTINUE_ON_SUBTREE) {
                                     override fun onProgress(
                                         insets: WindowInsetsCompat,
-                                        runningAnimations: MutableList<WindowInsetsAnimationCompat>
+                                        runningAnimations: MutableList<WindowInsetsAnimationCompat>,
                                     ): WindowInsetsCompat {
                                         innerProgressInsets += insets
                                         return insets
@@ -2128,15 +2132,15 @@ class AndroidViewTest {
 
                                     override fun onStart(
                                         animation: WindowInsetsAnimationCompat,
-                                        bounds: BoundsCompat
+                                        bounds: BoundsCompat,
                                     ): BoundsCompat {
                                         innerBounds = bounds
                                         return bounds
                                     }
-                                }
+                                },
                             )
                         }
-                    }
+                    },
                 )
             }
         }
@@ -2148,7 +2152,7 @@ class AndroidViewTest {
                 object : Callback(DISPATCH_MODE_CONTINUE_ON_SUBTREE) {
                     override fun onProgress(
                         insets: WindowInsetsCompat,
-                        runningAnimations: MutableList<WindowInsetsAnimationCompat>
+                        runningAnimations: MutableList<WindowInsetsAnimationCompat>,
                     ): WindowInsetsCompat {
                         outerProgressInsets += insets
                         return insets
@@ -2156,7 +2160,7 @@ class AndroidViewTest {
 
                     override fun onStart(
                         animation: WindowInsetsAnimationCompat,
-                        bounds: BoundsCompat
+                        bounds: BoundsCompat,
                     ): BoundsCompat {
                         outerBounds = bounds
                         isAnimating = true
@@ -2167,7 +2171,7 @@ class AndroidViewTest {
                     override fun onEnd(animation: WindowInsetsAnimationCompat) {
                         isAnimating = false
                     }
-                }
+                },
             )
             ViewCompat.setOnApplyWindowInsetsListener(view) { _, insets ->
                 isImeVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
@@ -2272,7 +2276,7 @@ class AndroidViewTest {
                         factory = { context ->
                             View(context).apply { layoutParams = ViewGroup.LayoutParams(100, 100) }
                         },
-                        onReset = { _ -> }
+                        onReset = { _ -> },
                     )
                 }
             }
@@ -2283,6 +2287,60 @@ class AndroidViewTest {
         rule.waitForIdle()
     }
 
+    @Test
+    fun premeasuredViewCanChangeItsSizeBeforePlacement() {
+        val tag = "view"
+        lateinit var view: ChangingSizeView
+        var shouldSubcompose by mutableStateOf(false)
+        val content =
+            @Composable {
+                AndroidView(
+                    factory = {
+                        view = ChangingSizeView(it)
+                        val parent = FrameLayout(it)
+                        parent.addView(view)
+                        parent
+                    }
+                )
+            }
+        val state = SubcomposeLayoutState()
+        var lastConstraints = Constraints()
+        rule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                SubcomposeLayout(state = state, modifier = Modifier.testTag(tag)) { constraints ->
+                    lastConstraints = constraints
+                    val placeable =
+                        if (shouldSubcompose) {
+                            subcompose(Unit, content).first().measure(constraints)
+                        } else {
+                            null
+                        }
+                    layout(placeable?.width ?: 0, placeable?.height ?: 0) { placeable?.place(0, 0) }
+                }
+            }
+        }
+
+        rule.onNodeWithTag(tag).assertWidthIsEqualTo(0.dp)
+        rule.runOnIdle { state.precompose(Unit, content).premeasure(0, lastConstraints) }
+
+        rule.runOnIdle {
+            view.desiredSize = 20
+            view.requestLayout()
+        }
+
+        rule.runOnIdle { shouldSubcompose = true }
+
+        rule.onNodeWithTag(tag).assertWidthIsEqualTo(20.dp)
+    }
+
+    class ChangingSizeView(context: Context) : View(context) {
+        var desiredSize = 10
+
+        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            setMeasuredDimension(desiredSize, desiredSize)
+        }
+    }
+
     @Composable
     private inline fun <T : View> ReusableAndroidViewWithLifecycleTracking(
         crossinline factory: (Context) -> T,
@@ -2290,7 +2348,7 @@ class AndroidViewTest {
         modifier: Modifier = Modifier,
         crossinline update: (T) -> Unit = {},
         crossinline reuse: (T) -> Unit = {},
-        crossinline release: (T) -> Unit = {}
+        crossinline release: (T) -> Unit = {},
     ) {
         AndroidView(
             factory = {
@@ -2309,7 +2367,7 @@ class AndroidViewTest {
 
                             override fun onStateChanged(
                                 source: LifecycleOwner,
-                                event: Lifecycle.Event
+                                event: Lifecycle.Event,
                             ) {
                                 onLifecycleEvent(ViewLifecycleEvent(event))
                             }
@@ -2329,7 +2387,7 @@ class AndroidViewTest {
             onRelease = {
                 onLifecycleEvent(OnRelease)
                 release(it)
-            }
+            },
         )
     }
 
@@ -2359,7 +2417,7 @@ class AndroidViewTest {
     private class StateSavingView(
         context: Context,
         var value: String = "",
-        private val onRestoredValue: (String) -> Unit = {}
+        private val onRestoredValue: (String) -> Unit = {},
     ) : View(context) {
         init {
             id = ID

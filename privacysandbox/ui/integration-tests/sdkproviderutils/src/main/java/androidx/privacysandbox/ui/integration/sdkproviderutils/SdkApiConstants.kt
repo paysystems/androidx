@@ -19,12 +19,21 @@ package androidx.privacysandbox.ui.integration.sdkproviderutils
 // TODO(b/346965982) : Move to SdkApi file
 class SdkApiConstants {
     companion object {
+        annotation class AdFormat {
+            companion object {
+                const val BANNER_AD = 0
+                const val NATIVE_AD = 1
+            }
+        }
+
         annotation class AdType {
             companion object {
                 const val BASIC_NON_WEBVIEW = 0
                 const val BASIC_WEBVIEW = 1
                 const val WEBVIEW_FROM_LOCAL_ASSETS = 2
                 const val NON_WEBVIEW_VIDEO = 3
+                const val SCROLL_VIEW = 4
+                const val SCROLL_VIEW_APP_CAN_NOT_SCROLL = 5
             }
         }
 
@@ -73,6 +82,10 @@ class SdkApiConstants {
                 const val RESIZE = 0
                 const val SCROLL = 1
                 const val POOLING_CONTAINER = 2
+                const val RESIZE_HIDDEN = 3
+                const val OCCLUSIONS_HIDDEN = 4
+                const val SCROLL_HIDDEN = 5
+                const val REUSABLE_LIST_HIDDEN = 6
             }
         }
 
@@ -82,5 +95,29 @@ class SdkApiConstants {
                 const val COMPOSE = 1
             }
         }
+
+        annotation class NativeAdAssetName {
+            companion object {
+                const val ASSET_BUNDLE_NAME = "assets"
+                const val HEADLINE = "headline"
+                const val BODY = "body"
+                const val ICON = "icon"
+                const val MEDIA_VIEW_1 = "media-view-1"
+                const val MEDIA_VIEW_2 = "media-view-2"
+                const val AD_CHOICES = "ad-choices"
+                const val CALL_TO_ACTION = "call-to-action"
+            }
+        }
+
+        annotation class NativeAdAssetProperties {
+            companion object {
+                const val TEXT = "text"
+                const val COLOR = "color"
+                const val BITMAP = "bitmap"
+                const val URL = "url"
+            }
+        }
+
+        const val AUTOMATED_TEST_CALLBACK = "automated-test-callback"
     }
 }

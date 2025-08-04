@@ -16,10 +16,10 @@
 
 package androidx.xr.compose.spatial
 
+import android.util.Log
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -32,8 +32,8 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.dp
 import androidx.xr.compose.platform.LocalSpatialCapabilities
 
 /**
@@ -45,28 +45,25 @@ import androidx.xr.compose.platform.LocalSpatialCapabilities
  *
  * In non-spatial environments, the content is rendered normally without elevation.
  *
- * @param spatialElevationLevel the desired elevation level for the panel in spatial environments.
+ * SpatialElevation does not support a [content] lambda that has a width or height of zero.
+ *
+ * @param elevation the desired elevation level for the panel in spatial environments.
  * @param content the composable content to be displayed within the elevated panel.
  */
 @Composable
 public fun SpatialElevation(
-    spatialElevationLevel: SpatialElevationLevel = SpatialElevationLevel.Level0,
+    elevation: Dp = SpatialElevationLevel.Level0,
     content: @Composable () -> Unit,
 ) {
     if (LocalSpatialCapabilities.current.isSpatialUiEnabled) {
-        LayoutSpatialElevation(spatialElevationLevel, content)
+        LayoutSpatialElevation(elevation, content)
     } else {
         content()
     }
 }
 
 @Composable
-private fun LayoutSpatialElevation(
-    spatialElevationLevel: SpatialElevationLevel,
-    content: @Composable () -> Unit,
-) {
-    val bufferPadding = 1.dp
-    val bufferPaddingPx = with(LocalDensity.current) { bufferPadding.toPx() }
+private fun LayoutSpatialElevation(elevation: Dp, content: @Composable () -> Unit) {
     var contentSize by remember { mutableStateOf(IntSize.Zero) }
     var contentOffset: Offset? by remember { mutableStateOf(null) }
 
@@ -83,24 +80,22 @@ private fun LayoutSpatialElevation(
     // not know the constraints of the parent view.
     BoxWithConstraints {
         ElevatedPanel(
-            spatialElevationLevel = spatialElevationLevel,
+            elevation = elevation,
             contentSize = contentSize,
             contentOffset = contentOffset,
         ) {
-            // This padding prevents visual aberrations due to stretched panels. The panel is still
-            // being stretched in those cases (which will affect input tracking), but it will not be
-            // visible to the user.
-            // TODO(b/333074376): Remove this padding when the underlying bug is fixed.
             Box(
-                Modifier.constrainTo(constraints)
-                    .onSizeChanged {
-                        check(it.width > bufferPaddingPx * 2 && it.height > bufferPaddingPx * 2) {
+                Modifier.constrainTo(constraints).onSizeChanged {
+                    if (it.width <= 0 || it.height <= 0) {
+                        Log.w(
+                            "SpatialElevation",
                             "Empty composables cannot be placed at a SpatialElevation. You may be trying" +
-                                " to use a Popup or Dialog with a SpatialElevation, which is not supported."
-                        }
-                        contentSize = it
+                                " to use a Popup or Dialog with a SpatialElevation, which is not supported.",
+                        )
+                        return@onSizeChanged
                     }
-                    .padding(bufferPadding)
+                    contentSize = it
+                }
             ) {
                 content()
             }

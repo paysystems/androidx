@@ -25,11 +25,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.testutils.assertPixels
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.background
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.node.LayoutNode
 import androidx.compose.ui.platform.testTag
@@ -46,6 +48,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SdkSuppress
 import androidx.test.filters.SmallTest
 import com.google.common.truth.Truth.assertThat
+import kotlin.math.roundToInt
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -407,13 +410,191 @@ class PlacedChildTest {
             assertThat(childPlaceCount).isEqualTo(1)
         }
     }
+
+    @Test
+    fun remeasureNotPlacedChildMeasuredInPlacement() {
+        lateinit var coordinates: LayoutCoordinates
+        var childHeight by mutableIntStateOf(0)
+        rule.setContent {
+            Layout(
+                {
+                    Box(
+                        Modifier.layout { m, c ->
+                            val h = childHeight
+                            val p = m.measure(c.copy(minHeight = h, maxHeight = h))
+                            layout(p.width, h) { if (h != 0) p.place(0, 0) }
+                        }
+                    )
+                    Box(Modifier.size(100.dp).onPlaced { coordinates = it })
+                },
+                Modifier.fillMaxSize(),
+            ) { measurables, constraints ->
+                val layoutWidth = constraints.maxWidth
+                val layoutHeight = constraints.maxHeight
+                layout(layoutWidth, layoutHeight) {
+                    val upperPlaceable = measurables[0].measure(Constraints())
+                    val lowerPlaceable = measurables[1].measure(Constraints())
+                    upperPlaceable.place(0, 0)
+                    lowerPlaceable.place(0, upperPlaceable.height)
+                }
+            }
+        }
+        rule.runOnIdle { childHeight = 200 }
+        rule.runOnIdle { assertThat(coordinates.positionInParent().y.roundToInt()).isEqualTo(200) }
+    }
+
+    @Test
+    fun remeasureNotPlacedChildMeasuredInPlacementInLookahead() {
+        lateinit var coordinates: LayoutCoordinates
+        var childHeight by mutableIntStateOf(0)
+        rule.setContent {
+            LookaheadScope {
+                Layout(
+                    {
+                        Box(
+                            Modifier.layout { m, c ->
+                                if (isLookingAhead) {
+                                    val h = childHeight
+                                    val p = m.measure(c.copy(minHeight = h, maxHeight = h))
+                                    layout(p.width, h) { if (h != 0) p.place(0, 0) }
+                                } else {
+                                    val p = m.measure(c)
+                                    layout(p.width, p.height) {}
+                                }
+                            }
+                        )
+                        Box(
+                            Modifier.size(100.dp).layout { m, c ->
+                                val p = m.measure(c)
+                                layout(p.width, p.height) {
+                                    if (isLookingAhead && this.coordinates != null) {
+                                        coordinates = this.coordinates!!
+                                    }
+                                    p.place(0, 0)
+                                }
+                            }
+                        )
+                    },
+                    Modifier.fillMaxSize(),
+                ) { measurables, constraints ->
+                    val layoutWidth = constraints.maxWidth
+                    val layoutHeight = constraints.maxHeight
+                    layout(layoutWidth, layoutHeight) {
+                        val upperPlaceable = measurables[0].measure(Constraints())
+                        val lowerPlaceable = measurables[1].measure(Constraints())
+                        upperPlaceable.place(0, 0)
+                        lowerPlaceable.place(0, upperPlaceable.height)
+                    }
+                }
+            }
+        }
+        rule.runOnIdle { childHeight = 200 }
+        rule.runOnIdle { assertThat(coordinates.positionInParent().y.roundToInt()).isEqualTo(200) }
+    }
+
+    @Test
+    fun onPlacedIsNotCalledDuringAlignmentLinesCalculation() {
+        val onPlacedPositions = mutableListOf<Offset>()
+        rule.setContent {
+            Layout(
+                content = {
+                    Box {
+                        Layout(
+                            modifier =
+                                Modifier.onPlaced { onPlacedPositions.add(it.positionInRoot()) }
+                        ) { measurables, constraints ->
+                            layout(50, 50, mapOf(FirstBaseline to 0)) {}
+                        }
+                    }
+                }
+            ) { measurables, constraints ->
+                val placeable = measurables.first().measure(constraints)
+                placeable[FirstBaseline]
+                layout(placeable.width, placeable.height) { placeable.place(10, 10) }
+            }
+        }
+
+        rule.runOnIdle { assertThat(onPlacedPositions).isEqualTo(listOf(Offset(10f, 10f))) }
+    }
+
+    @Test
+    fun grandChildIsPlacedWithNullCoordinatesFirstDuringAlignmentLinesCalculation() {
+        val onPlacedPositions = mutableListOf<Offset?>()
+        rule.setContent {
+            Layout(
+                content = {
+                    Box {
+                        Layout { measurables, constraints ->
+                            layout(50, 50, mapOf(FirstBaseline to 0)) {
+                                onPlacedPositions.add(coordinates?.positionInRoot())
+                            }
+                        }
+                    }
+                }
+            ) { measurables, constraints ->
+                val placeable = measurables.first().measure(constraints)
+                placeable[FirstBaseline]
+                layout(placeable.width, placeable.height) { placeable.place(10, 10) }
+            }
+        }
+
+        rule.runOnIdle { assertThat(onPlacedPositions).isEqualTo(listOf(null, Offset(10f, 10f))) }
+    }
+
+    @Test
+    fun onPlacedIsNotCalledOnNotPlacedChildUsedByAlignmentLinesCalculation() {
+        var onPlacedCalls = 0
+        rule.setContent {
+            Layout(
+                content = {
+                    Box {
+                        Layout(modifier = Modifier.onPlaced { onPlacedCalls++ }) {
+                            measurables,
+                            constraints ->
+                            layout(50, 50, mapOf(FirstBaseline to 0)) {}
+                        }
+                    }
+                }
+            ) { measurables, constraints ->
+                val placeable = measurables.first().measure(constraints)
+                placeable[FirstBaseline]
+                layout(placeable.width, placeable.height) {}
+            }
+        }
+
+        rule.runOnIdle { assertThat(onPlacedCalls).isEqualTo(0) }
+    }
+
+    @Test
+    fun grandChildIsOnlyCalledWithNullCoordinatesWhenUsedByAlignmentLinesCalculationButNotPlaced() {
+        val onPlacedPositions = mutableListOf<Offset?>()
+        rule.setContent {
+            Layout(
+                content = {
+                    Box {
+                        Layout { measurables, constraints ->
+                            layout(50, 50, mapOf(FirstBaseline to 0)) {
+                                onPlacedPositions.add(coordinates?.positionInRoot())
+                            }
+                        }
+                    }
+                }
+            ) { measurables, constraints ->
+                val placeable = measurables.first().measure(constraints)
+                placeable[FirstBaseline]
+                layout(placeable.width, placeable.height) {}
+            }
+        }
+
+        rule.runOnIdle { assertThat(onPlacedPositions).isEqualTo(listOf(null)) }
+    }
 }
 
 private val UseChildSizeButNotPlace =
     object : LayoutNode.NoIntrinsicsMeasurePolicy("") {
         override fun MeasureScope.measure(
             measurables: List<Measurable>,
-            constraints: Constraints
+            constraints: Constraints,
         ): MeasureResult {
             val placeable = measurables.first().measure(constraints)
             return layout(placeable.width, placeable.height) {

@@ -17,15 +17,16 @@
 package androidx.xr.compose.subspace.layout
 
 import androidx.xr.compose.subspace.node.SubspaceLayoutModifierNode
-import androidx.xr.compose.subspace.node.SubspaceModifierElement
+import androidx.xr.compose.subspace.node.SubspaceModifierNodeElement
 import androidx.xr.compose.unit.VolumeConstraints
 import androidx.xr.runtime.math.Pose
 import androidx.xr.runtime.math.Quaternion
 import androidx.xr.runtime.math.Vector3
 
 /**
- * Rotate a subspace element (i.e. Panel) in space. Parameter rotation angles are specified in
- * degrees. The rotations are applied with the order pitch, then yaw, then roll.
+ * Rotate a subspace element (i.e. Panel) in space with regards to the center of the element.
+ * Parameter rotation angles are specified in degrees. The rotations are applied with the order
+ * pitch, then yaw, then roll.
  *
  * @param pitch Rotation around the x-axis. The x-axis is the axis width is measured on.
  * @param yaw Rotation around the y-axis. The y-axis is the axis height is measured on.
@@ -35,7 +36,10 @@ public fun SubspaceModifier.rotate(pitch: Float, yaw: Float, roll: Float): Subsp
     this.then(RotationElement(pitch, yaw, roll))
 
 /**
- * Rotate a subspace element (i.e. Panel) in space.
+ * Rotate a subspace element (i.e. Panel) in space with regards to the center of the element. The
+ * rotation is defined by a [Vector3] and a rotation angle in degrees. The axis angle will be
+ * normalized during construction. The [rotation] will be applied to the unit vector representing
+ * the [axisAngle].
  *
  * @param axisAngle Vector representing the axis of rotation.
  * @param rotation Degrees of rotation.
@@ -44,7 +48,9 @@ public fun SubspaceModifier.rotate(axisAngle: Vector3, rotation: Float): Subspac
     this.then(RotationElement(axisAngle, rotation))
 
 /**
- * Rotate a subspace element (i.e. Panel) in space.
+ * Rotate a subspace element (i.e. Panel) in space with regards to the center of the element. The
+ * rotation is directly specified by the provided [Quaternion]. The [Quaternion] values are
+ * specified as x,y,z,w. Where w is the rotation of the unit vector, in radians.
  *
  * @param quaternion Quaternion describing the rotation.
  */
@@ -52,7 +58,7 @@ public fun SubspaceModifier.rotate(quaternion: Quaternion): SubspaceModifier =
     this.then(RotationElement(quaternion))
 
 private class RotationElement(private val quaternion: Quaternion) :
-    SubspaceModifierElement<RotationNode>() {
+    SubspaceModifierNodeElement<RotationNode>() {
 
     public constructor(
         pitch: Float,
@@ -87,10 +93,10 @@ private class RotationElement(private val quaternion: Quaternion) :
 
 internal class RotationNode(public var quaternion: Quaternion) :
     SubspaceLayoutModifierNode, SubspaceModifier.Node() {
-    override fun MeasureScope.measure(
-        measurable: Measurable,
+    override fun SubspaceMeasureScope.measure(
+        measurable: SubspaceMeasurable,
         constraints: VolumeConstraints,
-    ): MeasureResult {
+    ): SubspaceMeasureResult {
         val placeable = measurable.measure(constraints)
         return layout(placeable.measuredWidth, placeable.measuredHeight, placeable.measuredDepth) {
             placeable.place(Pose(translation = Vector3.Zero, rotation = quaternion))

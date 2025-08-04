@@ -23,18 +23,22 @@ import android.view.View
 import android.widget.CheckBox
 import android.widget.Switch
 import androidx.appcompat.app.AppCompatActivity
+import androidx.xr.runtime.Config
+import androidx.xr.runtime.Config.PlaneTrackingMode
+import androidx.xr.runtime.Session
+import androidx.xr.runtime.SessionCreateSuccess
+import androidx.xr.runtime.math.IntSize2d
 import androidx.xr.runtime.math.Pose
 import androidx.xr.runtime.math.Ray
 import androidx.xr.runtime.math.Vector3
 import androidx.xr.scenecore.AnchorPlacement
-import androidx.xr.scenecore.Dimensions
 import androidx.xr.scenecore.Entity
+import androidx.xr.scenecore.EntityMoveListener
 import androidx.xr.scenecore.MovableComponent
-import androidx.xr.scenecore.MoveListener
 import androidx.xr.scenecore.PanelEntity
-import androidx.xr.scenecore.PlaneSemantic
-import androidx.xr.scenecore.PlaneType
-import androidx.xr.scenecore.Session
+import androidx.xr.scenecore.PlaneOrientation
+import androidx.xr.scenecore.PlaneSemanticType
+import androidx.xr.scenecore.scene
 import java.util.concurrent.Executors
 
 /**
@@ -50,14 +54,14 @@ import java.util.concurrent.Executors
  */
 class MovableActivity : AppCompatActivity() {
 
-    private val session by lazy { Session.create(this) }
+    private val session by lazy { (Session.create(this) as SessionCreateSuccess).session }
     private var systemMovable = false
     private var scaleInZ = false
     private var anchorable = false
     private var parentedToPanel = false
     private var movableComponent: MovableComponent? = null
     private val executor = Executors.newSingleThreadExecutor()
-    private var planeTypeFilter: MutableSet<Int> = mutableSetOf()
+    private var planeOrientationFilter: MutableSet<Int> = mutableSetOf()
     private var planeSemanticFilter: MutableSet<Int> = mutableSetOf()
 
     companion object {
@@ -68,14 +72,15 @@ class MovableActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.movable_activity)
 
+        session.configure(Config(planeTracking = PlaneTrackingMode.HORIZONTAL_AND_VERTICAL))
+
         @SuppressLint("InflateParams")
         val stationaryPanelContentView = layoutInflater.inflate(R.layout.stationary_panel, null)
         val stationaryPanelEntity =
             PanelEntity.create(
                 session,
                 stationaryPanelContentView,
-                Dimensions(640f, 480f),
-                Dimensions(0.1f, 0.1f, 0.1f),
+                IntSize2d(640, 480),
                 "stationaryPanel",
                 Pose(Vector3(1f, 0f, 0f)),
             )
@@ -87,8 +92,7 @@ class MovableActivity : AppCompatActivity() {
             PanelEntity.create(
                 session,
                 movablePanelContentView,
-                Dimensions(640f, 880f),
-                Dimensions(0.1f, 0.1f, 0.1f),
+                IntSize2d(640, 880),
                 "panel",
                 Pose(Vector3(0f, 0f, 0.1f)),
             )
@@ -110,8 +114,8 @@ class MovableActivity : AppCompatActivity() {
         val parentSwitch = movablePanelContentView.findViewById<Switch>(R.id.parent_switch)
         parentSwitch.setOnCheckedChangeListener { _, isChecked: Boolean ->
             when (isChecked) {
-                true -> movablePanelEntity.setParent(stationaryPanelEntity)
-                false -> movablePanelEntity.setParent(session.activitySpace)
+                true -> movablePanelEntity.parent = stationaryPanelEntity
+                false -> movablePanelEntity.parent = session.scene.activitySpace
             }
             movablePanelEntity.setPose(Pose(Vector3(0f, 0f, 0.1f)))
         }
@@ -124,31 +128,34 @@ class MovableActivity : AppCompatActivity() {
     private fun setupAnchorPlacementCheckboxes(view: View, movablePanelEntity: Entity) {
         val planeTypeCheckboxMap =
             mapOf(
-                view.findViewById<CheckBox>(R.id.planetype_any_checkbox) to PlaneType.ANY,
+                view.findViewById<CheckBox>(R.id.planetype_any_checkbox) to PlaneOrientation.ANY,
                 view.findViewById<CheckBox>(R.id.planetype_horizontal_checkbox) to
-                    PlaneType.HORIZONTAL,
-                view.findViewById<CheckBox>(R.id.planetype_vertical_checkbox) to PlaneType.VERTICAL,
+                    PlaneOrientation.HORIZONTAL,
+                view.findViewById<CheckBox>(R.id.planetype_vertical_checkbox) to
+                    PlaneOrientation.VERTICAL,
             )
         val planeSemanticCheckboxMap =
             mapOf(
-                view.findViewById<CheckBox>(R.id.planesemantic_any_checkbox) to PlaneSemantic.ANY,
-                view.findViewById<CheckBox>(R.id.planesemantic_wall_checkbox) to PlaneSemantic.WALL,
+                view.findViewById<CheckBox>(R.id.planesemantic_any_checkbox) to
+                    PlaneSemanticType.ANY,
+                view.findViewById<CheckBox>(R.id.planesemantic_wall_checkbox) to
+                    PlaneSemanticType.WALL,
                 view.findViewById<CheckBox>(R.id.planesemantic_ceiling_checkbox) to
-                    PlaneSemantic.CEILING,
+                    PlaneSemanticType.CEILING,
                 view.findViewById<CheckBox>(R.id.planesemantic_table_checkbox) to
-                    PlaneSemantic.TABLE,
+                    PlaneSemanticType.TABLE,
                 view.findViewById<CheckBox>(R.id.planesemantic_floor_checkbox) to
-                    PlaneSemantic.FLOOR,
+                    PlaneSemanticType.FLOOR,
             )
 
         for ((planeView, planeType) in planeTypeCheckboxMap) {
             if (planeView.isChecked) {
-                planeTypeFilter.add(planeType)
+                planeOrientationFilter.add(planeType)
             }
             planeView.setOnCheckedChangeListener { _, isChecked: Boolean ->
                 when (isChecked) {
-                    true -> planeTypeFilter.add(planeType)
-                    false -> planeTypeFilter.remove(planeType)
+                    true -> planeOrientationFilter.add(planeType)
+                    false -> planeOrientationFilter.remove(planeType)
                 }
                 replaceMovableComponent(movablePanelEntity)
             }
@@ -173,48 +180,42 @@ class MovableActivity : AppCompatActivity() {
         val anchorPlacementSet: MutableSet<AnchorPlacement> = mutableSetOf()
         if (anchorable) {
             anchorPlacementSet.add(
-                AnchorPlacement.createForPlanes(planeTypeFilter, planeSemanticFilter)
+                AnchorPlacement.createForPlanes(planeOrientationFilter, planeSemanticFilter)
             )
-        }
-
-        movableComponent =
-            MovableComponent.create(session, systemMovable, scaleInZ, anchorPlacementSet)
-        movableComponent?.let {
-            if (!movablePanelEntity.addComponent(it)) {
-                Log.e(TAG, "Error adding Movable component to parentedMovableEntity")
-            }
-            it.addMoveListener(
-                executor,
-                object : MoveListener {
-                    override fun onMoveUpdate(
-                        entity: Entity,
-                        currentInputRay: Ray,
-                        currentPose: Pose,
-                        currentScale: Float,
-                    ) {
-                        if (!systemMovable) {
+            movableComponent = MovableComponent.createAnchorable(session, anchorPlacementSet)
+        } else if (systemMovable) {
+            movableComponent = MovableComponent.createSystemMovable(session, scaleInZ)
+        } else {
+            movableComponent =
+                MovableComponent.createCustomMovable(
+                    session,
+                    scaleInZ,
+                    executor,
+                    object : EntityMoveListener {
+                        override fun onMoveUpdate(
+                            entity: Entity,
+                            currentInputRay: Ray,
+                            currentPose: Pose,
+                            currentScale: Float,
+                        ) {
                             entity.setPose(currentPose)
                             entity.setScale(currentScale)
                         }
-                    }
 
-                    override fun onMoveEnd(
-                        entity: Entity,
-                        finalInputRay: Ray,
-                        finalPose: Pose,
-                        finalScale: Float,
-                        updatedParent: Entity?,
-                    ) {
-                        if (!systemMovable) {
-                            entity.setPose(finalPose)
-                            entity.setScale(finalScale)
+                        override fun onMoveEnd(
+                            entity: Entity,
+                            finalInputRay: Ray,
+                            finalPose: Pose,
+                            finalScale: Float,
+                            updatedParent: Entity?,
+                        ) {
+                            if (updatedParent != null) {
+                                Log.i(TAG, "Panel parent is updated to: $updatedParent")
+                            }
                         }
-                        if (updatedParent != null) {
-                            Log.i(TAG, "Panel parent is updated to: $updatedParent")
-                        }
-                    }
-                },
-            )
+                    },
+                )
         }
+        movablePanelEntity.addComponent(movableComponent!!)
     }
 }

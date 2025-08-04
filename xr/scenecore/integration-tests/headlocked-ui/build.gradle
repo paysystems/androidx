@@ -22,6 +22,7 @@
  * modifying its settings.
  */
 
+import androidx.build.AndroidXConfig
 import androidx.build.ApkCopyHelperKt
 import androidx.build.SoftwareType
 
@@ -36,7 +37,7 @@ android {
     defaultConfig {
         // TODO: This should be lower, possibly 21.
         //       Address API calls that require higher versions.
-        minSdkVersion 34
+        minSdk = 34
     }
     buildFeatures { viewBinding = true }
     namespace = "androidx.xr.scenecore.samples.headlocked_ui"
@@ -55,8 +56,6 @@ androidx {
     type = SoftwareType.TEST_APPLICATION
     inceptionYear = "2024"
     description = "Test app that demonstrates a headlocked UI."
-    // TODO: b/326456246
-    optOutJSpecify = true
 }
 
 dependencies {
@@ -76,6 +75,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel:2.8.7")
     implementation("androidx.savedstate:savedstate:1.2.1")
+
+    compileOnly(files(new File(AndroidXConfig.getPrebuiltsRoot(project), "androidx/xr/extensions/com.android.extensions.xr.jar")))
 }
 
 // Making this APK available via Android Build so the QA team can

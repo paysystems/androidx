@@ -48,45 +48,26 @@ class AppFunctionComponentRegistryGenerator(private val codeGenerator: CodeGener
      *   componentNames = [
      *     "com.android.Test1",
      *     "com.android.Test2",
-     *   ]
-     * )
-     * @Generated
-     * public class `$ComAndroid_Inventory`
-     *
-     * @AppFunctionComponentRegistry(
-     *   componentCategory = "INVENTORY",
-     *   componentNames = [
      *     "com.android.diff.Test1",
      *   ]
      * )
      * @Generated
-     * public class `$ComAndroidDiff_Inventory`
+     * public class `$Mylibrary_InventoryComponentRegistry`
      * ```
-     *
-     * The components are grouped by the package name when generating a registry. This is to ensure
-     * that each registry class has an unique name across all compilation units.
      */
-    fun generateRegistriesByPackageName(
+    fun generateRegistry(
+        moduleName: String,
         category: String,
         components: List<AppFunctionComponent>,
     ) {
-        val componentsByPackageName = components.groupBy(AppFunctionComponent::packageName)
-        for ((packageName, groupedComponents) in componentsByPackageName) {
-            val registryName = getRegistryClassName(packageName, category)
-            generateRegistry(registryName, category, groupedComponents)
-        }
-    }
-
-    private fun generateRegistry(
-        className: String,
-        componentCategory: String,
-        components: List<AppFunctionComponent>,
-    ) {
-        val annotationBuilder =
+        // Ensure the generated registry is stable
+        val sortedComponents = components.sortedBy { it.qualifiedName }
+        val className = getRegistryClassName(moduleName, category)
+        var annotationBuilder =
             AnnotationSpec.builder(AppFunctionComponentRegistryAnnotation.CLASS_NAME)
                 .addMember(
                     "${AppFunctionComponentRegistryAnnotation.PROPERTY_COMPONENT_CATEGORY} = %S",
-                    componentCategory,
+                    category,
                 )
                 .addMember(
                     buildCodeBlock {
@@ -94,13 +75,31 @@ class AppFunctionComponentRegistryGenerator(private val codeGenerator: CodeGener
                             "${AppFunctionComponentRegistryAnnotation.PROPERTY_COMPONENT_NAMES} = ["
                         )
                         indent()
-                        for (componentName in components.map { it.qualifiedName }) {
-                            addStatement("%S,", componentName)
+                        for (component in sortedComponents) {
+                            addStatement("%S,", component.qualifiedName)
                         }
                         unindent()
                         add("]")
                     }
                 )
+        if (
+            category == AppFunctionComponentRegistryAnnotation.Category.FUNCTION ||
+                category == AppFunctionComponentRegistryAnnotation.Category.SERIALIZABLE
+        ) {
+            annotationBuilder.addMember(
+                buildCodeBlock {
+                    addStatement(
+                        "${AppFunctionComponentRegistryAnnotation.PROPERTY_COMPONENT_DOCSTRINGS} = ["
+                    )
+                    indent()
+                    for (component in sortedComponents) {
+                        addStatement("%S,", component.docString)
+                    }
+                    unindent()
+                    add("]")
+                }
+            )
+        }
 
         val registryClassBuilder = TypeSpec.classBuilder(className)
         registryClassBuilder.addAnnotation(annotationBuilder.build())
@@ -122,19 +121,19 @@ class AppFunctionComponentRegistryGenerator(private val codeGenerator: CodeGener
             .use { fileSpec.writeTo(it) }
     }
 
-    private fun getRegistryClassName(packageName: String, componentCategory: String): String {
-        val prefix = packageName.toPascalCase()
+    private fun getRegistryClassName(moduleName: String, componentCategory: String): String {
+        val prefix = moduleName.toPascalCase()
         val componentCategoryPascalCase = componentCategory.toPascalCase()
         return "${'$'}${prefix}_${componentCategoryPascalCase}ComponentRegistry"
     }
 
     /** Wrapper to hold AppFunction component data. */
     class AppFunctionComponent(
-        /** The component class package name. */
-        val packageName: String,
         /** The component class qualified name. */
         val qualifiedName: String,
         /** The source files used to generate the component. */
         val sourceFiles: Set<KSFile> = emptySet(),
+        /** DocString of the component. */
+        val docString: String = "",
     )
 }

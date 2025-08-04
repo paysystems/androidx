@@ -24,7 +24,7 @@ import androidx.xr.compose.subspace.layout.SpatialAlignment
 import androidx.xr.compose.subspace.layout.SubspaceLayout
 import androidx.xr.compose.subspace.layout.SubspaceModifier
 import androidx.xr.runtime.math.Pose
-import androidx.xr.scenecore.ContentlessEntity
+import androidx.xr.scenecore.GroupEntity
 
 /**
  * A layout composable that arranges its children in a vertical sequence.
@@ -33,7 +33,6 @@ import androidx.xr.scenecore.ContentlessEntity
  *
  * @param modifier Modifiers to apply to the layout.
  * @param alignment The default alignment for child elements within the column.
- * @param name The name of the layout.
  * @param content The composable content to be laid out vertically.
  */
 @Composable
@@ -41,17 +40,15 @@ import androidx.xr.scenecore.ContentlessEntity
 public fun SpatialColumn(
     modifier: SubspaceModifier = SubspaceModifier,
     alignment: SpatialAlignment = SpatialAlignment.Center,
-    name: String = defaultSpatialColumnName(),
     content: @Composable @SubspaceComposable SpatialColumnScope.() -> Unit,
 ) {
     SubspaceLayout(
         modifier = modifier,
         content = { SpatialColumnScopeInstance.content() },
         coreEntity =
-            rememberCoreContentlessEntity {
-                ContentlessEntity.create(this, name = name, pose = Pose.Identity)
+            rememberCoreGroupEntity {
+                GroupEntity.create(this, name = entityName("SpatialColumn"), pose = Pose.Identity)
             },
-        name = name,
         measurePolicy =
             RowColumnMeasurePolicy(
                 orientation = LayoutOrientation.Vertical,
@@ -121,10 +118,4 @@ internal object SpatialColumnScopeInstance : SpatialColumnScope {
     override fun SubspaceModifier.align(alignment: SpatialAlignment.Depth): SubspaceModifier {
         return this then RowColumnAlignElement(depthSpatialAlignment = alignment)
     }
-}
-
-private var spatialColumnNamePart: Int = 0
-
-private fun defaultSpatialColumnName(): String {
-    return "SpatialColumn-${spatialColumnNamePart++}"
 }

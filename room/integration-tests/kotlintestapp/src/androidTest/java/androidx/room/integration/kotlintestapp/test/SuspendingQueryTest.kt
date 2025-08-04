@@ -36,6 +36,7 @@ import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
+import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.IOException
 import java.util.concurrent.CountDownLatch
@@ -159,7 +160,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
             Room.databaseBuilder(
                     context = context,
                     klass = TestDatabase::class.java,
-                    name = "test.db"
+                    name = "test.db",
                 )
                 .setAutoCloseTimeout(10, TimeUnit.MILLISECONDS)
                 .build()
@@ -173,6 +174,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
                 db.booksDao().getBooksSuspend()
             }
         }
+        db.close()
     }
 
     @Test
@@ -183,7 +185,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
             Room.databaseBuilder(
                     context = context,
                     klass = TestDatabase::class.java,
-                    name = "test.db"
+                    name = "test.db",
                 )
                 .build()
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -197,6 +199,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
                 db.booksDao().getBooksSuspend()
             }
         }
+        db.close()
     }
 
     @Test
@@ -207,7 +210,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
                 database.beginTransaction()
                 booksDao.insertPublisherSuspend(
                     TestUtil.PUBLISHER.publisherId,
-                    TestUtil.PUBLISHER.name
+                    TestUtil.PUBLISHER.name,
                 )
                 booksDao.insertBookSuspend(TestUtil.BOOK_1.copy(salesCnt = 0))
                 booksDao.insertBookSuspend(TestUtil.BOOK_2)
@@ -229,7 +232,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
                 database.beginTransaction()
                 booksDao.insertPublisherSuspend(
                     TestUtil.PUBLISHER.publisherId,
-                    TestUtil.PUBLISHER.name
+                    TestUtil.PUBLISHER.name,
                 )
 
                 booksDao.addBooks(TestUtil.BOOK_1.copy(salesCnt = 0), TestUtil.BOOK_2)
@@ -251,7 +254,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
                 database.beginTransaction()
                 booksDao.insertPublisherSuspend(
                     TestUtil.PUBLISHER.publisherId,
-                    TestUtil.PUBLISHER.name
+                    TestUtil.PUBLISHER.name,
                 )
                 booksDao.insertBookSuspend(TestUtil.BOOK_1.copy(salesCnt = 0))
                 booksDao.insertBookSuspend(TestUtil.BOOK_2)
@@ -282,7 +285,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
             database.withTransaction {
                 booksDao.insertPublisherSuspend(
                     TestUtil.PUBLISHER.publisherId,
-                    TestUtil.PUBLISHER.name
+                    TestUtil.PUBLISHER.name,
                 )
                 booksDao.insertBookSuspend(TestUtil.BOOK_1.copy(salesCnt = 0))
                 booksDao.insertBookSuspend(TestUtil.BOOK_2)
@@ -298,7 +301,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
             database.withTransaction {
                 booksDao.insertPublisherSuspend(
                     TestUtil.PUBLISHER.publisherId,
-                    TestUtil.PUBLISHER.name
+                    TestUtil.PUBLISHER.name,
                 )
                 booksDao.insertBookSuspend(TestUtil.BOOK_1.copy(salesCnt = 0))
                 booksDao.insertBookSuspend(TestUtil.BOOK_2)
@@ -315,7 +318,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
                 database.withTransaction {
                     booksDao.insertPublisherSuspend(
                         TestUtil.PUBLISHER.publisherId,
-                        TestUtil.PUBLISHER.name
+                        TestUtil.PUBLISHER.name,
                     )
                     booksDao.insertBookSuspend(TestUtil.BOOK_1.copy(salesCnt = 0))
                     booksDao.insertBookSuspend(TestUtil.BOOK_2)
@@ -332,7 +335,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
             database.withTransaction {
                 booksDao.insertPublisherSuspend(
                     TestUtil.PUBLISHER.publisherId,
-                    TestUtil.PUBLISHER.name
+                    TestUtil.PUBLISHER.name,
                 )
                 booksDao.insertBookSuspend(TestUtil.BOOK_1.copy(salesCnt = 0))
                 booksDao.insertBookSuspend(TestUtil.BOOK_2)
@@ -348,7 +351,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
             database.withTransaction {
                 booksDao.insertPublisherSuspend(
                     TestUtil.PUBLISHER.publisherId,
-                    TestUtil.PUBLISHER.name
+                    TestUtil.PUBLISHER.name,
                 )
                 withContext(Dispatchers.IO) {
                     booksDao.insertBookSuspend(TestUtil.BOOK_1.copy(salesCnt = 0))
@@ -367,7 +370,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
                 database.withTransaction {
                     booksDao.insertPublisherSuspend(
                         TestUtil.PUBLISHER.publisherId,
-                        TestUtil.PUBLISHER.name
+                        TestUtil.PUBLISHER.name,
                     )
                     withContext(Dispatchers.IO) {
                         booksDao.insertBookSuspend(TestUtil.BOOK_1.copy(salesCnt = 0))
@@ -390,7 +393,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
             database.withTransaction {
                 booksDao.insertPublisherSuspend(
                     TestUtil.PUBLISHER.publisherId,
-                    TestUtil.PUBLISHER.name
+                    TestUtil.PUBLISHER.name,
                 )
                 booksDao.insertBookSuspend(TestUtil.BOOK_1)
             }
@@ -416,7 +419,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
             database.withTransaction {
                 booksDao.insertPublisherSuspend(
                     TestUtil.PUBLISHER.publisherId,
-                    TestUtil.PUBLISHER.name
+                    TestUtil.PUBLISHER.name,
                 )
                 database.withTransaction {
                     booksDao.insertBookSuspend(TestUtil.BOOK_1.copy(salesCnt = 0))
@@ -434,7 +437,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
             database.withTransaction {
                 booksDao.insertPublisherSuspend(
                     TestUtil.PUBLISHER.publisherId,
-                    TestUtil.PUBLISHER.name
+                    TestUtil.PUBLISHER.name,
                 )
                 database.withTransaction {
                     booksDao.insertBookSuspend(TestUtil.BOOK_1.copy(salesCnt = 0))
@@ -452,7 +455,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
             database.withTransaction {
                 booksDao.insertPublisherSuspend(
                     TestUtil.PUBLISHER.publisherId,
-                    TestUtil.PUBLISHER.name
+                    TestUtil.PUBLISHER.name,
                 )
 
                 try {
@@ -500,7 +503,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
             database.withTransaction {
                 booksDao.insertPublisherSuspend(
                     TestUtil.PUBLISHER.publisherId,
-                    TestUtil.PUBLISHER.name
+                    TestUtil.PUBLISHER.name,
                 )
                 withContext(Dispatchers.IO) {
                     database.withTransaction {
@@ -520,7 +523,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
             database.withTransaction {
                 booksDao.insertPublisherSuspend(
                     TestUtil.PUBLISHER.publisherId,
-                    TestUtil.PUBLISHER.name
+                    TestUtil.PUBLISHER.name,
                 )
                 coroutineScope {
                     launch {
@@ -540,7 +543,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
             database.withTransaction {
                 booksDao.insertPublisherSuspend(
                     TestUtil.PUBLISHER.publisherId,
-                    TestUtil.PUBLISHER.name
+                    TestUtil.PUBLISHER.name,
                 )
                 coroutineScope {
                     launch(Dispatchers.IO) {
@@ -592,7 +595,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
         val localDatabase =
             Room.inMemoryDatabaseBuilder(
                     ApplicationProvider.getApplicationContext(),
-                    TestDatabase::class.java
+                    TestDatabase::class.java,
                 )
                 .setTransactionExecutor(executorService)
                 .build()
@@ -621,6 +624,8 @@ class SuspendingQueryTest : TestDatabaseTest() {
         assertThat(executorService.awaitTermination(1, TimeUnit.SECONDS)).isTrue()
 
         assertThat(localDatabase.booksDao().getPublishers()).isEmpty()
+
+        localDatabase.close()
     }
 
     @Test
@@ -629,7 +634,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
             database.withTransaction {
                 booksDao.insertPublisherSuspend(
                     TestUtil.PUBLISHER.publisherId,
-                    TestUtil.PUBLISHER.name
+                    TestUtil.PUBLISHER.name,
                 )
                 booksDao.addBooks(TestUtil.BOOK_1.copy(salesCnt = 0))
                 booksDao.addBooks(TestUtil.BOOK_2)
@@ -704,7 +709,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
             database.withTransaction {
                 booksDao.insertPublisherSuspend(
                     TestUtil.PUBLISHER.publisherId,
-                    TestUtil.PUBLISHER.name
+                    TestUtil.PUBLISHER.name,
                 )
 
                 coroutineScope {
@@ -727,7 +732,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
             database.withTransaction {
                 booksDao.insertPublisherSuspend(
                     TestUtil.PUBLISHER.publisherId,
-                    TestUtil.PUBLISHER.name
+                    TestUtil.PUBLISHER.name,
                 )
 
                 withContext(Dispatchers.IO) {
@@ -796,7 +801,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
         val localDatabase =
             Room.inMemoryDatabaseBuilder(
                     ApplicationProvider.getApplicationContext(),
-                    TestDatabase::class.java
+                    TestDatabase::class.java,
                 )
                 .setQueryExecutor(ArchTaskExecutor.getIOThreadExecutor())
                 .setTransactionExecutor(wrappedExecutor)
@@ -824,6 +829,8 @@ class SuspendingQueryTest : TestDatabaseTest() {
         assertThat(busyThreadsCount.get()).isEqualTo(0)
         wrappedExecutor.shutdown()
         assertThat(wrappedExecutor.awaitTermination(1, TimeUnit.SECONDS)).isTrue()
+
+        localDatabase.close()
     }
 
     @Test
@@ -832,7 +839,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
         val localDatabase =
             Room.inMemoryDatabaseBuilder(
                     ApplicationProvider.getApplicationContext(),
-                    TestDatabase::class.java
+                    TestDatabase::class.java,
                 )
                 .setTransactionExecutor(executorService)
                 .build()
@@ -848,7 +855,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
                     localDatabase.withTransaction {
                         booksDao.insertPublisherSuspend(
                             TestUtil.PUBLISHER.publisherId,
-                            TestUtil.PUBLISHER.name
+                            TestUtil.PUBLISHER.name,
                         )
                     }
                 }
@@ -867,6 +874,8 @@ class SuspendingQueryTest : TestDatabaseTest() {
         assertThat(executorService.awaitTermination(1, TimeUnit.SECONDS)).isTrue()
 
         assertThat(booksDao.getPublishers()).isEmpty()
+
+        localDatabase.close()
     }
 
     @Test
@@ -875,7 +884,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
         val localDatabase =
             Room.inMemoryDatabaseBuilder(
                     ApplicationProvider.getApplicationContext(),
-                    TestDatabase::class.java
+                    TestDatabase::class.java,
                 )
                 .setTransactionExecutor(executorService)
                 .build()
@@ -895,6 +904,8 @@ class SuspendingQueryTest : TestDatabaseTest() {
 
         executorService.shutdown()
         assertThat(executorService.awaitTermination(1, TimeUnit.SECONDS)).isTrue()
+
+        localDatabase.close()
     }
 
     @Test
@@ -902,7 +913,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
         val localDatabase =
             Room.inMemoryDatabaseBuilder(
                     ApplicationProvider.getApplicationContext(),
-                    TestDatabase::class.java
+                    TestDatabase::class.java,
                 )
                 .addCallback(
                     object : RoomDatabase.Callback() {
@@ -920,6 +931,8 @@ class SuspendingQueryTest : TestDatabaseTest() {
                 assertThat(ex).hasMessageThat().contains("Error opening Database.")
             }
         }
+
+        localDatabase.close()
     }
 
     @Test
@@ -928,7 +941,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
         val localDatabase =
             Room.inMemoryDatabaseBuilder(
                     ApplicationProvider.getApplicationContext(),
-                    TestDatabase::class.java
+                    TestDatabase::class.java,
                 )
                 .openHelperFactory(
                     object : SupportSQLiteOpenHelper.Factory {
@@ -968,6 +981,8 @@ class SuspendingQueryTest : TestDatabaseTest() {
                 assertThat(ex).hasMessageThat().contains("Error beginning transaction")
             }
         }
+
+        localDatabase.close()
     }
 
     @Test
@@ -1139,7 +1154,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
         val localDatabase =
             Room.inMemoryDatabaseBuilder(
                     ApplicationProvider.getApplicationContext(),
-                    TestDatabase::class.java
+                    TestDatabase::class.java,
                 )
                 .setTransactionExecutor(executor)
                 .build()
@@ -1150,7 +1165,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
                         .booksDao()
                         .insertPublisherSuspend(
                             TestUtil.PUBLISHER.publisherId,
-                            TestUtil.PUBLISHER.name
+                            TestUtil.PUBLISHER.name,
                         )
                 }
             }
@@ -1159,6 +1174,8 @@ class SuspendingQueryTest : TestDatabaseTest() {
 
         executor.shutdown()
         assertThat(executor.awaitTermination(1, TimeUnit.SECONDS)).isTrue()
+
+        localDatabase.close()
     }
 
     @Test
@@ -1167,7 +1184,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
         val localDatabase =
             Room.inMemoryDatabaseBuilder(
                     ApplicationProvider.getApplicationContext(),
-                    TestDatabase::class.java
+                    TestDatabase::class.java,
                 )
                 .setTransactionExecutor(executor)
                 .build()
@@ -1178,7 +1195,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
                         .booksDao()
                         .insertPublisherSuspend(
                             TestUtil.PUBLISHER.publisherId,
-                            TestUtil.PUBLISHER.name
+                            TestUtil.PUBLISHER.name,
                         )
                     localDatabase.withTransaction {
                         localDatabase.booksDao().insertBookSuspend(TestUtil.BOOK_1)
@@ -1191,6 +1208,8 @@ class SuspendingQueryTest : TestDatabaseTest() {
 
         executor.shutdown()
         assertThat(executor.awaitTermination(1, TimeUnit.SECONDS)).isTrue()
+
+        localDatabase.close()
     }
 
     @Test
@@ -1199,7 +1218,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
         val localDatabase =
             Room.inMemoryDatabaseBuilder(
                     ApplicationProvider.getApplicationContext(),
-                    TestDatabase::class.java
+                    TestDatabase::class.java,
                 )
                 .setTransactionExecutor(executor)
                 .build()
@@ -1210,7 +1229,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
                         .booksDao()
                         .insertPublisherSuspend(
                             TestUtil.PUBLISHER.publisherId,
-                            TestUtil.PUBLISHER.name
+                            TestUtil.PUBLISHER.name,
                         )
                     try {
                         localDatabase.withTransaction {
@@ -1237,7 +1256,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
         val localDatabase =
             Room.inMemoryDatabaseBuilder(
                     ApplicationProvider.getApplicationContext(),
-                    TestDatabase::class.java
+                    TestDatabase::class.java,
                 )
                 .setTransactionExecutor(executor)
                 .build()
@@ -1249,7 +1268,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
                         .booksDao()
                         .insertPublisherSuspend(
                             TestUtil.PUBLISHER.publisherId,
-                            TestUtil.PUBLISHER.name
+                            TestUtil.PUBLISHER.name,
                         )
                     withContext(Dispatchers.IO) {
                         localDatabase.withTransaction {
@@ -1264,6 +1283,8 @@ class SuspendingQueryTest : TestDatabaseTest() {
 
         executor.shutdown()
         assertThat(executor.awaitTermination(1, TimeUnit.SECONDS)).isTrue()
+
+        localDatabase.close()
     }
 
     @Test
@@ -1273,7 +1294,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
         val localDatabase =
             Room.inMemoryDatabaseBuilder(
                     ApplicationProvider.getApplicationContext(),
-                    TestDatabase::class.java
+                    TestDatabase::class.java,
                 )
                 .setTransactionExecutor(executor)
                 .build()
@@ -1301,7 +1322,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
                         .booksDao()
                         .insertPublisherSuspend(
                             TestUtil.PUBLISHER.publisherId,
-                            TestUtil.PUBLISHER.name
+                            TestUtil.PUBLISHER.name,
                         )
                 }
             }
@@ -1311,6 +1332,8 @@ class SuspendingQueryTest : TestDatabaseTest() {
 
         executor.shutdown()
         assertThat(executor.awaitTermination(1, TimeUnit.SECONDS)).isTrue()
+
+        localDatabase.close()
     }
 
     @Test
@@ -1319,7 +1342,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
             database.withTransaction {
                 booksDao.insertPublisherSuspend(
                     TestUtil.PUBLISHER.publisherId,
-                    TestUtil.PUBLISHER.name
+                    TestUtil.PUBLISHER.name,
                 )
                 booksDao.insertBookSuspend(TestUtil.BOOK_1.copy(salesCnt = 0))
                 booksDao.insertBookSuspend(TestUtil.BOOK_2)
@@ -1352,6 +1375,7 @@ class SuspendingQueryTest : TestDatabaseTest() {
     }
 
     @Test
+    @SdkSuppress(minSdkVersion = 23)
     fun withTransaction_stress_dbMutation() {
         val context: Context = ApplicationProvider.getApplicationContext()
         context.deleteDatabase("test_stress_dbMutation.db")

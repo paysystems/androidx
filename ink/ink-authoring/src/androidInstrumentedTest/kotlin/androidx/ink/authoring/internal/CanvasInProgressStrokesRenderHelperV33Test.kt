@@ -25,6 +25,7 @@ import androidx.ink.authoring.ExperimentalLatencyDataApi
 import androidx.ink.authoring.InProgressStrokeId
 import androidx.ink.authoring.internal.CanvasInProgressStrokesRenderHelperV33.Bounds
 import androidx.ink.brush.Brush
+import androidx.ink.brush.ExperimentalInkCustomBrushApi
 import androidx.ink.brush.StockBrushes
 import androidx.ink.geometry.MutableBox
 import androidx.ink.rendering.android.canvas.CanvasStrokeRenderer
@@ -57,12 +58,12 @@ import org.mockito.kotlin.whenever
  * level but covers the functionality of [CanvasInProgressStrokesRenderHelperV33] in a different way
  * than this test.
  */
-@OptIn(ExperimentalLatencyDataApi::class)
+@OptIn(ExperimentalLatencyDataApi::class, ExperimentalInkCustomBrushApi::class)
 @RunWith(AndroidJUnit4::class)
 @MediumTest
 @SdkSuppress(
     maxSdkVersion = Build.VERSION_CODES.TIRAMISU,
-    minSdkVersion = Build.VERSION_CODES.TIRAMISU
+    minSdkVersion = Build.VERSION_CODES.TIRAMISU,
 )
 class CanvasInProgressStrokesRenderHelperV33Test {
 
@@ -197,7 +198,7 @@ class CanvasInProgressStrokesRenderHelperV33Test {
         withActivity { activity ->
             whenever(callback.onDraw()).then {
                 activity.renderHelper.prepareToDrawInModifiedRegion(MutableBox())
-                activity.renderHelper.drawInModifiedRegion(InProgressStroke(), Matrix())
+                activity.renderHelper.drawInModifiedRegion(InProgressStroke(), Matrix(), 0F)
                 activity.renderHelper.afterDrawInModifiedRegion()
             }
 

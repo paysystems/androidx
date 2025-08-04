@@ -136,13 +136,15 @@ class ProvidedTypeConverterTest {
         assertThat(db2.dao()[2]).isEqualTo(entity2)
         assertThat(db1.dao().getRawUsername(1)).isEqualTo("foo1-bar1")
         assertThat(db2.dao().getRawUsername(2)).isEqualTo("bar2-foo2")
+        db1.close()
+        db2.close()
     }
 
     @Database(
         entities = [Pet::class, Toy::class, PetUser::class, Robot::class, Hivemind::class],
         views = [PetWithUser::class],
         version = 1,
-        exportSchema = false
+        exportSchema = false,
     )
     @TypeConverters(TimeStampConverter::class, UUIDConverter::class)
     internal abstract class TestDatabaseWithConverterOne : RoomDatabase() {

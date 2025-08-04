@@ -31,6 +31,7 @@ import androidx.core.graphics.withMatrix
 import androidx.ink.authoring.ExperimentalLatencyDataApi
 import androidx.ink.authoring.InProgressStrokeId
 import androidx.ink.authoring.latency.LatencyData
+import androidx.ink.brush.ExperimentalInkCustomBrushApi
 import androidx.ink.geometry.MutableBox
 import androidx.ink.rendering.android.canvas.CanvasStrokeRenderer
 import androidx.ink.strokes.InProgressStroke
@@ -42,7 +43,7 @@ import androidx.ink.strokes.InProgressStroke
  * Support of pre-Q Android versions comes with the expense of rendering latency that is higher than
  * it would be with [androidx.graphics.lowlatency.CanvasFrontBufferedRenderer].
  */
-@OptIn(ExperimentalLatencyDataApi::class)
+@OptIn(ExperimentalLatencyDataApi::class, ExperimentalInkCustomBrushApi::class)
 @UiThread
 internal class CanvasInProgressStrokesRenderHelperV21(
     private val mainView: ViewGroup,
@@ -143,12 +144,18 @@ internal class CanvasInProgressStrokesRenderHelperV21(
     override fun drawInModifiedRegion(
         inProgressStroke: InProgressStroke,
         strokeToMainViewTransform: Matrix,
+        textureAnimationProgress: Float,
     ) {
         assertOnUiThread()
         val canvas =
             checkNotNull(canvasForCurrentDraw) { "Can only render during Callback.onDraw." }
         canvas.withMatrix(strokeToMainViewTransform) {
-            renderer.draw(canvas, inProgressStroke, strokeToMainViewTransform)
+            renderer.draw(
+                canvas,
+                inProgressStroke,
+                strokeToMainViewTransform,
+                textureAnimationProgress,
+            )
         }
     }
 

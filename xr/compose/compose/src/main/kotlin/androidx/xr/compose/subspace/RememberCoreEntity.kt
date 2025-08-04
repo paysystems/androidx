@@ -18,44 +18,114 @@ package androidx.xr.compose.subspace
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisallowComposableCalls
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalDensity
 import androidx.xr.compose.platform.LocalSession
-import androidx.xr.compose.platform.disposableValueOf
-import androidx.xr.compose.platform.getValue
-import androidx.xr.compose.subspace.layout.CoreContentlessEntity
+import androidx.xr.compose.subspace.layout.CoreGroupEntity
 import androidx.xr.compose.subspace.layout.CorePanelEntity
+import androidx.xr.compose.subspace.layout.CoreSphereSurfaceEntity
+import androidx.xr.compose.subspace.layout.CoreSurfaceEntity
+import androidx.xr.compose.subspace.layout.SpatialShape
+import androidx.xr.runtime.Config.HeadTrackingMode
+import androidx.xr.runtime.Session
+import androidx.xr.runtime.SessionConfigureSuccess
 import androidx.xr.scenecore.Entity
 import androidx.xr.scenecore.PanelEntity
-import androidx.xr.scenecore.Session
+import androidx.xr.scenecore.SurfaceEntity
+import androidx.xr.scenecore.scene
 
 /**
- * Creates a [CoreContentlessEntity] that is automatically disposed of when it leaves the
- * composition.
+ * Creates a [CoreGroupEntity]. If this [androidx.xr.compose.subspace.layout.CoreEntity] is attached
+ * to a [androidx.xr.compose.subspace.node.ComposeSubspaceNode], then the node will dispose of the
+ * CoreEntity when it exits composition. Otherwise, it is the responsibility of the caller to
+ * dispose of the CoreEntity (e.g. [androidx.xr.compose.spatial.ElevatedPanel]).
  */
 @Composable
-internal inline fun rememberCoreContentlessEntity(
-    crossinline entityFactory: @DisallowComposableCalls Session.() -> Entity
-): CoreContentlessEntity {
+internal fun rememberCoreGroupEntity(
+    entityFactory: @DisallowComposableCalls Session.() -> Entity
+): CoreGroupEntity {
     val session = checkNotNull(LocalSession.current) { "session must be initialized" }
-    val coreEntity by remember {
-        disposableValueOf(CoreContentlessEntity(session.entityFactory())) { it.dispose() }
-    }
-    return coreEntity
+
+    return remember { CoreGroupEntity(session.entityFactory()) }
 }
 
-/** Creates a [CorePanelEntity] that is automatically disposed of when it leaves the composition. */
+/**
+ * Creates a [CorePanelEntity]. If this [androidx.xr.compose.subspace.layout.CoreEntity] is attached
+ * to a [androidx.xr.compose.subspace.node.ComposeSubspaceNode], then the node will dispose of the
+ * CoreEntity when it exits composition. Otherwise, it is the responsibility of the caller to
+ * dispose of the CoreEntity (e.g. [androidx.xr.compose.spatial.ElevatedPanel]).
+ */
 @Composable
 internal inline fun rememberCorePanelEntity(
-    crossinline onCoreEntityCreated: @DisallowComposableCalls (CorePanelEntity) -> Unit = {},
+    shape: SpatialShape = SpatialPanelDefaults.shape,
     crossinline entityFactory: @DisallowComposableCalls Session.() -> PanelEntity,
 ): CorePanelEntity {
     val session = checkNotNull(LocalSession.current) { "session must be initialized" }
-    val coreEntity by remember {
-        disposableValueOf(
-            CorePanelEntity(session, session.entityFactory()).also(onCoreEntityCreated)
-        ) {
-            it.dispose()
-        }
+    val density = LocalDensity.current
+    val coreEntity = remember {
+        CorePanelEntity(session.entityFactory()).also { it.setShape(shape, density) }
     }
+    LaunchedEffect(shape, density) { coreEntity.setShape(shape, density) }
+
     return coreEntity
+}
+
+/**
+ * Creates a [CoreSurfaceEntity]. If this [androidx.xr.compose.subspace.layout.CoreEntity] is
+ * attached to a [androidx.xr.compose.subspace.node.ComposeSubspaceNode], then the node will dispose
+ * of the CoreEntity when it exits composition. Otherwise, it is the responsibility of the caller to
+ * dispose of the CoreEntity (e.g. [androidx.xr.compose.spatial.ElevatedPanel]).
+ */
+@Composable
+internal inline fun rememberCoreSurfaceEntity(
+    key: Any? = null,
+    crossinline entityFactory: @DisallowComposableCalls Session.() -> SurfaceEntity,
+): CoreSurfaceEntity {
+    val session = checkNotNull(LocalSession.current) { "session must be initialized" }
+    val density = LocalDensity.current
+
+    return remember(key) { CoreSurfaceEntity(session.entityFactory(), density) }
+}
+
+/**
+ * Creates a [CoreSphereSurfaceEntity]. If this [androidx.xr.compose.subspace.layout.CoreEntity] is
+ * attached to a [androidx.xr.compose.subspace.node.ComposeSubspaceNode], then the node will dispose
+ * of the CoreEntity when it exits composition. Otherwise, it is the responsibility of the caller to
+ * dispose of the CoreEntity (e.g. [androidx.xr.compose.spatial.ElevatedPanel]).
+ */
+@Composable
+internal inline fun rememberCoreSphereSurfaceEntity(
+    key: Any? = null,
+    crossinline entityFactory: @DisallowComposableCalls Session.() -> SurfaceEntity,
+): CoreSphereSurfaceEntity {
+    val session = checkNotNull(LocalSession.current) { "session must be initialized" }
+    val density = LocalDensity.current
+
+    return remember(key) {
+        val headPose =
+            if (
+                session.config.headTracking == HeadTrackingMode.LAST_KNOWN ||
+                    session.configure(
+                        config = session.config.copy(headTracking = HeadTrackingMode.LAST_KNOWN)
+                    ) is SessionConfigureSuccess
+            ) {
+                session.scene.spatialUser.head?.activitySpacePose
+            } else {
+                null
+            }
+        CoreSphereSurfaceEntity(session.entityFactory(), headPose, density)
+    }
+}
+
+private var entityNamePart: Int = 0
+
+/**
+ * Creates a unique debugging name for an [Entity].
+ *
+ * @param name A context-specific name for the [Entity].
+ */
+@PublishedApi
+internal fun entityName(name: String): String {
+    return "$name-${entityNamePart++}"
 }

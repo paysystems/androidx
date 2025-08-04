@@ -35,6 +35,8 @@ import static android.media.MediaCodecInfo.CodecProfileLevel.VP9Profile3;
 import static android.media.MediaCodecInfo.CodecProfileLevel.VP9Profile3HDR;
 import static android.media.MediaCodecInfo.CodecProfileLevel.VP9Profile3HDR10Plus;
 
+import static androidx.camera.core.SurfaceRequest.FRAME_RATE_RANGE_UNSPECIFIED;
+import static androidx.camera.video.VideoSpec.ENCODE_FRAME_RATE_AUTO;
 import static androidx.camera.video.internal.encoder.VideoEncoderDataSpace.ENCODER_DATA_SPACE_BT2020_HLG;
 import static androidx.camera.video.internal.encoder.VideoEncoderDataSpace.ENCODER_DATA_SPACE_BT2020_PQ;
 import static androidx.camera.video.internal.encoder.VideoEncoderDataSpace.ENCODER_DATA_SPACE_BT709;
@@ -64,6 +66,7 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -77,7 +80,7 @@ public final class VideoConfigUtil {
     private static final Map<String, Map<Integer, VideoEncoderDataSpace>> MIME_TO_DATA_SPACE_MAP =
             new HashMap<>();
 
-    private static final Timebase DEFAULT_TIME_BASE = Timebase.UPTIME;
+    public static final int VIDEO_FRAME_RATE_FIXED_DEFAULT = 30;
 
     // Should not be instantiated.
     private VideoConfigUtil() {
@@ -370,16 +373,30 @@ public final class VideoConfigUtil {
         return ENCODER_DATA_SPACE_UNSPECIFIED;
     }
 
-    /** Converts a {@link VideoProfileProxy} to a {@link VideoEncoderConfig}. */
-    public static @NonNull VideoEncoderConfig toVideoEncoderConfig(
-            @NonNull VideoProfileProxy videoProfile) {
-        return VideoEncoderConfig.builder()
-                .setMimeType(videoProfile.getMediaType())
-                .setProfile(videoProfile.getProfile())
-                .setResolution(new Size(videoProfile.getWidth(), videoProfile.getHeight()))
-                .setFrameRate(videoProfile.getFrameRate())
-                .setBitrate(videoProfile.getBitrate())
-                .setInputTimebase(DEFAULT_TIME_BASE)
-                .build();
+    @NonNull
+    static CaptureEncodeRates resolveFrameRates(@NonNull VideoSpec videoSpec,
+            @NonNull Range<Integer> expectedCaptureFrameRateRange) {
+        int captureFrameRate;
+        if (FRAME_RATE_RANGE_UNSPECIFIED.equals(expectedCaptureFrameRateRange)) {
+            captureFrameRate = VIDEO_FRAME_RATE_FIXED_DEFAULT;
+        } else {
+            captureFrameRate = expectedCaptureFrameRateRange.getUpper();
+        }
+
+        int encodeFrameRate;
+        if (videoSpec.getEncodeFrameRate() != ENCODE_FRAME_RATE_AUTO) {
+            encodeFrameRate = videoSpec.getEncodeFrameRate();
+        } else {
+            encodeFrameRate = captureFrameRate;
+        }
+
+        Logger.d(TAG, String.format(Locale.ENGLISH,
+                "Resolved capture/encode frame rate %dfps/%dfps, "
+                        + "[Expected operating range: %s]",
+                captureFrameRate, encodeFrameRate,
+                FRAME_RATE_RANGE_UNSPECIFIED.equals(expectedCaptureFrameRateRange)
+                        ? "<UNSPECIFIED>" : expectedCaptureFrameRateRange));
+
+        return new CaptureEncodeRates(captureFrameRate, encodeFrameRate);
     }
 }

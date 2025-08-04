@@ -20,7 +20,7 @@ import androidx.annotation.FloatRange
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.util.fastRoundToInt
 import androidx.xr.compose.subspace.node.SubspaceLayoutModifierNode
-import androidx.xr.compose.subspace.node.SubspaceModifierElement
+import androidx.xr.compose.subspace.node.SubspaceModifierNodeElement
 import androidx.xr.compose.unit.DpVolumeSize
 import androidx.xr.compose.unit.VolumeConstraints
 import androidx.xr.compose.unit.constrain
@@ -77,24 +77,46 @@ public fun SubspaceModifier.size(size: DpVolumeSize): SubspaceModifier =
         )
     )
 
-/** Declare the size of the content to be exactly [width] dp along the x dimension. */
+/**
+ * Declare the size of the content to be exactly [width] dp along the x dimension, disregarding the
+ * incoming [VolumeConstraints].
+ *
+ * This is in contrast to [SubspaceModifier.width], which respects the parent's constraints.
+ * `requiredWidth` will ignore the `minWidth` and `maxWidth` from the incoming constraints, which
+ * can be useful for sizing an element to a specific value even if it exceeds the parent's bounds.
+ */
 public fun SubspaceModifier.requiredWidth(width: Dp): SubspaceModifier =
     this.then(SizeElement(minWidth = width, maxWidth = width, enforceIncoming = false))
 
-/** Declare the size of the content to be exactly [height] dp along the y dimension. */
+/**
+ * Declare the size of the content to be exactly [height] dp along the y dimension, disregarding the
+ * incoming [VolumeConstraints].
+ *
+ * This is in contrast to [SubspaceModifier.height], which respects the parent's constraints.
+ * `requiredHeight` will ignore the `minHeight` and `maxHeight` from the incoming constraints, which
+ * can be useful for sizing an element to a specific value even if it exceeds the parent's bounds.
+ */
 public fun SubspaceModifier.requiredHeight(height: Dp): SubspaceModifier =
     this.then(SizeElement(minHeight = height, maxHeight = height, enforceIncoming = false))
 
 /**
- * Declare the size of the content to be exactly [depth] dp along the z dimension. Panels have 0
- * depth and ignore this modifier.
+ * Declare the size of the content to be exactly [depth] dp along the z dimension, disregarding the
+ * incoming [VolumeConstraints].
+ *
+ * This is in contrast to [SubspaceModifier.depth], which respects the parent's constraints.
+ * `requiredDepth` will ignore the `minDepth` and `maxDepth` from the incoming constraints, which
+ * can be useful for sizing an element to a specific value even if it exceeds the parent's bounds.
  */
 public fun SubspaceModifier.requiredDepth(depth: Dp): SubspaceModifier =
     this.then(SizeElement(minDepth = depth, maxDepth = depth, enforceIncoming = false))
 
 /**
- * Declare the size of the content to be exactly a [size] dp cube. When applied to a Panel, the size
- * will be a [size] dp square instead.
+ * Declare the size of the content to be exactly a [size] dp cube, disregarding the incoming
+ * [VolumeConstraints]. When applied to a Panel, the size will be a [size] dp square instead.
+ *
+ * This is in contrast to [SubspaceModifier.size], which respects the parent's constraints.
+ * `requiredSize` will ignore all min and max constraints from the incoming constraints, which can
+ * be useful for sizing an element to a specific value even if it exceeds the parent's bounds.
  */
 public fun SubspaceModifier.requiredSize(size: Dp): SubspaceModifier =
     this.then(
@@ -110,8 +132,14 @@ public fun SubspaceModifier.requiredSize(size: Dp): SubspaceModifier =
     )
 
 /**
- * Declare the size of the content to be exactly [size] in each of the three dimensions. Panels have
- * 0 depth and ignore the z-component of this modifier.
+ * Declare the size of the content to be exactly [size] in each of the three dimensions,
+ * disregarding the incoming [VolumeConstraints]. Panels have 0 depth and ignore the z-component of
+ * this modifier.
+ *
+ * This is in contrast to [SubspaceModifier.size], which respects the parent's constraints.
+ * `requiredSize` will ignore all min and max constraints from the incoming constraints, which can
+ * be useful for sizing an element to a specific value even if it exceeds the parent's bounds. The
+ * parent will then determine how to handle the overflow.
  */
 public fun SubspaceModifier.requiredSize(size: DpVolumeSize): SubspaceModifier =
     this.then(
@@ -199,7 +227,7 @@ private class FillElement(
     private val direction: Direction,
     private val fraction: Float,
     private val inspectorName: String,
-) : SubspaceModifierElement<FillNode>() {
+) : SubspaceModifierNodeElement<FillNode>() {
     override fun create(): FillNode = FillNode(direction = direction, fraction = fraction)
 
     override fun update(node: FillNode) {
@@ -229,21 +257,21 @@ private class FillElement(
             FillElement(
                 direction = Direction.X,
                 fraction = fraction,
-                inspectorName = "fillMaxWidth"
+                inspectorName = "fillMaxWidth",
             )
 
         public fun height(fraction: Float) =
             FillElement(
                 direction = Direction.Y,
                 fraction = fraction,
-                inspectorName = "fillMaxHeight"
+                inspectorName = "fillMaxHeight",
             )
 
         public fun depth(fraction: Float) =
             FillElement(
                 direction = Direction.Z,
                 fraction = fraction,
-                inspectorName = "fillMaxDepth"
+                inspectorName = "fillMaxDepth",
             )
 
         public fun size(fraction: Float) =
@@ -257,10 +285,10 @@ private class FillElement(
 
 private class FillNode(public var direction: Direction, public var fraction: Float) :
     SubspaceLayoutModifierNode, SubspaceModifier.Node() {
-    override fun MeasureScope.measure(
-        measurable: Measurable,
+    override fun SubspaceMeasureScope.measure(
+        measurable: SubspaceMeasurable,
         constraints: VolumeConstraints,
-    ): MeasureResult {
+    ): SubspaceMeasureResult {
         val minWidth: Int
         val maxWidth: Int
         if (
@@ -328,7 +356,7 @@ private class SizeElement(
     private val minDepth: Dp = Dp.Unspecified,
     private val maxDepth: Dp = Dp.Unspecified,
     private val enforceIncoming: Boolean,
-) : SubspaceModifierElement<SizeNode>() {
+) : SubspaceModifierNodeElement<SizeNode>() {
     override fun create(): SizeNode =
         SizeNode(
             minWidth = minWidth,
@@ -387,7 +415,7 @@ private class SizeNode(
     public var enforceIncoming: Boolean,
 ) : SubspaceLayoutModifierNode, SubspaceModifier.Node() {
 
-    private val MeasureScope.targetConstraints: VolumeConstraints
+    private val SubspaceMeasureScope.targetConstraints: VolumeConstraints
         get() {
             val maxWidth =
                 if (maxWidth != Dp.Unspecified) {
@@ -441,10 +469,10 @@ private class SizeNode(
             )
         }
 
-    override fun MeasureScope.measure(
-        measurable: Measurable,
+    override fun SubspaceMeasureScope.measure(
+        measurable: SubspaceMeasurable,
         constraints: VolumeConstraints,
-    ): MeasureResult {
+    ): SubspaceMeasureResult {
         val wrappedConstraints =
             targetConstraints.let {
                 if (enforceIncoming) {
