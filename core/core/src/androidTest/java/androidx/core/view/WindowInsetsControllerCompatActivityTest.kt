@@ -21,7 +21,6 @@ import android.os.Build
 import android.view.View
 import android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS
 import android.widget.TextView
-import androidx.annotation.RequiresApi
 import androidx.core.graphics.Insets
 import androidx.core.test.R
 import androidx.test.core.app.ActivityScenario
@@ -50,7 +49,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 @Suppress("DEPRECATION")
-@SdkSuppress(minSdkVersion = 23) // ViewCompat.getRootWindowInsets()
 @LargeTest
 @RunWith(AndroidJUnit4::class)
 public class WindowInsetsControllerCompatActivityTest {
@@ -80,7 +78,6 @@ public class WindowInsetsControllerCompatActivityTest {
     }
 
     /** IME visibility is only reliable on API 23+, where we have access to the root WindowInsets */
-    @SdkSuppress(minSdkVersion = 23)
     @Ignore("b/294556594")
     @Test
     public fun toggleIME() {
@@ -98,7 +95,6 @@ public class WindowInsetsControllerCompatActivityTest {
     }
 
     /** IME visibility is only reliable on API 23+, where we have access to the root WindowInsets */
-    @SdkSuppress(minSdkVersion = 23)
     @Ignore("b/294556594")
     @Test
     fun show_IME_fromEditText() {
@@ -118,7 +114,6 @@ public class WindowInsetsControllerCompatActivityTest {
     }
 
     /** IME visibility is only reliable on API 23+, where we have access to the root WindowInsets */
-    @SdkSuppress(minSdkVersion = 23)
     @Ignore("b/294556594")
     @Test
     fun show_IME_fromEditText_in_dialog() {
@@ -144,8 +139,7 @@ public class WindowInsetsControllerCompatActivityTest {
         editText.assertInsetsVisibility(type, true)
     }
 
-    /** IME visibility is only reliable on API 23+, where we have access to the root WindowInsets */
-    @SdkSuppress(minSdkVersion = 23, excludedSdks = [28]) // Excluded due to flakes (b/324904606)
+    @SdkSuppress(excludedSdks = [28]) // Excluded due to flakes (b/324904606)
     @Test
     public fun hide_IME() {
         // Test do not currently work on Cuttlefish
@@ -181,7 +175,6 @@ public class WindowInsetsControllerCompatActivityTest {
         container.assertInsetsVisibility(type, true)
     }
 
-    @SdkSuppress(minSdkVersion = 23)
     @Test
     public fun statusBar_light() {
         scenario.onActivity { windowInsetsController.setAppearanceLightStatusBars(true) }
@@ -196,7 +189,6 @@ public class WindowInsetsControllerCompatActivityTest {
         assertThat(windowInsetsController.isAppearanceLightStatusBars(), `is`(true))
     }
 
-    @SdkSuppress(minSdkVersion = 23)
     @Test
     public fun statusBar_dark() {
         val decorView = scenario.withActivity { window.decorView }
@@ -251,7 +243,6 @@ public class WindowInsetsControllerCompatActivityTest {
     }
 
     /** IME visibility is only reliable on API 23+, where we have access to the root WindowInsets */
-    @SdkSuppress(minSdkVersion = 23)
     @Ignore("The listener isn't called when changing the visibility")
     @Test
     public fun ime_toggle_check_with_listener() {
@@ -353,7 +344,6 @@ public class WindowInsetsControllerCompatActivityTest {
         scenario.close()
     }
 
-    @RequiresApi(23) //  ViewCompat.getRootWindowInsets()
     private fun View.assertInsetsVisibility(type: Int, expectedVisibility: Boolean) {
         val latch = CountDownLatch(1)
         var loop = true

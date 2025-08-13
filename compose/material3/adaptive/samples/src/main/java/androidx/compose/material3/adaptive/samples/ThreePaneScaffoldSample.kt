@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -42,6 +43,8 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -57,6 +60,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.VerticalDragHandle
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.adaptive.layout.AdaptStrategy
 import androidx.compose.material3.adaptive.layout.AnimatedPane
 import androidx.compose.material3.adaptive.layout.DockedEdge
@@ -73,6 +77,7 @@ import androidx.compose.material3.adaptive.layout.SupportingPaneScaffoldRole
 import androidx.compose.material3.adaptive.layout.ThreePaneScaffoldPaneScope
 import androidx.compose.material3.adaptive.layout.ThreePaneScaffoldRole
 import androidx.compose.material3.adaptive.layout.ThreePaneScaffoldScope
+import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
 import androidx.compose.material3.adaptive.layout.rememberDragToResizeState
 import androidx.compose.material3.adaptive.layout.rememberPaneExpansionState
 import androidx.compose.material3.adaptive.navigation.BackNavigationBehavior
@@ -92,6 +97,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -186,6 +194,7 @@ fun ListDetailPaneScaffoldSampleWithExtraPane() {
             rememberPaneExpansionState(
                 keyProvider = scaffoldNavigator.scaffoldValue,
                 anchors = PaneExpansionAnchors,
+                initialAnchoredIndex = 1,
             ),
         paneExpansionDragHandle = { state -> PaneExpansionDragHandleSample(state) },
     )
@@ -253,16 +262,16 @@ fun SupportingPaneScaffoldSample() {
 @Composable
 fun SupportingPaneScaffoldSampleWithExtraPaneLevitatedAsBottomSheet() {
     val coroutineScope = rememberCoroutineScope()
+    val scaffoldDirective = calculatePaneScaffoldDirective(currentWindowAdaptiveInfo())
     val scaffoldNavigator =
         rememberSupportingPaneScaffoldNavigator<NavItemData>(
+            scaffoldDirective = scaffoldDirective,
             adaptStrategies =
                 SupportingPaneScaffoldDefaults.adaptStrategies(
                     extraPaneAdaptStrategy =
-                        AdaptStrategy.Levitate(
-                            strategy = AdaptStrategy.Levitate.Strategy.SinglePaneOnly,
-                            alignment = Alignment.BottomCenter,
-                        )
-                )
+                        AdaptStrategy.Levitate(alignment = Alignment.BottomCenter)
+                            .onlyIfSinglePane(scaffoldDirective)
+                ),
         )
     val extraItems = listOf("Extra content")
     val selectedItem = NavItemData(index = 0, showExtra = true)
@@ -385,23 +394,25 @@ fun <T> reflowAdaptStrategySample(): ThreePaneScaffoldNavigator<T> =
 @Composable
 fun <T> levitateAdaptStrategySample(): ThreePaneScaffoldNavigator<T> {
     val coroutineScope = rememberCoroutineScope()
+    val scaffoldDirective = calculatePaneScaffoldDirective(currentWindowAdaptiveInfo())
     var navigator: ThreePaneScaffoldNavigator<T>? = null
     navigator =
         rememberListDetailPaneScaffoldNavigator<T>(
+            scaffoldDirective = scaffoldDirective,
             adaptStrategies =
                 ListDetailPaneScaffoldDefaults.adaptStrategies(
                     extraPaneAdaptStrategy =
                         AdaptStrategy.Levitate(
-                            strategy = AdaptStrategy.Levitate.Strategy.SinglePaneOnly,
-                            alignment = Alignment.Center,
-                            scrim =
-                                Scrim(
-                                    onClick = {
-                                        coroutineScope.launch { navigator?.navigateBack() }
-                                    }
-                                ),
-                        )
-                )
+                                alignment = Alignment.Center,
+                                scrim =
+                                    Scrim(
+                                        onClick = {
+                                            coroutineScope.launch { navigator?.navigateBack() }
+                                        }
+                                    ),
+                            )
+                            .onlyIfSinglePane(scaffoldDirective)
+                ),
         )
     return navigator
 }
@@ -561,7 +572,7 @@ private data class NavItemData(val index: Int, val showExtra: Boolean = false) :
 @Composable
 private fun ListCard(
     title: String,
-    highlight: Boolean,
+    isSelected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -570,17 +581,36 @@ private fun ListCard(
         colors =
             CardDefaults.outlinedCardColors(
                 when {
-                    highlight -> MaterialTheme.colorScheme.primaryContainer
+                    isSelected -> MaterialTheme.colorScheme.primaryContainer
                     else -> MaterialTheme.colorScheme.surface
                 }
             ),
-        modifier = modifier.height(80.dp).fillMaxWidth(),
+        modifier =
+            modifier.height(80.dp).fillMaxWidth().semantics {
+                contentDescription = title
+                selected = isSelected
+            },
     ) {
-        Text(
-            text = title,
-            modifier = Modifier.fillMaxSize().wrapContentHeight().padding(12.dp),
-            style = MaterialTheme.typography.headlineSmall,
-        )
+        Row(
+            modifier = Modifier.padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                modifier = Modifier.fillMaxHeight(),
+                imageVector =
+                    when {
+                        isSelected -> Icons.Filled.CheckCircle
+                        else -> Icons.Outlined.CheckCircle
+                    },
+                contentDescription = null,
+            )
+            Text(
+                text = title,
+                modifier = Modifier.fillMaxSize().wrapContentHeight(),
+                style = MaterialTheme.typography.headlineSmall,
+            )
+        }
     }
 }
 
@@ -597,7 +627,7 @@ private fun ListPaneContent(
         items.forEachIndexed { index, item ->
             ListCard(
                 title = item,
-                highlight =
+                isSelected =
                     index == selectedItem?.index &&
                         scaffoldNavigator.isExpanded(ListDetailPaneScaffoldRole.Detail),
                 onClick = {
@@ -710,7 +740,7 @@ private fun SupportingPaneContent(modifier: Modifier = Modifier) {
         items.forEachIndexed { index, item ->
             ListCard(
                 title = item,
-                highlight = index == selectedIndex,
+                isSelected = index == selectedIndex,
                 onClick = { selectedIndex = index },
             )
         }
@@ -807,8 +837,8 @@ private fun RadioButtonRow(
 private val PaneExpansionAnchors =
     listOf(
         PaneExpansionAnchor.Proportion(0f),
-        PaneExpansionAnchor.Offset.fromStart(360.dp),
+        PaneExpansionAnchor.Offset.fromStart(240.dp),
         PaneExpansionAnchor.Proportion(0.5f),
-        PaneExpansionAnchor.Offset.fromEnd(360.dp),
+        PaneExpansionAnchor.Offset.fromEnd(240.dp),
         PaneExpansionAnchor.Proportion(1f),
     )

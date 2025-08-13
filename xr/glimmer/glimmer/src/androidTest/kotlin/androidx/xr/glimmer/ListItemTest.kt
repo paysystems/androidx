@@ -45,6 +45,7 @@ import androidx.compose.ui.focus.focusTarget
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.indirect.IndirectTouchEvent
+import androidx.compose.ui.input.indirect.IndirectTouchEventPrimaryDirectionalMotionAxis
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -67,12 +68,9 @@ import androidx.core.view.InputDeviceCompat.SOURCE_TOUCH_NAVIGATION
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.MediumTest
 import androidx.test.filters.SdkSuppress
-import androidx.test.platform.app.InstrumentationRegistry
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import org.junit.After
-import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -85,13 +83,7 @@ import org.junit.runner.RunWith
 class ListItemTest {
     @get:Rule val rule = createComposeRule()
 
-    // Enter non-touch mode for tests, so that clickables can be focused.
-    // TODO(b/267253920): Add a compose test API to set/reset InputMode.
-    @Before
-    fun enterNonTouchMode() = InstrumentationRegistry.getInstrumentation().setInTouchMode(false)
-
-    // TODO(b/267253920): Add a compose test API to set/reset InputMode.
-    @After fun resetTouchMode() = InstrumentationRegistry.getInstrumentation().resetInTouchMode()
+    @get:Rule val inputModeRule = nonTouchInputModeRule()
 
     @Test
     fun semantics() {
@@ -338,7 +330,14 @@ class ListItemTest {
                 0,
             )
         down.source = SOURCE_TOUCH_NAVIGATION
-        rule.onNodeWithTag("listItem").performIndirectTouchEvent(IndirectTouchEvent(down))
+        rule
+            .onNodeWithTag("listItem")
+            .performIndirectTouchEvent(
+                IndirectTouchEvent(
+                    down,
+                    primaryDirectionalMotionAxis = IndirectTouchEventPrimaryDirectionalMotionAxis.X,
+                )
+            )
 
         rule.runOnIdle {
             assertThat(interactions).hasSize(1)
@@ -355,7 +354,14 @@ class ListItemTest {
                 0,
             )
         up.source = SOURCE_TOUCH_NAVIGATION
-        rule.onNodeWithTag("listItem").performIndirectTouchEvent(IndirectTouchEvent(up))
+        rule
+            .onNodeWithTag("listItem")
+            .performIndirectTouchEvent(
+                IndirectTouchEvent(
+                    up,
+                    primaryDirectionalMotionAxis = IndirectTouchEventPrimaryDirectionalMotionAxis.X,
+                )
+            )
 
         rule.runOnIdle {
             assertThat(interactions).hasSize(2)

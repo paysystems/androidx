@@ -22,9 +22,9 @@ import androidx.camera.camera2.pipe.integration.CameraPipeConfig
 import androidx.camera.core.CameraXConfig
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
-import androidx.camera.core.Logger
+import androidx.camera.integration.view.TestUtil.assertPreviewStreamingState
+import androidx.camera.integration.view.TestUtil.getFragment
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.testing.impl.CameraAvailabilityUtil.assumeDeviceHasFrontCamera
 import androidx.camera.testing.impl.CameraPipeConfigTestRule
 import androidx.camera.testing.impl.CameraUtil
 import androidx.camera.testing.impl.CoreAppTestUtil
@@ -104,34 +104,9 @@ class EffectsFragmentDeviceTest(
     }
 
     @Test
-    fun toggleCameraLatencyTest() {
-        assumeDeviceHasFrontCamera()
-
-        // Arrange: use COMPATIBLE mode to get an accurate measurement.
-        instrumentation.runOnMainSync {
-            fragment.previewView.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-        }
-        val startTimeMillis = System.currentTimeMillis()
-        fragment.assertPreviewStreamingState(PreviewView.StreamState.STREAMING)
-
-        // Act: toggle camera for 10 times.
-        val numberOfToggles = 10
-        for (i in 0 until numberOfToggles) {
-            instrumentation.runOnMainSync { fragment.toggleCamera() }
-            fragment.assertPreviewStreamingState(PreviewView.StreamState.IDLE)
-            fragment.assertPreviewStreamingState(PreviewView.StreamState.STREAMING)
-        }
-
-        // Record the average duration of the test.
-        val averageDuration = (System.currentTimeMillis() - startTimeMillis) / numberOfToggles
-        val tag = "toggleCameraLatencyTest"
-        Logger.d(tag, "Effects pipeline performance profiling. duration: [$averageDuration]")
-    }
-
-    @Test
     fun launchFragment_surfaceProcessorIsActive() {
         // Arrange.
-        fragment.assertPreviewStreamingState(PreviewView.StreamState.STREAMING)
+        fragment.assertPreviewStreamingState(PreviewView.StreamState.STREAMING, instrumentation)
         // Assert.
         assertThat(fragment.getSurfaceProcessor().isSurfaceRequestedAndProvided()).isTrue()
     }
@@ -140,7 +115,7 @@ class EffectsFragmentDeviceTest(
     fun takePicture_imageEffectInvoked() {
         // Arrange.
         fragment.run {
-            assertPreviewStreamingState(PreviewView.StreamState.STREAMING)
+            assertPreviewStreamingState(PreviewView.StreamState.STREAMING, instrumentation)
             // Act.
             assertCanTakePicture()
         }
@@ -153,15 +128,9 @@ class EffectsFragmentDeviceTest(
         // Act.
         instrumentation.runOnMainSync { fragment.surfaceEffectForImageCapture.isChecked = true }
         // Assert.
-        fragment.assertPreviewStreamingState(PreviewView.StreamState.STREAMING)
+        fragment.assertPreviewStreamingState(PreviewView.StreamState.STREAMING, instrumentation)
         fragment.assertCanTakePicture()
         assertThat(fragment.getImageEffect()).isNull()
-    }
-
-    private fun FragmentScenario<EffectsFragment>.getFragment(): EffectsFragment {
-        var fragment: EffectsFragment? = null
-        this.onFragment { newValue: EffectsFragment -> fragment = newValue }
-        return fragment!!
     }
 
     private fun EffectsFragment.assertCanTakePicture() {
@@ -185,20 +154,8 @@ class EffectsFragmentDeviceTest(
         assertThat(uri).isNotNull()
     }
 
-    private fun EffectsFragment.assertPreviewStreamingState(streamState: PreviewView.StreamState) {
-        val previewStreaming = Semaphore(0)
-        instrumentation.runOnMainSync {
-            previewView.previewStreamState.observe(this) {
-                if (it == streamState) {
-                    previewStreaming.release()
-                }
-            }
-        }
-        assertThat(previewStreaming.tryAcquire(TIMEOUT_SECONDS, TimeUnit.SECONDS)).isTrue()
-    }
-
     companion object {
-        const val TIMEOUT_SECONDS = 10L
+        private const val TIMEOUT_SECONDS = 10L
 
         @JvmStatic
         @Parameterized.Parameters(name = "{0}")

@@ -16,7 +16,10 @@
 
 package androidx.aab.analysis
 
+import androidx.aab.ApkInfo
 import androidx.aab.BundleInfo
+import androidx.aab.DexInfo
+import androidx.aab.ProfInfo
 import androidx.aab.analysis.BaselineProfileIssues.getPartlyCorruptedProfileIssue
 import kotlin.math.roundToInt
 
@@ -37,15 +40,17 @@ data class ProfileAnalysis(
         OK,
     }
 
-    override fun getScore(): SubScore {
-        val score: Int =
-            when (status) {
-                Status.MISSING,
-                Status.EMPTY,
-                Status.FULLY_CORRUPTED -> 0
-                Status.PARTLY_CORRUPTED -> (20 * corruptionRatio).roundToInt()
-                Status.OK -> 20
-            }
+    fun getScore() =
+        when (status) {
+            Status.MISSING,
+            Status.EMPTY,
+            Status.FULLY_CORRUPTED -> 0
+            Status.PARTLY_CORRUPTED -> (20 * corruptionRatio).roundToInt()
+            Status.OK -> 20
+        }
+
+    override fun getSubScore(): SubScore {
+        val score: Int = getScore()
 
         val issue =
             when (status) {
@@ -58,11 +63,15 @@ data class ProfileAnalysis(
         return SubScore("Baseline Profile", score, 20, listOfNotNull(issue))
     }
 
+    fun csvEntries() = listOf(getScore().toString(), status.toString())
+
     companion object {
-        fun BundleInfo.getProfileAnalysis(): ProfileAnalysis {
+        val CSV_TITLES = listOf("profile_score", "profile_status")
+
+        fun getProfileAnalysis(dexInfo: List<DexInfo>, profileInfo: ProfInfo?): ProfileAnalysis {
             val setOfDexCrc32FromDex = (dexInfo.map { it.crc32 }.toSet())
             val setOfDexCrc32FromProfiles =
-                profileInfo?.dexInfoList?.map { it.checksumCrc32 }?.toSet() ?: emptySet()
+                profileInfo?.profDexInfoList?.map { it.checksumCrc32 }?.toSet() ?: emptySet()
 
             val dexCrc32ChecksumsMatching =
                 setOfDexCrc32FromDex.intersect(setOfDexCrc32FromProfiles)
@@ -72,7 +81,7 @@ data class ProfileAnalysis(
             val status =
                 when {
                     profileInfo == null -> Status.MISSING
-                    profileInfo.dexInfoList.isEmpty() -> Status.EMPTY
+                    profileInfo.profDexInfoList.isEmpty() -> Status.EMPTY
                     dexCrc32ChecksumsProfileOnly.isNotEmpty() &&
                         dexCrc32ChecksumsMatching.isEmpty() -> Status.FULLY_CORRUPTED
                     dexCrc32ChecksumsProfileOnly.isNotEmpty() -> Status.PARTLY_CORRUPTED
@@ -90,5 +99,9 @@ data class ProfileAnalysis(
                 dexCrc32ChecksumsDexOnly = dexCrc32ChecksumsDexOnly,
             )
         }
+
+        fun ApkInfo.getProfileAnalysis() = getProfileAnalysis(dexInfo, profileInfo)
+
+        fun BundleInfo.getProfileAnalysis() = getProfileAnalysis(dexInfo, profileInfo)
     }
 }

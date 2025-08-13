@@ -14,23 +14,30 @@
  * limitations under the License.
  */
 
+@file:OptIn(ExperimentalCoroutinesApi::class)
+
 package androidx.navigationevent
 
 import androidx.kruth.assertThat
 import androidx.navigationevent.NavigationEventInfo.NotProvided
 import androidx.navigationevent.NavigationEventState.Idle
 import androidx.navigationevent.NavigationEventState.InProgress
-import androidx.navigationevent.testing.TestNavigationEvent
 import androidx.navigationevent.testing.TestNavigationEventCallback
 import androidx.navigationevent.testing.TestNavigationEventDispatcherOwner
 import kotlin.test.Test
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 
 class NavigationEventDispatcherStateTest {
 
     private val dispatcherOwner = TestNavigationEventDispatcherOwner()
     private val dispatcher = dispatcherOwner.navigationEventDispatcher
-    private val inputHandler = NavigationEventInputHandler(dispatcher)
+    private val inputHandler =
+        DirectNavigationEventInputHandler().also { dispatcher.addInputHandler(it) }
 
     @Test
     fun state_whenMultipleCallbacksAreAdded_thenReflectsInfoFromLastAddedCallback() = runTest {
@@ -86,8 +93,8 @@ class NavigationEventDispatcherStateTest {
         val callback = TestNavigationEventCallback(currentInfo = callbackInfo)
         dispatcher.addCallback(callback)
 
-        val startEvent = TestNavigationEvent(touchX = 0.1F)
-        val progressEvent = TestNavigationEvent(touchX = 0.3f)
+        val startEvent = NavigationEvent(touchX = 0.1F)
+        val progressEvent = NavigationEvent(touchX = 0.3f)
 
         assertThat(dispatcher.state.value).isEqualTo(Idle(callbackInfo))
 
@@ -114,7 +121,7 @@ class NavigationEventDispatcherStateTest {
         val callback = TestNavigationEventCallback(currentInfo = callbackInfo)
         dispatcher.addCallback(callback)
 
-        val startEvent = TestNavigationEvent()
+        val startEvent = NavigationEvent()
 
         assertThat(dispatcher.state.value).isEqualTo(Idle(callbackInfo))
 
@@ -133,7 +140,7 @@ class NavigationEventDispatcherStateTest {
         val callback = TestNavigationEventCallback(currentInfo = firstInfo)
         dispatcher.addCallback(callback)
 
-        val startEvent = TestNavigationEvent(touchX = 0.1F)
+        val startEvent = NavigationEvent(touchX = 0.1F)
 
         // Start the gesture.
         inputHandler.handleOnStarted(startEvent)
@@ -166,7 +173,7 @@ class NavigationEventDispatcherStateTest {
         dispatcher.addCallback(callback)
 
         // FIRST GESTURE: Create a complex state.
-        inputHandler.handleOnStarted(TestNavigationEvent(touchX = 0.1f))
+        inputHandler.handleOnStarted(NavigationEvent(touchX = 0.1f))
         callback.setInfo(currentInfo = HomeScreenInfo("updated"), previousInfo = null)
         inputHandler.handleOnCompleted()
 
@@ -175,7 +182,7 @@ class NavigationEventDispatcherStateTest {
         assertThat(dispatcher.state.value).isEqualTo(Idle(finalInfo))
 
         // SECOND GESTURE: Verify that previousInfo was cleared by `clearPreviousInfo()`.
-        val event2 = TestNavigationEvent(touchX = 0.3f)
+        val event2 = NavigationEvent(touchX = 0.3f)
         inputHandler.handleOnStarted(event2)
 
         // When a new gesture starts, `previousInfo` should be null, not stale data.
@@ -212,6 +219,104 @@ class NavigationEventDispatcherStateTest {
         // The state should once again reflect callbackB, as it's now enabled
         // and has higher priority (due to being added last).
         assertThat(dispatcher.state.value).isEqualTo(Idle(DetailsScreenInfo("B")))
+    }
+
+    @Test
+    fun getState_whenFilteredForSpecificType_onlyEmitsMatchingStates() =
+        runTest(UnconfinedTestDispatcher()) {
+            val initialHomeInfo = HomeScreenInfo("initial")
+            val homeCallback = TestNavigationEventCallback(currentInfo = HomeScreenInfo("home"))
+            val detailsCallback =
+                TestNavigationEventCallback(currentInfo = DetailsScreenInfo("details"))
+            val collectedStates = mutableListOf<NavigationEventState<HomeScreenInfo>>()
+
+            dispatcher
+                .getState(backgroundScope, initialHomeInfo)
+                .onEach { collectedStates.add(it) }
+                .launchIn(backgroundScope)
+            advanceUntilIdle()
+
+            // The flow must start with the initial value provided.
+            assertThat(collectedStates).hasSize(1)
+            assertThat(collectedStates.last()).isEqualTo(Idle(initialHomeInfo))
+
+            // A new state with a matching type should be collected.
+            dispatcher.addCallback(homeCallback)
+            advanceUntilIdle()
+            assertThat(collectedStates).hasSize(2)
+            assertThat(collectedStates.last()).isEqualTo(Idle(HomeScreenInfo("home")))
+
+            // A state with a non-matching type should be filtered out and not collected.
+            dispatcher.addCallback(detailsCallback)
+            advanceUntilIdle()
+            assertThat(collectedStates).hasSize(2)
+
+            // When the active callback is removed, since a non-matching type should be filtered out
+            // and not collected.
+            detailsCallback.remove()
+            advanceUntilIdle()
+            assertThat(collectedStates).hasSize(2)
+            assertThat(collectedStates.last()).isEqualTo(Idle(HomeScreenInfo("home")))
+        }
+
+    @Test
+    fun getState_whenTypeDoesNotMatch_emitsOnlyInitialInfo() =
+        runTest(UnconfinedTestDispatcher()) {
+            val initialHomeInfo = HomeScreenInfo("initial")
+            val detailsCallback =
+                TestNavigationEventCallback(currentInfo = DetailsScreenInfo("details"))
+            val collectedStates = mutableListOf<NavigationEventState<HomeScreenInfo>>()
+
+            dispatcher
+                .getState(backgroundScope, initialHomeInfo)
+                .onEach { collectedStates.add(it) }
+                .launchIn(backgroundScope)
+            advanceUntilIdle()
+
+            // The flow must start with its initial value.
+            assertThat(collectedStates).hasSize(1)
+            assertThat(collectedStates.first()).isEqualTo(Idle(initialHomeInfo))
+
+            // Add a callback with a non-matching type.
+            dispatcher.addCallback(detailsCallback)
+            advanceUntilIdle()
+
+            // The collector should not have emitted a new value.
+            assertThat(collectedStates).hasSize(1)
+
+            // Update the non-matching callback's info.
+            detailsCallback.setInfo(
+                currentInfo = DetailsScreenInfo("details-updated"),
+                previousInfo = null,
+            )
+            advanceUntilIdle()
+
+            // The collector should still not have emitted a new value.
+            assertThat(collectedStates).hasSize(1)
+        }
+
+    @Test
+    fun progress_whenIdleOrInProgress_returnsCorrectValue() {
+        val callbackInfo = HomeScreenInfo("home")
+        val callback = TestNavigationEventCallback(currentInfo = callbackInfo)
+        dispatcher.addCallback(callback)
+
+        // Before any gesture, the state is Idle and progress should be 0.
+        assertThat(dispatcher.state.value.progress).isEqualTo(0f)
+
+        // Start a gesture.
+        inputHandler.handleOnStarted(NavigationEvent(progress = 0.1f))
+        assertThat(dispatcher.state.value.progress).isEqualTo(0.1f)
+
+        // InProgress state should reflect the event's progress.
+        inputHandler.handleOnProgressed(NavigationEvent(progress = 0.5f))
+        assertThat(dispatcher.state.value.progress).isEqualTo(0.5f)
+
+        // Complete the gesture.
+        inputHandler.handleOnCompleted()
+
+        // After the gesture, the state is Idle again and progress should be 0.
+        assertThat(dispatcher.state.value.progress).isEqualTo(0f)
     }
 }
 

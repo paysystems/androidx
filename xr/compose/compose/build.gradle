@@ -51,7 +51,7 @@ dependencies {
     implementation("androidx.compose.runtime:runtime:1.7.5")
     implementation("androidx.compose.ui:ui:1.7.5")
     implementation("androidx.compose.ui:ui-unit:1.7.5")
-    implementation("androidx.compose.ui:ui-util:1.6.0-beta01")
+    implementation("androidx.compose.ui:ui-util:1.6.0")
 
     testImplementation(libs.espressoCore)
     testImplementation(libs.junit)
@@ -83,5 +83,6 @@ androidx {
     type = SoftwareType.PUBLISHED_LIBRARY_ONLY_USED_BY_KOTLIN_CONSUMERS
     inceptionYear = "2024"
     description = "Compose libraries for the androidx.xr namespace."
+    samples(project(":xr:compose:compose:compose-samples"))
     enableRobolectric()
 }

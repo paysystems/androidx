@@ -82,6 +82,12 @@ package androidx.webkit {
     method @RequiresFeature(name=androidx.webkit.WebViewFeature.STARTUP_FEATURE_SET_DATA_DIRECTORY_SUFFIX, enforcement="androidx.webkit.WebViewFeature#isConfigFeatureSupported(String, Context)") public androidx.webkit.ProcessGlobalConfig setDataDirectorySuffix(android.content.Context, String);
     method @RequiresFeature(name=androidx.webkit.WebViewFeature.STARTUP_FEATURE_SET_DIRECTORY_BASE_PATHS, enforcement="androidx.webkit.WebViewFeature#isConfigFeatureSupported(String, Context)") public androidx.webkit.ProcessGlobalConfig setDirectoryBasePaths(android.content.Context, java.io.File, java.io.File);
     method @RequiresFeature(name=androidx.webkit.WebViewFeature.STARTUP_FEATURE_CONFIGURE_PARTITIONED_COOKIES, enforcement="androidx.webkit.WebViewFeature#isConfigFeatureSupported(String, Context)") public androidx.webkit.ProcessGlobalConfig setPartitionedCookiesEnabled(android.content.Context, boolean);
+    method @SuppressCompatibility @RequiresFeature(name=androidx.webkit.WebViewFeature.STARTUP_FEATURE_SET_UI_THREAD_STARTUP_MODE, enforcement="androidx.webkit.WebViewFeature#isConfigFeatureSupported(String, Context)") @androidx.webkit.WebViewCompat.ExperimentalAsyncStartUp public androidx.webkit.ProcessGlobalConfig setUiThreadStartupMode(android.content.Context, @SuppressCompatibility int);
+    field @SuppressCompatibility @androidx.webkit.WebViewCompat.ExperimentalAsyncStartUp public static final int UI_THREAD_STARTUP_MODE_ASYNC_LONG_TASKS = 1; // 0x1
+    field @SuppressCompatibility @androidx.webkit.WebViewCompat.ExperimentalAsyncStartUp public static final int UI_THREAD_STARTUP_MODE_ASYNC_SHORT_TASKS = 2; // 0x2
+    field @SuppressCompatibility @androidx.webkit.WebViewCompat.ExperimentalAsyncStartUp public static final int UI_THREAD_STARTUP_MODE_ASYNC_VERY_SHORT_TASKS = 3; // 0x3
+    field @SuppressCompatibility @androidx.webkit.WebViewCompat.ExperimentalAsyncStartUp public static final int UI_THREAD_STARTUP_MODE_DEFAULT = -1; // 0xffffffff
+    field @SuppressCompatibility @androidx.webkit.WebViewCompat.ExperimentalAsyncStartUp public static final int UI_THREAD_STARTUP_MODE_SYNC = 0; // 0x0
   }
 
   public interface Profile {
@@ -94,6 +100,7 @@ package androidx.webkit {
     method @AnyThread @RequiresFeature(name=androidx.webkit.WebViewFeature.MULTI_PROFILE, enforcement="androidx.webkit.WebViewFeature#isFeatureSupported") public android.webkit.ServiceWorkerController getServiceWorkerController();
     method @AnyThread @RequiresFeature(name=androidx.webkit.WebViewFeature.MULTI_PROFILE, enforcement="androidx.webkit.WebViewFeature#isFeatureSupported") public android.webkit.WebStorage getWebStorage();
     method @SuppressCompatibility @RequiresFeature(name=androidx.webkit.WebViewFeature.ORIGIN_MATCHED_HEADERS, enforcement="androidx.webkit.WebViewFeature#isFeatureSupported") @UiThread @androidx.webkit.Profile.ExperimentalOriginMatchedHeader public boolean hasOriginMatchedHeader(String);
+    method @SuppressCompatibility @RequiresFeature(name=androidx.webkit.WebViewFeature.PRECONNECT, enforcement="androidx.webkit.WebViewFeature#isFeatureSupported") @UiThread @androidx.webkit.Profile.ExperimentalPreconnect public default void preconnect(String);
     method @SuppressCompatibility @AnyThread @RequiresFeature(name=androidx.webkit.WebViewFeature.PROFILE_URL_PREFETCH, enforcement="androidx.webkit.WebViewFeature#isFeatureSupported") @androidx.webkit.Profile.ExperimentalUrlPrefetch public void prefetchUrlAsync(String, android.os.CancellationSignal?, java.util.concurrent.Executor, androidx.core.os.OutcomeReceiverCompat<java.lang.Void!,androidx.webkit.PrefetchException!>);
     method @SuppressCompatibility @AnyThread @RequiresFeature(name=androidx.webkit.WebViewFeature.PROFILE_URL_PREFETCH, enforcement="androidx.webkit.WebViewFeature#isFeatureSupported") @androidx.webkit.Profile.ExperimentalUrlPrefetch public void prefetchUrlAsync(String, android.os.CancellationSignal?, java.util.concurrent.Executor, androidx.webkit.SpeculativeLoadingParameters, androidx.core.os.OutcomeReceiverCompat<java.lang.Void!,androidx.webkit.PrefetchException!>);
     method @SuppressCompatibility @RequiresFeature(name=androidx.webkit.WebViewFeature.ORIGIN_MATCHED_HEADERS, enforcement="androidx.webkit.WebViewFeature#isFeatureSupported") @UiThread @androidx.webkit.Profile.ExperimentalOriginMatchedHeader public void setOriginMatchedHeader(String, String, java.util.Set<java.lang.String!>);
@@ -103,6 +110,9 @@ package androidx.webkit {
   }
 
   @SuppressCompatibility @RequiresOptIn(level=androidx.annotation.RequiresOptIn.Level.ERROR) @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.CLASS) @java.lang.annotation.Target({java.lang.annotation.ElementType.METHOD, java.lang.annotation.ElementType.TYPE, java.lang.annotation.ElementType.FIELD}) public static @interface Profile.ExperimentalOriginMatchedHeader {
+  }
+
+  @SuppressCompatibility @RequiresOptIn(level=androidx.annotation.RequiresOptIn.Level.ERROR) @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.CLASS) @java.lang.annotation.Target({java.lang.annotation.ElementType.METHOD, java.lang.annotation.ElementType.TYPE, java.lang.annotation.ElementType.FIELD}) public static @interface Profile.ExperimentalPreconnect {
   }
 
   @SuppressCompatibility @RequiresOptIn(level=androidx.annotation.RequiresOptIn.Level.ERROR) @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.CLASS) @java.lang.annotation.Target({java.lang.annotation.ElementType.METHOD, java.lang.annotation.ElementType.TYPE, java.lang.annotation.ElementType.FIELD}) public static @interface Profile.ExperimentalUrlPrefetch {
@@ -470,7 +480,7 @@ package androidx.webkit {
 
   public class WebViewClientCompat extends android.webkit.WebViewClient {
     ctor public WebViewClientCompat();
-    method @RequiresApi(android.os.Build.VERSION_CODES.M) public final void onReceivedError(android.webkit.WebView, android.webkit.WebResourceRequest, android.webkit.WebResourceError);
+    method public final void onReceivedError(android.webkit.WebView, android.webkit.WebResourceRequest, android.webkit.WebResourceError);
     method @UiThread public void onReceivedError(android.webkit.WebView, android.webkit.WebResourceRequest, androidx.webkit.WebResourceErrorCompat);
     method @RequiresApi(android.os.Build.VERSION_CODES.O_MR1) public final void onSafeBrowsingHit(android.webkit.WebView, android.webkit.WebResourceRequest, int, android.webkit.SafeBrowsingResponse);
     method @UiThread public void onSafeBrowsingHit(android.webkit.WebView, android.webkit.WebResourceRequest, int, androidx.webkit.SafeBrowsingResponseCompat);
@@ -560,6 +570,7 @@ package androidx.webkit {
     field public static final String ORIGIN_MATCHED_HEADERS = "ORIGIN_MATCHED_HEADERS";
     field public static final String PAYMENT_REQUEST = "PAYMENT_REQUEST";
     field public static final String POST_WEB_MESSAGE = "POST_WEB_MESSAGE";
+    field public static final String PRECONNECT = "PRECONNECT";
     field public static final String PRERENDER_WITH_URL = "PRERENDER_URL_V2";
     field @SuppressCompatibility @androidx.webkit.Profile.ExperimentalUrlPrefetch public static final String PROFILE_URL_PREFETCH = "PREFETCH_URL_V5";
     field public static final String PROXY_OVERRIDE = "PROXY_OVERRIDE";
@@ -587,6 +598,8 @@ package androidx.webkit {
     field public static final String STARTUP_FEATURE_CONFIGURE_PARTITIONED_COOKIES = "STARTUP_FEATURE_CONFIGURE_PARTITIONED_COOKIES";
     field public static final String STARTUP_FEATURE_SET_DATA_DIRECTORY_SUFFIX = "STARTUP_FEATURE_SET_DATA_DIRECTORY_SUFFIX";
     field public static final String STARTUP_FEATURE_SET_DIRECTORY_BASE_PATHS = "STARTUP_FEATURE_SET_DIRECTORY_BASE_PATHS";
+    field public static final String STARTUP_FEATURE_SET_PROFILES_TO_LOAD = "STARTUP_FEATURE_SET_PROFILES_TO_LOAD";
+    field public static final String STARTUP_FEATURE_SET_UI_THREAD_STARTUP_MODE = "STARTUP_FEATURE_SET_UI_THREAD_STARTUP_MODE";
     field public static final String START_SAFE_BROWSING = "START_SAFE_BROWSING";
     field public static final String TRACING_CONTROLLER_BASIC_USAGE = "TRACING_CONTROLLER_BASIC_USAGE";
     field public static final String USER_AGENT_METADATA = "USER_AGENT_METADATA";

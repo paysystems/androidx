@@ -45,7 +45,6 @@ import android.graphics.Color;
 import android.media.AudioAttributes;
 import android.net.Uri;
 import android.os.Build;
-import android.service.notification.StatusBarNotification;
 
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -1185,13 +1184,9 @@ public class NotificationManagerCompatTest {
         NotificationManagerCompat notificationManager =
                 new NotificationManagerCompat(fakeManager, mContext);
 
-        List<StatusBarNotification> notifs = notificationManager.getActiveNotifications();
+        notificationManager.getActiveNotifications();
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            verify(fakeManager, times(1)).getActiveNotifications();
-        } else {
-            assertEquals(0, notifs.size());
-        }
+        verify(fakeManager, times(1)).getActiveNotifications();
     }
 
     @Test
@@ -1209,17 +1204,6 @@ public class NotificationManagerCompatTest {
     }
 
     @Test
-    @SdkSuppress(maxSdkVersion = 22)
-    public void testGetCurrentInterruptionFilterLegacy() {
-        NotificationManager fakeManager = mPlatformNotificationManager;
-        NotificationManagerCompat notificationManager = new NotificationManagerCompat(fakeManager,
-                mContext);
-        assertEquals(NotificationManagerCompat.INTERRUPTION_FILTER_UNKNOWN,
-                notificationManager.getCurrentInterruptionFilter());
-    }
-
-    @Test
-    @SdkSuppress(minSdkVersion = 23)
     public void testGetCurrentInterruptionFilter() {
         NotificationManagerCompat notificationManager = new NotificationManagerCompat(
                 mPlatformNotificationManager,

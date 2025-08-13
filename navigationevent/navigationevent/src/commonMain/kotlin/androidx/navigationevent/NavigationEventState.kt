@@ -34,12 +34,27 @@ public sealed class NavigationEventState<out T : NavigationEventInfo> {
     public abstract val currentInfo: T
 
     /**
+     * The progress of the current navigation gesture, typically from 0.0f to 1.0f.
+     *
+     * Returns `0f` when the state is [Idle]. When the state is [InProgress], it reflects the
+     * completion progress of the ongoing gesture from its `latestEvent`.
+     */
+    public val progress: Float
+        get() {
+            return when (this) {
+                is Idle -> 0f
+                is InProgress -> latestEvent.progress
+            }
+        }
+
+    /**
      * The UI is settled, and no navigation gesture is currently active.
      *
      * @property currentInfo Information about the current UI state.
      */
-    public class Idle<out T : NavigationEventInfo>(override val currentInfo: T) :
-        NavigationEventState<T>() {
+    public class Idle<out T : NavigationEventInfo>
+    @PublishedApi
+    internal constructor(override val currentInfo: T) : NavigationEventState<T>() {
 
         override fun toString(): String {
             return "Idle(currentInfo=$currentInfo)"
@@ -64,7 +79,8 @@ public sealed class NavigationEventState<out T : NavigationEventInfo> {
      * @property latestEvent The latest [NavigationEvent] in the gesture sequence, containing
      *   details like touch position and progress.
      */
-    public class InProgress<out T : NavigationEventInfo>(
+    public class InProgress<out T : NavigationEventInfo>
+    internal constructor(
         override val currentInfo: T,
         public val previousInfo: T?,
         public val latestEvent: NavigationEvent,

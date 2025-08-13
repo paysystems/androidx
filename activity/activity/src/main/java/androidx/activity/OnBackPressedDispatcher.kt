@@ -24,6 +24,7 @@ import androidx.core.util.Consumer
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
+import androidx.navigationevent.DirectNavigationEventInputHandler
 import androidx.navigationevent.NavigationEventCallback
 import androidx.navigationevent.NavigationEventDispatcher
 import androidx.navigationevent.NavigationEventInputHandler
@@ -73,15 +74,27 @@ class OnBackPressedDispatcher(
      * @see [OnBackPressedCallback.eventCallbacks]
      */
     internal val eventDispatcher: NavigationEventDispatcher by lazy {
-        NavigationEventDispatcher(
-            fallbackOnBackPressed = { fallbackOnBackPressed?.run() },
-            onHasEnabledCallbacksChanged = { enabled ->
-                onHasEnabledCallbacksChanged?.accept(enabled)
-            },
-        )
+        val dispatcher =
+            NavigationEventDispatcher(fallbackOnBackPressed = { fallbackOnBackPressed?.run() })
+        // This is to implement `OnBackPressedDispatcher.onHasEnabledCallbacksChanged`, which
+        // can be set through OnBackPressedDispatcher's public constructor.
+        onHasEnabledCallbacksChanged?.let { callback ->
+            dispatcher.addInputHandler(
+                object : NavigationEventInputHandler() {
+                    override fun onHasEnabledCallbacksChanged(hasEnabledCallbacks: Boolean) {
+                        callback.accept(hasEnabledCallbacks)
+                    }
+                }
+            )
+        }
+        dispatcher
     }
 
-    private val manualDispatchInputHandler by lazy { NavigationEventInputHandler(eventDispatcher) }
+    private val manualDispatchInputHandler by lazy {
+        val inputHandler = DirectNavigationEventInputHandler()
+        eventDispatcher.addInputHandler(inputHandler)
+        inputHandler
+    }
 
     @JvmOverloads
     constructor(fallbackOnBackPressed: Runnable? = null) : this(fallbackOnBackPressed, null)
@@ -93,7 +106,8 @@ class OnBackPressedDispatcher(
      */
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     fun setOnBackInvokedDispatcher(invoker: OnBackInvokedDispatcher) {
-        OnBackInvokedInputHandler(eventDispatcher, invoker)
+        val inputHandler = OnBackInvokedInputHandler(invoker)
+        eventDispatcher.addInputHandler(inputHandler)
     }
 
     /**

@@ -16,8 +16,15 @@
 
 package androidx.aab
 
+import androidx.aab.cli.VERBOSE
 import java.io.InputStream
 
+/**
+ * Bundle information captured from `app-metadata.properties` (in either BUNDLE-METADATA/ or
+ * META-INF/)
+ *
+ * This primarily lists AGP version
+ */
 data class AppMetadataPropsInfo(
     val appMetadataVersion: String,
     val androidGradlePluginVersion: String,
@@ -35,6 +42,8 @@ data class AppMetadataPropsInfo(
             "base/root/META-INF/com/android/build/gradle/app-metadata.properties"
         const val BUNDLE_LOCATION_METADATA =
             "BUNDLE-METADATA/com.android.tools.build.gradle/app-metadata.properties"
+        const val APK_LOCATION_META_INF =
+            "META-INF/com/android/build/gradle/app-metadata.properties"
 
         fun from(src: InputStream): AppMetadataPropsInfo {
             var appMetadataVersion = ""
@@ -56,24 +65,23 @@ data class AppMetadataPropsInfo(
         }
 
         val CSV_TITLES_META_INF =
-            listOf(
-                "appMetadataPropsLegacy_present",
-                "appMetadataPropsLegacy_version",
-                "appMetadataPropsLegacy_agpVerson",
+            listOfNotNull(
+                "appMetadataPropsLegacy_agpVersion",
+                if (VERBOSE) "appMetadataPropsLegacy_version" else null,
             )
         val CSV_TITLES_BUNDLE =
-            listOf(
-                "appMetadataProps_present",
-                "appMetadataProps_version",
-                "appMetadataProps_agpVerson",
+            listOfNotNull(
+                "appMetadataProps_agpVersion",
+                if (VERBOSE) "appMetadataProps_version" else null,
             )
 
         fun AppMetadataPropsInfo?.csvEntries(): List<String> {
-            return if (this == null) {
-                listOf("FALSE, null, null")
-            } else {
-                listOf("TRUE, $appMetadataVersion, $androidGradlePluginVersion")
-            }
+            return listOf(this?.androidGradlePluginVersion.toString()) +
+                if (VERBOSE) {
+                    listOf(this?.appMetadataVersion.toString())
+                } else {
+                    emptyList()
+                }
         }
     }
 }

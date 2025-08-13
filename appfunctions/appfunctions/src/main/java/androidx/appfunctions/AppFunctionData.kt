@@ -156,7 +156,12 @@ internal constructor(
             } else {
                 array[0]
             }
-        spec?.validateReadRequest(key, Boolean::class.java, isCollection = false)
+        spec?.validateReadRequest(
+            key,
+            Boolean::class.java,
+            isCollection = false,
+            targetValue = booleanValue,
+        )
         return booleanValue
     }
 
@@ -205,7 +210,12 @@ internal constructor(
             } else {
                 array[0]
             }
-        spec?.validateReadRequest(key, Float::class.java, isCollection = false)
+        spec?.validateReadRequest(
+            key,
+            Float::class.java,
+            isCollection = false,
+            targetValue = doubleValue,
+        )
         if (doubleValue != null && !isDoubleWithinFloatRange(doubleValue)) {
             // This should never happen because the setters forbid such value to exist in the
             // first place.
@@ -261,7 +271,12 @@ internal constructor(
             } else {
                 array[0]
             }
-        spec?.validateReadRequest(key, Double::class.java, isCollection = false)
+        spec?.validateReadRequest(
+            key,
+            Double::class.java,
+            isCollection = false,
+            targetValue = doubleValue,
+        )
         return doubleValue
     }
 
@@ -310,7 +325,6 @@ internal constructor(
             } else {
                 array[0]
             }
-        spec?.validateReadRequest(key, Int::class.java, isCollection = false)
         if (longValue != null && !isLongWithinLongRange(longValue)) {
             // This should never happen because the setters forbid such value to exist in the
             // first place.
@@ -318,7 +332,14 @@ internal constructor(
                 "The value associated with $key is not within the range of Int"
             )
         }
-        return longValue?.toInt()
+        val intValue = longValue?.toInt()
+        spec?.validateReadRequest(
+            key,
+            Int::class.java,
+            isCollection = false,
+            targetValue = intValue,
+        )
+        return intValue
     }
 
     /**
@@ -366,7 +387,12 @@ internal constructor(
             } else {
                 array[0]
             }
-        spec?.validateReadRequest(key, Long::class.java, isCollection = false)
+        spec?.validateReadRequest(
+            key,
+            Long::class.java,
+            isCollection = false,
+            targetValue = longValue,
+        )
         return longValue
     }
 
@@ -399,12 +425,19 @@ internal constructor(
         val array = unsafeGetProperty(key, Array<String>::class.java)
         val stringValue =
             when {
-                key == LEGACY_ID_FIELD_KEY -> id
+                // For key == "id" we first check GD's id, if that's empty we fallback to checking
+                // GD's properties.
+                key == LEGACY_ID_FIELD_KEY -> id.ifEmpty { array?.ifEmpty { null }?.get(0) }
                 array == null || array.isEmpty() -> null
                 else -> array[0]
             }
 
-        spec?.validateReadRequest(key, String::class.java, isCollection = false)
+        spec?.validateReadRequest(
+            key,
+            String::class.java,
+            isCollection = false,
+            targetValue = stringValue,
+        )
         return stringValue
     }
 
@@ -428,7 +461,12 @@ internal constructor(
                     extras.getBundle(extrasKey(key)) ?: Bundle.EMPTY,
                 )
             }
-        spec?.validateReadRequest(key, AppFunctionData::class.java, isCollection = false)
+        spec?.validateReadRequest(
+            key,
+            AppFunctionData::class.java,
+            isCollection = false,
+            targetValue = dataValue,
+        )
         return dataValue
     }
 
@@ -458,8 +496,14 @@ internal constructor(
      */
     @RestrictTo(LIBRARY_GROUP)
     public fun getPendingIntentOrNull(key: String): PendingIntent? {
-        spec?.validateReadRequest(key, PendingIntent::class.java, isCollection = false)
-        return extras.getParcelable(extrasKey(key), PendingIntent::class.java)
+        val pendingIntentValue = extras.getParcelable(extrasKey(key), PendingIntent::class.java)
+        spec?.validateReadRequest(
+            key,
+            PendingIntent::class.java,
+            isCollection = false,
+            targetValue = pendingIntentValue,
+        )
+        return pendingIntentValue
     }
 
     /**
@@ -472,7 +516,12 @@ internal constructor(
      */
     public fun getBooleanArray(key: String): BooleanArray? {
         val booleanArrayValue = unsafeGetProperty(key, BooleanArray::class.java)
-        spec?.validateReadRequest(key, Boolean::class.java, isCollection = true)
+        spec?.validateReadRequest(
+            key,
+            Boolean::class.java,
+            isCollection = true,
+            targetValue = booleanArrayValue,
+        )
         return booleanArrayValue
     }
 
@@ -486,19 +535,27 @@ internal constructor(
      */
     public fun getFloatArray(key: String): FloatArray? {
         val doubleArrayValue = unsafeGetProperty(key, DoubleArray::class.java)
-        spec?.validateReadRequest(key, Float::class.java, isCollection = true)
-        return doubleArrayValue
-            ?.map { doubleValue ->
-                if (!isDoubleWithinFloatRange(doubleValue)) {
-                    // This should never happen because the setters forbid such value to exist in
-                    // the first place.
-                    throw IllegalStateException(
-                        "One of the value associated with $key is not within the range of Float"
-                    )
+        val floatArrayValue =
+            doubleArrayValue
+                ?.map { doubleValue ->
+                    if (!isDoubleWithinFloatRange(doubleValue)) {
+                        // This should never happen because the setters forbid such value to exist
+                        // in
+                        // the first place.
+                        throw IllegalStateException(
+                            "One of the value associated with $key is not within the range of Float"
+                        )
+                    }
+                    doubleValue.toFloat()
                 }
-                doubleValue.toFloat()
-            }
-            ?.toFloatArray()
+                ?.toFloatArray()
+        spec?.validateReadRequest(
+            key,
+            Float::class.java,
+            isCollection = true,
+            targetValue = floatArrayValue,
+        )
+        return floatArrayValue
     }
 
     /**
@@ -511,7 +568,12 @@ internal constructor(
      */
     public fun getDoubleArray(key: String): DoubleArray? {
         val doubleArrayValue = unsafeGetProperty(key, DoubleArray::class.java)
-        spec?.validateReadRequest(key, Double::class.java, isCollection = true)
+        spec?.validateReadRequest(
+            key,
+            Double::class.java,
+            isCollection = true,
+            targetValue = doubleArrayValue,
+        )
         return doubleArrayValue
     }
 
@@ -525,19 +587,27 @@ internal constructor(
      */
     public fun getIntArray(key: String): IntArray? {
         val longArrayValue = unsafeGetProperty(key, LongArray::class.java)
-        spec?.validateReadRequest(key, Int::class.java, isCollection = true)
-        return longArrayValue
-            ?.map { longValue ->
-                if (!isLongWithinLongRange(longValue)) {
-                    // This should never happen because the setters forbid such value to exist in
-                    // the first place.
-                    throw IllegalStateException(
-                        "One of the value associated with $key is not within the range of Int"
-                    )
+        val intArrayValue =
+            longArrayValue
+                ?.map { longValue ->
+                    if (!isLongWithinLongRange(longValue)) {
+                        // This should never happen because the setters forbid such value to exist
+                        // in
+                        // the first place.
+                        throw IllegalStateException(
+                            "One of the value associated with $key is not within the range of Int"
+                        )
+                    }
+                    longValue.toInt()
                 }
-                longValue.toInt()
-            }
-            ?.toIntArray()
+                ?.toIntArray()
+        spec?.validateReadRequest(
+            key,
+            Int::class.java,
+            isCollection = true,
+            targetValue = intArrayValue,
+        )
+        return intArrayValue
     }
 
     /**
@@ -550,7 +620,12 @@ internal constructor(
      */
     public fun getLongArray(key: String): LongArray? {
         val longArrayValue = unsafeGetProperty(key, LongArray::class.java)
-        spec?.validateReadRequest(key, Long::class.java, isCollection = true)
+        spec?.validateReadRequest(
+            key,
+            Long::class.java,
+            isCollection = true,
+            targetValue = longArrayValue,
+        )
         return longArrayValue
     }
 
@@ -564,12 +639,19 @@ internal constructor(
      */
     public fun getByteArray(key: String): ByteArray? {
         val byteArrayValue = unsafeGetProperty(key, Array<ByteArray>::class.java)
-        spec?.validateReadRequest(key, Byte::class.java, isCollection = true)
-        return if (byteArrayValue == null || byteArrayValue.isEmpty()) {
-            null
-        } else {
-            byteArrayValue[0]
-        }
+        val finalByteArrayValue =
+            if (byteArrayValue == null || byteArrayValue.isEmpty()) {
+                null
+            } else {
+                byteArrayValue[0]
+            }
+        spec?.validateReadRequest(
+            key,
+            Byte::class.java,
+            isCollection = true,
+            targetValue = finalByteArrayValue,
+        )
+        return finalByteArrayValue
     }
 
     /**
@@ -583,8 +665,14 @@ internal constructor(
     @Suppress("NullableCollection")
     public fun getStringList(key: String): List<String>? {
         val stringArrayValue = unsafeGetProperty(key, Array<String>::class.java)
-        spec?.validateReadRequest(key, String::class.java, isCollection = true)
-        return stringArrayValue?.asList()
+        val stringListValue = stringArrayValue?.asList()
+        spec?.validateReadRequest(
+            key,
+            String::class.java,
+            isCollection = true,
+            targetValue = stringListValue,
+        )
+        return stringListValue
     }
 
     /**
@@ -607,7 +695,12 @@ internal constructor(
                     extras.getBundle(extrasKey(key, index)) ?: Bundle.EMPTY,
                 )
             }
-        spec?.validateReadRequest(key, AppFunctionData::class.java, isCollection = true)
+        spec?.validateReadRequest(
+            key,
+            AppFunctionData::class.java,
+            isCollection = true,
+            targetValue = dataArrayValue,
+        )
         return dataArrayValue
     }
 
@@ -621,8 +714,15 @@ internal constructor(
      */
     @Suppress("NullableCollection")
     public fun getPendingIntentList(key: String): List<PendingIntent>? {
-        spec?.validateReadRequest(key, PendingIntent::class.java, isCollection = true)
-        return extras.getParcelableArrayList(extrasKey(key), PendingIntent::class.java)
+        val pendingIntentListValue =
+            extras.getParcelableArrayList(extrasKey(key), PendingIntent::class.java)
+        spec?.validateReadRequest(
+            key,
+            PendingIntent::class.java,
+            isCollection = true,
+            targetValue = pendingIntentListValue,
+        )
+        return pendingIntentListValue
     }
 
     override fun toString(): String {
@@ -874,6 +974,11 @@ internal constructor(
             // we need to have a compat version of this API to set the ID.
             if (SdkExtensions.getExtensionVersion(Build.VERSION_CODES.TIRAMISU) >= 13) {
                 genericDocumentBuilder.setId(id)
+            } else {
+                Log.wtf(
+                    APP_FUNCTIONS_TAG,
+                    "setId method in GenericDocument isn't supported on the current device.",
+                )
             }
         }
 
@@ -886,7 +991,12 @@ internal constructor(
          *   match the metadata specification associated with the [key].
          */
         public fun setBoolean(key: String, value: Boolean): Builder {
-            spec?.validateWriteRequest(key, Boolean::class.java, isCollection = false)
+            spec?.validateWriteRequest(
+                key,
+                Boolean::class.java,
+                isCollection = false,
+                targetValue = value,
+            )
             genericDocumentBuilder.setPropertyBoolean(key, value)
             return this
         }
@@ -900,7 +1010,12 @@ internal constructor(
          *   match the metadata specification associated with the [key].
          */
         public fun setFloat(key: String, value: Float): Builder {
-            spec?.validateWriteRequest(key, Float::class.java, isCollection = false)
+            spec?.validateWriteRequest(
+                key,
+                Float::class.java,
+                isCollection = false,
+                targetValue = value,
+            )
             genericDocumentBuilder.setPropertyDouble(key, value.toDouble())
             return this
         }
@@ -914,7 +1029,12 @@ internal constructor(
          *   match the metadata specification associated with the [key].
          */
         public fun setDouble(key: String, value: Double): Builder {
-            spec?.validateWriteRequest(key, Double::class.java, isCollection = false)
+            spec?.validateWriteRequest(
+                key,
+                Double::class.java,
+                isCollection = false,
+                targetValue = value,
+            )
             genericDocumentBuilder.setPropertyDouble(key, value)
             return this
         }
@@ -928,7 +1048,12 @@ internal constructor(
          *   match the metadata specification associated with the [key].
          */
         public fun setInt(key: String, value: Int): Builder {
-            spec?.validateWriteRequest(key, Int::class.java, isCollection = false)
+            spec?.validateWriteRequest(
+                key,
+                Int::class.java,
+                isCollection = false,
+                targetValue = value,
+            )
             genericDocumentBuilder.setPropertyLong(key, value.toLong())
             return this
         }
@@ -942,7 +1067,12 @@ internal constructor(
          *   match the metadata specification associated with the [key].
          */
         public fun setLong(key: String, value: Long): Builder {
-            spec?.validateWriteRequest(key, Long::class.java, isCollection = false)
+            spec?.validateWriteRequest(
+                key,
+                Long::class.java,
+                isCollection = false,
+                targetValue = value,
+            )
             genericDocumentBuilder.setPropertyLong(key, value)
             return this
         }
@@ -956,7 +1086,12 @@ internal constructor(
          *   match the metadata specification associated with the [key].
          */
         public fun setString(key: String, value: String): Builder {
-            spec?.validateWriteRequest(key, String::class.java, isCollection = false)
+            spec?.validateWriteRequest(
+                key,
+                String::class.java,
+                isCollection = false,
+                targetValue = value,
+            )
             genericDocumentBuilder.setPropertyString(key, value)
             if (key == LEGACY_ID_FIELD_KEY) {
                 setLegacyId(value)
@@ -973,7 +1108,12 @@ internal constructor(
          *   match the metadata specification associated with the [key].
          */
         public fun setAppFunctionData(key: String, value: AppFunctionData): Builder {
-            spec?.validateWriteRequest(key, AppFunctionData::class.java, isCollection = false)
+            spec?.validateWriteRequest(
+                key,
+                AppFunctionData::class.java,
+                isCollection = false,
+                targetValue = value,
+            )
             spec?.getPropertyObjectSpec(key)?.validateDataSpecMatches(value)
 
             genericDocumentBuilder.setPropertyDocument(key, value.genericDocument)
@@ -992,7 +1132,12 @@ internal constructor(
          *   match the metadata specification associated with the [key].
          */
         public fun setPendingIntent(key: String, value: PendingIntent): Builder {
-            spec?.validateWriteRequest(key, PendingIntent::class.java, isCollection = false)
+            spec?.validateWriteRequest(
+                key,
+                PendingIntent::class.java,
+                isCollection = false,
+                targetValue = value,
+            )
             extrasBuilder.putParcelable(extrasKey(key), value)
             return this
         }
@@ -1006,7 +1151,12 @@ internal constructor(
          *   match the metadata specification associated with the [key].
          */
         public fun setBooleanArray(key: String, value: BooleanArray): Builder {
-            spec?.validateWriteRequest(key, Boolean::class.java, isCollection = true)
+            spec?.validateWriteRequest(
+                key,
+                Boolean::class.java,
+                isCollection = true,
+                targetValue = value,
+            )
             genericDocumentBuilder.setPropertyBoolean(key, *value)
             return this
         }
@@ -1020,7 +1170,12 @@ internal constructor(
          *   match the metadata specification associated with the [key].
          */
         public fun setFloatArray(key: String, value: FloatArray): Builder {
-            spec?.validateWriteRequest(key, Float::class.java, isCollection = true)
+            spec?.validateWriteRequest(
+                key,
+                Float::class.java,
+                isCollection = true,
+                targetValue = value,
+            )
             genericDocumentBuilder.setPropertyDouble(
                 key,
                 *(value.asList().map { it.toDouble() }.toDoubleArray()),
@@ -1037,7 +1192,12 @@ internal constructor(
          *   match the metadata specification associated with the [key].
          */
         public fun setDoubleArray(key: String, value: DoubleArray): Builder {
-            spec?.validateWriteRequest(key, Double::class.java, isCollection = true)
+            spec?.validateWriteRequest(
+                key,
+                Double::class.java,
+                isCollection = true,
+                targetValue = value,
+            )
             genericDocumentBuilder.setPropertyDouble(key, *value)
             return this
         }
@@ -1051,7 +1211,12 @@ internal constructor(
          *   match the metadata specification associated with the [key].
          */
         public fun setIntArray(key: String, value: IntArray): Builder {
-            spec?.validateWriteRequest(key, Int::class.java, isCollection = true)
+            spec?.validateWriteRequest(
+                key,
+                Int::class.java,
+                isCollection = true,
+                targetValue = value,
+            )
             genericDocumentBuilder.setPropertyLong(
                 key,
                 *(value.asList().map { it.toLong() }.toLongArray()),
@@ -1068,7 +1233,12 @@ internal constructor(
          *   match the metadata specification associated with the [key].
          */
         public fun setLongArray(key: String, value: LongArray): Builder {
-            spec?.validateWriteRequest(key, Long::class.java, isCollection = true)
+            spec?.validateWriteRequest(
+                key,
+                Long::class.java,
+                isCollection = true,
+                targetValue = value,
+            )
             genericDocumentBuilder.setPropertyLong(key, *value)
             return this
         }
@@ -1082,7 +1252,12 @@ internal constructor(
          *   match the metadata specification associated with the [key].
          */
         public fun setByteArray(key: String, value: ByteArray): Builder {
-            spec?.validateWriteRequest(key, Byte::class.java, isCollection = true)
+            spec?.validateWriteRequest(
+                key,
+                Byte::class.java,
+                isCollection = true,
+                targetValue = value,
+            )
             genericDocumentBuilder.setPropertyBytes(key, value)
             return this
         }
@@ -1096,7 +1271,12 @@ internal constructor(
          *   match the metadata specification associated with the [key].
          */
         public fun setStringList(key: String, value: List<String>): Builder {
-            spec?.validateWriteRequest(key, String()::class.java, isCollection = true)
+            spec?.validateWriteRequest(
+                key,
+                String()::class.java,
+                isCollection = true,
+                targetValue = value,
+            )
             genericDocumentBuilder.setPropertyString(key, *value.toTypedArray())
             return this
         }
@@ -1110,7 +1290,12 @@ internal constructor(
          *   match the metadata specification associated with the [key].
          */
         public fun setAppFunctionDataList(key: String, value: List<AppFunctionData>): Builder {
-            spec?.validateWriteRequest(key, AppFunctionData::class.java, isCollection = true)
+            spec?.validateWriteRequest(
+                key,
+                AppFunctionData::class.java,
+                isCollection = true,
+                targetValue = value,
+            )
             genericDocumentBuilder.setPropertyDocument(
                 key,
                 *value.map { it.genericDocument }.toTypedArray(),
@@ -1133,7 +1318,12 @@ internal constructor(
          *   match the metadata specification associated with the [key].
          */
         public fun setPendingIntentList(key: String, value: List<PendingIntent>): Builder {
-            spec?.validateWriteRequest(key, PendingIntent::class.java, isCollection = true)
+            spec?.validateWriteRequest(
+                key,
+                PendingIntent::class.java,
+                isCollection = true,
+                targetValue = value,
+            )
             extrasBuilder.putParcelableArrayList(extrasKey(key), ArrayList<PendingIntent>(value))
             return this
         }

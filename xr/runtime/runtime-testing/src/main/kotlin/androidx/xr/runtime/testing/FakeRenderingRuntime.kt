@@ -23,9 +23,11 @@ import androidx.xr.runtime.internal.MaterialResource
 import androidx.xr.runtime.internal.RenderingRuntime
 import androidx.xr.runtime.internal.SceneRuntime
 import androidx.xr.runtime.internal.TextureResource
+import androidx.xr.runtime.internal.TextureSampler
 import androidx.xr.runtime.math.Matrix3
 import androidx.xr.runtime.math.Vector3
 import androidx.xr.runtime.math.Vector4
+import com.google.common.util.concurrent.Futures.immediateFailedFuture
 import com.google.common.util.concurrent.Futures.immediateFuture
 import com.google.common.util.concurrent.ListenableFuture
 
@@ -35,6 +37,33 @@ public class FakeRenderingRuntime(
     private val sceneRuntime: SceneRuntime,
     private val activity: Activity,
 ) : RenderingRuntime {
+    @Suppress("AsyncSuffixFuture")
+    override fun loadTexture(
+        assetName: String,
+        sampler: TextureSampler,
+    ): ListenableFuture<TextureResource> = immediateFailedFuture(NotImplementedError())
+
+    /**
+     * For test purposes only.
+     *
+     * Controls the `TextureResource` instance returned by [borrowReflectionTexture] and
+     * [getReflectionTextureFromIbl].
+     *
+     * <p>Tests can set this property to a [FakeResource] instance to simulate the availability of a
+     * reflection texture. This allows verification that the code under test correctly handles the
+     * borrowed or retrieved texture. Calling [destroyTexture] will reset this property to `null`,
+     * enabling tests to also verify resource cleanup behavior.
+     */
+    internal var reflectionTexture: FakeResource? = null
+
+    override fun borrowReflectionTexture(): TextureResource? {
+        return reflectionTexture
+    }
+
+    override fun destroyTexture(texture: TextureResource) {
+        reflectionTexture = null
+    }
+
     /**
      * For test purposes only.
      *
@@ -190,6 +219,204 @@ public class FakeRenderingRuntime(
 
     override fun destroyKhronosPbrMaterial(material: MaterialResource) {
         createdKhronosPbrMaterials.remove(material)
+    }
+
+    override fun setBaseColorTextureOnKhronosPbrMaterial(
+        material: MaterialResource,
+        baseColor: TextureResource,
+    ) {
+        (material as? FakeKhronosPbrMaterial)?.baseColorTexture = baseColor
+    }
+
+    override fun setBaseColorUvTransformOnKhronosPbrMaterial(
+        material: MaterialResource,
+        uvTransform: Matrix3,
+    ) {
+        (material as? FakeKhronosPbrMaterial)?.baseColorUvTransform = uvTransform
+    }
+
+    override fun setBaseColorFactorsOnKhronosPbrMaterial(
+        material: MaterialResource,
+        factors: Vector4,
+    ) {
+        (material as? FakeKhronosPbrMaterial)?.baseColorFactors = factors
+    }
+
+    override fun setMetallicRoughnessTextureOnKhronosPbrMaterial(
+        material: MaterialResource,
+        metallicRoughness: TextureResource,
+    ) {
+        (material as? FakeKhronosPbrMaterial)?.metallicRoughnessTexture = metallicRoughness
+    }
+
+    override fun setMetallicRoughnessUvTransformOnKhronosPbrMaterial(
+        material: MaterialResource,
+        uvTransform: Matrix3,
+    ) {
+        (material as? FakeKhronosPbrMaterial)?.metallicRoughnessUvTransform = uvTransform
+    }
+
+    override fun setMetallicFactorOnKhronosPbrMaterial(material: MaterialResource, factor: Float) {
+        (material as? FakeKhronosPbrMaterial)?.metallicFactor = factor
+    }
+
+    override fun setRoughnessFactorOnKhronosPbrMaterial(material: MaterialResource, factor: Float) {
+        (material as? FakeKhronosPbrMaterial)?.roughnessFactor = factor
+    }
+
+    override fun setNormalTextureOnKhronosPbrMaterial(
+        material: MaterialResource,
+        normal: TextureResource,
+    ) {
+        (material as? FakeKhronosPbrMaterial)?.normalTexture = normal
+    }
+
+    override fun setNormalUvTransformOnKhronosPbrMaterial(
+        material: MaterialResource,
+        uvTransform: Matrix3,
+    ) {
+        (material as? FakeKhronosPbrMaterial)?.normalUvTransform = uvTransform
+    }
+
+    override fun setNormalFactorOnKhronosPbrMaterial(material: MaterialResource, factor: Float) {
+        (material as? FakeKhronosPbrMaterial)?.normalFactor = factor
+    }
+
+    override fun setAmbientOcclusionTextureOnKhronosPbrMaterial(
+        material: MaterialResource,
+        ambientOcclusion: TextureResource,
+    ) {
+        (material as? FakeKhronosPbrMaterial)?.ambientOcclusionTexture = ambientOcclusion
+    }
+
+    override fun setAmbientOcclusionUvTransformOnKhronosPbrMaterial(
+        material: MaterialResource,
+        uvTransform: Matrix3,
+    ) {
+        (material as? FakeKhronosPbrMaterial)?.ambientOcclusionUvTransform = uvTransform
+    }
+
+    override fun setAmbientOcclusionFactorOnKhronosPbrMaterial(
+        material: MaterialResource,
+        factor: Float,
+    ) {
+        (material as? FakeKhronosPbrMaterial)?.ambientOcclusionFactor = factor
+    }
+
+    override fun setEmissiveTextureOnKhronosPbrMaterial(
+        material: MaterialResource,
+        emissive: TextureResource,
+    ) {
+        (material as? FakeKhronosPbrMaterial)?.emissiveTexture = emissive
+    }
+
+    override fun setEmissiveUvTransformOnKhronosPbrMaterial(
+        material: MaterialResource,
+        uvTransform: Matrix3,
+    ) {
+        (material as? FakeKhronosPbrMaterial)?.emissiveUvTransform = uvTransform
+    }
+
+    override fun setEmissiveFactorsOnKhronosPbrMaterial(
+        material: MaterialResource,
+        factors: Vector3,
+    ) {
+        (material as? FakeKhronosPbrMaterial)?.emissiveFactors = factors
+    }
+
+    override fun setClearcoatTextureOnKhronosPbrMaterial(
+        material: MaterialResource,
+        clearcoat: TextureResource,
+    ) {
+        (material as? FakeKhronosPbrMaterial)?.clearcoatTexture = clearcoat
+    }
+
+    override fun setClearcoatNormalTextureOnKhronosPbrMaterial(
+        material: MaterialResource,
+        clearcoatNormal: TextureResource,
+    ) {
+        (material as? FakeKhronosPbrMaterial)?.clearcoatNormalTexture = clearcoatNormal
+    }
+
+    override fun setClearcoatRoughnessTextureOnKhronosPbrMaterial(
+        material: MaterialResource,
+        clearcoatRoughness: TextureResource,
+    ) {
+        (material as? FakeKhronosPbrMaterial)?.clearcoatRoughnessTexture = clearcoatRoughness
+    }
+
+    override fun setClearcoatFactorsOnKhronosPbrMaterial(
+        material: MaterialResource,
+        intensity: Float,
+        roughness: Float,
+        normal: Float,
+    ) {
+        (material as? FakeKhronosPbrMaterial)?.clearcoatIntensity = intensity
+        (material as? FakeKhronosPbrMaterial)?.clearcoatRoughness = roughness
+        (material as? FakeKhronosPbrMaterial)?.clearcoatNormalFactor = normal
+    }
+
+    override fun setSheenColorTextureOnKhronosPbrMaterial(
+        material: MaterialResource,
+        sheenColor: TextureResource,
+    ) {
+        (material as? FakeKhronosPbrMaterial)?.sheenColorTexture = sheenColor
+    }
+
+    override fun setSheenColorFactorsOnKhronosPbrMaterial(
+        material: MaterialResource,
+        factors: Vector3,
+    ) {
+        (material as? FakeKhronosPbrMaterial)?.sheenColorFactors = factors
+    }
+
+    override fun setSheenRoughnessTextureOnKhronosPbrMaterial(
+        material: MaterialResource,
+        sheenRoughness: TextureResource,
+    ) {
+        (material as? FakeKhronosPbrMaterial)?.sheenRoughnessTexture = sheenRoughness
+    }
+
+    override fun setSheenRoughnessFactorOnKhronosPbrMaterial(
+        material: MaterialResource,
+        factor: Float,
+    ) {
+        (material as? FakeKhronosPbrMaterial)?.sheenRoughnessFactor = factor
+    }
+
+    override fun setTransmissionTextureOnKhronosPbrMaterial(
+        material: MaterialResource,
+        transmission: TextureResource,
+    ) {
+        (material as? FakeKhronosPbrMaterial)?.transmissionTexture = transmission
+    }
+
+    override fun setTransmissionUvTransformOnKhronosPbrMaterial(
+        material: MaterialResource,
+        uvTransform: Matrix3,
+    ) {
+        (material as? FakeKhronosPbrMaterial)?.transmissionUvTransform = uvTransform
+    }
+
+    override fun setTransmissionFactorOnKhronosPbrMaterial(
+        material: MaterialResource,
+        factor: Float,
+    ) {
+        (material as? FakeKhronosPbrMaterial)?.transmissionFactor = factor
+    }
+
+    override fun setIndexOfRefractionOnKhronosPbrMaterial(
+        material: MaterialResource,
+        indexOfRefraction: Float,
+    ) {
+        (material as? FakeKhronosPbrMaterial)?.indexOfRefraction = indexOfRefraction
+    }
+
+    override fun setAlphaCutoffOnKhronosPbrMaterial(
+        material: MaterialResource,
+        alphaCutoff: Float,
+    ) {
+        (material as? FakeKhronosPbrMaterial)?.alphaCutoff = alphaCutoff
     }
 
     override fun startRenderer() {}

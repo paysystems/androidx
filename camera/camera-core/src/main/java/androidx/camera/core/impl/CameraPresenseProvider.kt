@@ -79,7 +79,10 @@ public class CameraPresenceProvider(private val backgroundExecutor: Executor) {
         this.cameraRepository = cameraRepository
         this.sourcePresenceObservable = cameraFactory.cameraPresenceSource
 
-        sourcePresenceObservable?.addObserver(backgroundExecutor, sourceObserver)
+        sourcePresenceObservable?.addObserver(
+            CameraXExecutors.newSequentialExecutor(backgroundExecutor),
+            sourceObserver,
+        )
     }
 
     /** Shuts down the provider and cleans up all resources. */
@@ -248,7 +251,8 @@ public class CameraPresenceProvider(private val backgroundExecutor: Executor) {
                             "Ignore camera state change handling since already stop monitoring",
                         )
                     } else if (
-                        cameraState?.error != null || cameraState?.type == CameraState.Type.CLOSED
+                        cameraState?.error?.type == CameraState.ErrorType.CRITICAL ||
+                            cameraState?.type == CameraState.Type.CLOSED
                     ) {
                         Logger.w(
                             TAG,
@@ -299,9 +303,9 @@ public class CameraPresenceProvider(private val backgroundExecutor: Executor) {
         val repo = cameraRepository
         if (repo != null) {
             val cameraInfosToRemoveObserver =
-                repo.cameras.map { cameraInternal -> cameraInternal.cameraInfoInternal }
+                repo.cameras.mapNotNull { cameraInternal -> cameraInternal?.cameraInfoInternal }
             Logger.d(TAG, "Clearing all ${observersToClear.size} state observers.")
-            observersToClear.map { (cameraId, observer) ->
+            observersToClear.forEach { (cameraId, observer) ->
                 CameraXExecutors.mainThreadExecutor().execute {
                     try {
                         cameraInfosToRemoveObserver
@@ -309,7 +313,7 @@ public class CameraPresenceProvider(private val backgroundExecutor: Executor) {
                             ?.cameraState
                             ?.removeObserver(observer)
                     } catch (_: IllegalArgumentException) {
-                        // Safe to ignore, camera might have been removed from the repo already.
+                        // Safe to ignore, the camera might have already been removed.
                     }
                 }
             }

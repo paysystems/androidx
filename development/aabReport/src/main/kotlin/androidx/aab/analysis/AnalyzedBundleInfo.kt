@@ -33,7 +33,21 @@ class AnalyzedBundleInfo(val bundleInfo: BundleInfo) {
     val libraryAnalysis = bundleInfo.getLibraryAnalysis()
 
     fun printAnalysis() {
-        println("Analysis for ${bundleInfo.path}")
-        listOf(profileAnalysis, r8Analysis, libraryAnalysis).map { it.getScore() }.print()
+        println("\n\n\nAnalysis for ${bundleInfo.path}")
+        listOf(profileAnalysis, r8Analysis, libraryAnalysis).map { it.getSubScore() }.print()
+    }
+
+    fun toCsvLine(): String {
+        val entries =
+            (profileAnalysis.csvEntries() + r8Analysis.csvEntries() + bundleInfo.csvEntries())
+        check(entries.size == CSV_TITLES.size) {
+            "CSV Entry count (${entries.size}) didn't match header count ${CSV_TITLES.size}"
+        }
+        return entries.joinToString(", ")
+    }
+
+    companion object {
+        val CSV_TITLES = ProfileAnalysis.CSV_TITLES + R8Analysis.CSV_TITLES + BundleInfo.CSV_TITLES
+        val CSV_HEADER = CSV_TITLES.joinToString(", ")
     }
 }

@@ -40,7 +40,6 @@ import java.util.function.Consumer
  * setting the [Entity.parent] property on an AnchorEntity has no effect, as the parenting of an
  * Anchor is controlled by the system.
  */
-@Suppress("HiddenSuperclass") // TODO: b/427566816 - Fix HiddenSuperclass suppression
 @SuppressLint("NewApi") // TODO: b/413661481 - Remove this suppression prior to JXR stable release.
 public class AnchorEntity
 private constructor(rtEntity: RtAnchorEntity, entityManager: EntityManager) :
@@ -322,7 +321,7 @@ private constructor(rtEntity: RtAnchorEntity, entityManager: EntityManager) :
      * @param relativeTo The space in which the pose is defined.
      * @throws UnsupportedOperationException if called.
      */
-    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
+    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
     override fun setPose(pose: Pose, @SpaceValue relativeTo: Int) {
         throw UnsupportedOperationException("Cannot set 'pose' on an AnchorEntity.")
     }
@@ -358,7 +357,7 @@ private constructor(rtEntity: RtAnchorEntity, entityManager: EntityManager) :
      * @param relativeTo The space in which the scale is defined.
      * @throws UnsupportedOperationException if called.
      */
-    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX)
+    @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
     override fun setScale(scale: Float, @SpaceValue relativeTo: Int) {
         throw UnsupportedOperationException("Cannot set 'scale' on an AnchorEntity.")
     }

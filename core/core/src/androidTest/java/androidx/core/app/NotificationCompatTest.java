@@ -265,11 +265,6 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
                 .build();
         List<NotificationCompat.Action> actions = NotificationCompat.getInvisibleActions(nWith);
 
-        if (Build.VERSION.SDK_INT < 21) {
-            assertEquals(0, actions.size());
-            return;
-        }
-
         assertEquals(1, actions.size());
         assertEquals("testAction", actions.get(0).getTitle());
 
@@ -383,7 +378,7 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
 
         Notification notification = builder.build();
         assertThat(NotificationCompat.getShortCriticalText(notification))
-            .isEqualTo(shortCriticalText);
+                .isEqualTo(shortCriticalText);
 
         notification = builder.setShortCriticalText(null).build();
         assertThat(NotificationCompat.getShortCriticalText(notification)).isNull();
@@ -569,7 +564,6 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
         assertThat(recovered.largeIcon).isEqualTo(largeIcon);
     }
 
-    @SdkSuppress(minSdkVersion = 23)
     @Test
     public void testBuilderFromNotification_withSmallAndLargeIcons() {
         IconCompat smallIcon = IconCompat.createWithResource(mContext, R.drawable.ic_call_answer);
@@ -739,12 +733,6 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
 
         // Add an action so that we start getting the view
         builder.addAction(new NotificationCompat.Action(null, "action", null));
-
-        // Before Lollipop, there was no heads up view; expect null
-        if (Build.VERSION.SDK_INT < 21) {
-            assertNull(builder.createHeadsUpContentView());
-            return;
-        }
 
         // Expect the standard big notification template (yes, heads up defaults to big template)
         RemoteViews standardView = builder.createHeadsUpContentView();
@@ -965,7 +953,6 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
         assertFalse(action.getShowsUserInterface());
     }
 
-    @SdkSuppress(minSdkVersion = 20)
     @Test
     public void testGetActionCompatFromAction_sameIconResourceId() {
         NotificationCompat.Action action = new NotificationCompat.Action.Builder(
@@ -979,7 +966,6 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
         assertEquals(R.drawable.notification_bg, result.getIconCompat().getResId());
     }
 
-    @SdkSuppress(minSdkVersion = 20)
     @Test
     public void testGetActionCompatFromAction_showsUserInterface() {
         NotificationCompat.Action action = newActionBuilder()
@@ -993,7 +979,6 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
         assertFalse(result.getShowsUserInterface());
     }
 
-    @SdkSuppress(minSdkVersion = 20)
     @Test
     public void testGetActionCompatFromAction_withRemoteInputs_doesntCrash() {
         NotificationCompat.Action action = newActionBuilder()
@@ -1063,7 +1048,6 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
     }
 
     @Test
-    @SdkSuppress(minSdkVersion = 23)
     public void testNotificationSmallIcon() {
         IconCompat icon = IconCompat.createWithResource(mContext,
                 R.drawable.notification_action_background);
@@ -1150,7 +1134,7 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
                 .setGroupSummary(false)
                 .build();
 
-        if (Build.VERSION.SDK_INT >= 20 && !(Build.VERSION.SDK_INT >= 26)) {
+        if (Build.VERSION.SDK_INT < 26) {
             assertNull(n.sound);
             assertNull(n.vibrate);
             assertTrue((n.defaults & DEFAULT_LIGHTS) != 0);
@@ -1162,18 +1146,6 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
             assertTrue((n2.defaults & DEFAULT_LIGHTS) != 0);
             assertTrue((n2.defaults & DEFAULT_SOUND) == 0);
             assertTrue((n2.defaults & DEFAULT_VIBRATE) == 0);
-        } else if (Build.VERSION.SDK_INT < 20) {
-            assertNotNull(n.sound);
-            assertNotNull(n.vibrate);
-            assertTrue((n.defaults & DEFAULT_LIGHTS) != 0);
-            assertTrue((n.defaults & DEFAULT_SOUND) != 0);
-            assertTrue((n.defaults & DEFAULT_VIBRATE) != 0);
-
-            assertNotNull(n2.sound);
-            assertNotNull(n2.vibrate);
-            assertTrue((n2.defaults & DEFAULT_LIGHTS) != 0);
-            assertTrue((n2.defaults & DEFAULT_SOUND) != 0);
-            assertTrue((n2.defaults & DEFAULT_VIBRATE) != 0);
         }
     }
 
@@ -1186,16 +1158,14 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
 
         Bundle extras = NotificationCompat.getExtras(n);
         assertNotNull(extras);
-        if (Build.VERSION.SDK_INT <= 23) {
+        if (Build.VERSION.SDK_INT == 23) {
             assertFalse(extras.containsKey(NotificationCompat.EXTRA_LARGE_ICON));
         } else {
             assertTrue(extras.containsKey(NotificationCompat.EXTRA_LARGE_ICON));
             assertNull(extras.get(NotificationCompat.EXTRA_LARGE_ICON));
         }
 
-        if (Build.VERSION.SDK_INT >= 23) {
-            assertNull(n.getLargeIcon());
-        }
+        assertNull(n.getLargeIcon());
     }
 
     @Test
@@ -1212,12 +1182,9 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
         assertNotNull(extras);
         assertTrue(extras.containsKey(NotificationCompat.EXTRA_LARGE_ICON));
         assertNotNull(extras.get(NotificationCompat.EXTRA_LARGE_ICON));
-        if (Build.VERSION.SDK_INT >= 23) {
-            assertNotNull(n.getLargeIcon());
-        }
+        assertNotNull(n.getLargeIcon());
     }
 
-    @SdkSuppress(minSdkVersion = 23)
     @Test
     public void testSetNotification_setLargeIconNullIcon() {
         Notification n = new NotificationCompat.Builder(mContext, "channelId")
@@ -1231,9 +1198,7 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
         assertNotNull(extras);
         // Prior to API version 24, EXTRA_LARGE_ICON was not set if largeIcon was set to null.
         // Starting in version 24, EXTRA_LARGE_ICON is set, but its value is null.
-        // Note that extras are not populated before API 19, but this test's minSdkVersion is 23,
-        // so we don't have to check that.
-        if (Build.VERSION.SDK_INT <= 23) {
+        if (Build.VERSION.SDK_INT == 23) {
             assertFalse(extras.containsKey(NotificationCompat.EXTRA_LARGE_ICON));
         } else {
             assertTrue(extras.containsKey(NotificationCompat.EXTRA_LARGE_ICON));
@@ -1242,7 +1207,6 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
 
     }
 
-    @SdkSuppress(minSdkVersion = 23)
     @Test
     public void testSetNotification_setLargeIconIcon() {
         IconCompat iconCompat = IconCompat.createWithResource(mContext,
@@ -1265,7 +1229,7 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
         }
     }
 
-    @SdkSuppress(minSdkVersion = 23, maxSdkVersion = 26)
+    @SdkSuppress(maxSdkVersion = 26)
     @Test
     public void testSetNotification_setLargeIconBitmapScales() {
         // Original icon is 860x860
@@ -1358,7 +1322,7 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
                 .setSilent(false)
                 .build();
 
-        if (Build.VERSION.SDK_INT >= 20 && !(Build.VERSION.SDK_INT >= 26)) {
+        if (Build.VERSION.SDK_INT < 26) {
             assertNull(nSummary.sound);
             assertNull(nSummary.vibrate);
             assertTrue((nSummary.defaults & DEFAULT_LIGHTS) != 0);
@@ -1385,7 +1349,7 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
             assertEquals(GROUP_KEY_SILENT, nChild.getGroup());
             assertEquals(GROUP_KEY_SILENT, nSummary.getGroup());
             assertNull(nNoisy.getGroup());
-        } else if (Build.VERSION.SDK_INT >= 20) {
+        } else {
             assertNull(nChild.getGroup());
             assertNull(nSummary.getGroup());
             assertNull(nNoisy.getGroup());
@@ -1420,10 +1384,8 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
             assertEquals(GROUP_ALERT_SUMMARY, nChild.getGroupAlertBehavior());
             assertEquals(GROUP_ALERT_CHILDREN, nSummary.getGroupAlertBehavior());
         }
-        if (Build.VERSION.SDK_INT >= 20) {
-            assertEquals(groupKey, nChild.getGroup());
-            assertEquals(groupKey, nSummary.getGroup());
-        }
+        assertEquals(groupKey, nChild.getGroup());
+        assertEquals(groupKey, nSummary.getGroup());
     }
 
     @Test
@@ -1464,6 +1426,37 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
     }
 
     @Test
+    public void testSetNotificationSilent_clonedNotificationIsSilent_noGroup() {
+        // Create a silent notification
+        Notification notification = new NotificationCompat.Builder(mContext).setSilent(
+                true).build();
+        assertThat(NotificationCompat.isSilent(notification)).isTrue();
+        // Check that the copy notification is also silent
+        Notification notificationCopy = new NotificationCompat.Builder(mContext,
+                notification).build();
+        assertThat(NotificationCompat.isSilent(notificationCopy)).isTrue();
+
+        if (Build.VERSION.SDK_INT >= 26) {
+            assertThat(notification.getGroup()).isEqualTo(GROUP_KEY_SILENT);
+            assertThat(notificationCopy.getGroup()).isEqualTo(GROUP_KEY_SILENT);
+        }
+    }
+
+    @Test
+    public void testSetNotificationSilent_clonedNotificationIsSilent_grouped() {
+        // Create a silent notification
+        final String groupName = "testGrp";
+        Notification notification = new NotificationCompat.Builder(mContext).setGroup(
+                groupName).setSilent(true).build();
+        assertThat(NotificationCompat.isSilent(notification)).isTrue();
+        // Check that the copy notification is also silent
+        Notification notificationCopy = new NotificationCompat.Builder(mContext,
+                notification).build();
+        assertThat(NotificationCompat.isSilent(notificationCopy)).isTrue();
+        assertThat(NotificationCompat.getGroup(notificationCopy)).isEqualTo(groupName);
+    }
+
+    @Test
     public void testGroupAlertBehavior_doesNotMuteIncorrectGroupNotifications() throws Throwable {
         Notification n = new NotificationCompat.Builder(mActivityTestRule.getActivity())
                 .setGroupAlertBehavior(GROUP_ALERT_SUMMARY)
@@ -1491,7 +1484,7 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
                 .setGroupSummary(false)
                 .build();
 
-        if (Build.VERSION.SDK_INT >= 20 && !(Build.VERSION.SDK_INT >= 26)) {
+        if (Build.VERSION.SDK_INT < 26) {
             assertNotNull(n.sound);
             assertNotNull(n.vibrate);
             assertTrue((n.defaults & DEFAULT_LIGHTS) != 0);
@@ -1546,16 +1539,6 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
         assertNotNull(n.audioAttributes);
         assertEquals(AudioAttributes.USAGE_NOTIFICATION_RINGTONE, n.audioAttributes.getUsage());
         assertEquals(-1, n.audioStreamType);
-        assertEquals(Uri.EMPTY, n.sound);
-    }
-
-    @Test
-    @SdkSuppress(maxSdkVersion = 20)
-    public void testHasStreamTypePre21() throws Throwable {
-        Notification n = new NotificationCompat.Builder(mActivityTestRule.getActivity())
-                .setSound(Uri.EMPTY, 34)
-                .build();
-        assertEquals(34, n.audioStreamType);
         assertEquals(Uri.EMPTY, n.sound);
     }
 
@@ -1614,7 +1597,6 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
         assertNull(extras.get(NotificationCompat.EXTRA_LARGE_ICON_BIG));
     }
 
-    @SdkSuppress(minSdkVersion = 23)
     @Test
     public void testBigPictureStyle_withIconNullBigLargeIcon() {
         Bitmap bitmap = BitmapFactory.decodeResource(mContext.getResources(),
@@ -1633,7 +1615,6 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
         assertNull(extras.get(NotificationCompat.EXTRA_LARGE_ICON_BIG));
     }
 
-    @SdkSuppress(minSdkVersion = 23)
     @Test
     public void testBigPictureStyle_withIconBigLargeIcon() {
         Bitmap bitmap = BitmapFactory.decodeResource(mContext.getResources(),
@@ -1740,12 +1721,8 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
                         .setSummaryText("Summary Text"))
                 .build();
         Parcelable firstBuiltIcon = n.extras.getParcelable(Notification.EXTRA_LARGE_ICON_BIG);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            assertSame(Icon.class, firstBuiltIcon.getClass());
-            assertEquals(Icon.TYPE_BITMAP, ((Icon) firstBuiltIcon).getType());
-        } else {
-            assertSame(Bitmap.class, firstBuiltIcon.getClass());
-        }
+        assertSame(Icon.class, firstBuiltIcon.getClass());
+        assertEquals(Icon.TYPE_BITMAP, ((Icon) firstBuiltIcon).getType());
 
         Style style = Style.extractStyleFromNotification(n);
         assertNotNull(style);
@@ -1755,15 +1732,10 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
                 .setStyle(style)
                 .build();
         Parcelable rebuiltIcon = n.extras.getParcelable(Notification.EXTRA_LARGE_ICON_BIG);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            assertSame(Icon.class, rebuiltIcon.getClass());
-            assertEquals(Icon.TYPE_BITMAP, ((Icon) rebuiltIcon).getType());
-        } else {
-            assertSame(Bitmap.class, rebuiltIcon.getClass());
-        }
+        assertSame(Icon.class, rebuiltIcon.getClass());
+        assertEquals(Icon.TYPE_BITMAP, ((Icon) rebuiltIcon).getType());
     }
 
-    @SdkSuppress(minSdkVersion = 23)
     @SuppressWarnings("deprecation")
     @Test
     public void testBigPictureStyle_recoverStyleWithResIcon() {
@@ -2471,7 +2443,6 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
     }
 
     @Test
-    @SdkSuppress(minSdkVersion = 20)
     public void testCallStyle_preservesOneCustomAction() {
         PendingIntent hangupIntent = createIntent("hangup");
         Person person = new Person.Builder().setName("test name").build();
@@ -2509,15 +2480,14 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
         } else if (Build.VERSION.SDK_INT == 33) {
             // Could be either, so check presence but not ordering.
             assertThat(actionTitles).containsExactly(
-                            mContext.getString(R.string.call_notification_hang_up_action),
-                            customAction.title.toString());
+                    mContext.getString(R.string.call_notification_hang_up_action),
+                    customAction.title.toString());
         } else {
             throw new AssertionError("All SDK_INT values are covered!");
         }
     }
 
     @Test
-    @SdkSuppress(minSdkVersion = 20)
     public void testCallStyle_preservesTwoCustomActions() {
         PendingIntent hangupIntent = createIntent("hangup");
         Person person = new Person.Builder().setName("test name").build();
@@ -2561,15 +2531,14 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
         } else if (Build.VERSION.SDK_INT == 33) {
             // Could be either, so check presence but not ordering.
             assertThat(actionTitles).containsExactly(
-                            mContext.getString(R.string.call_notification_hang_up_action),
-                            customAction1.title.toString(),
-                            customAction2.title.toString());
+                    mContext.getString(R.string.call_notification_hang_up_action),
+                    customAction1.title.toString(),
+                    customAction2.title.toString());
         } else {
             throw new AssertionError("All SDK_INT values are covered!");
         }
     }
 
-    @SdkSuppress(minSdkVersion = 20)
     @Test
     public void testCallStyle_getActionsListWithSystemAndContextualActionsForIncoming() {
         PendingIntent positiveIntent = createIntent("answerIntent");
@@ -2620,7 +2589,6 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
         assertEquals("baz", resultActions.get(4).getTitle().toString());
     }
 
-    @SdkSuppress(minSdkVersion = 20)
     @Test
     public void testCallStyle_getActionsListWithSystemAndContextualActionsForOngoing() {
         PendingIntent negativeIntent = createIntent("hang up");
@@ -2664,7 +2632,6 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
         assertEquals("bbq", resultActions.get(4).getTitle().toString());
     }
 
-    @SdkSuppress(minSdkVersion = 20)
     @Test
     public void testCallStyle_getActionsListWithSystemAndContextualActionsForScreening() {
         PendingIntent positiveIntent = createIntent("answer");
@@ -2712,7 +2679,6 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
         assertEquals("baz", resultActions.get(4).getTitle().toString());
     }
 
-    @SdkSuppress(minSdkVersion = 20)
     @Test
     public void testCallStyle_getActionsListForIncomingVideo() {
         PendingIntent positiveIntent = createIntent("answerIntent");
@@ -2806,21 +2772,9 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
                 extras.getCharSequence(NotificationCompat.EXTRA_VERIFICATION_TEXT));
         // Unfortunately there is no easy way to directly compare the bitmaps of two icons,
         // so we settle for checking that it's the right size via the toString method.
-        // Icon is only available in API level 23 and above.
-        if (Build.VERSION.SDK_INT >= 23) {
-            assertTrue(extras.containsKey(NotificationCompat.EXTRA_VERIFICATION_ICON));
-            assertEquals(((Icon) extras.getParcelable(
-                            NotificationCompat.EXTRA_VERIFICATION_ICON)).toString(),
-                    IconCompat.createWithBitmap(bitmap).toIcon(mContext).toString());
-        } else {
-            // In older versions, to avoid losing the verification icon, the icon is bundled.
-            assertTrue(extras.containsKey(NotificationCompat.EXTRA_VERIFICATION_ICON_COMPAT));
-            IconCompat bundleIcon =
-                    IconCompat.createFromBundle(extras.getParcelable(
-                            NotificationCompat.EXTRA_VERIFICATION_ICON_COMPAT));
-            assertEquals(bundleIcon.toString(),
-                    IconCompat.createWithBitmap(bitmap).toString());
-        }
+        assertTrue(extras.containsKey(NotificationCompat.EXTRA_VERIFICATION_ICON));
+        assertEquals(extras.getParcelable(NotificationCompat.EXTRA_VERIFICATION_ICON).toString(),
+                IconCompat.createWithBitmap(bitmap).toIcon(mContext).toString());
     }
 
     @SdkSuppress(maxSdkVersion = 30)
@@ -2903,32 +2857,26 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
         // For versions above 11, the "Person" name from the style is applied to the title.
         assertEquals("test name", builder.mContentTitle);
 
-        if (Build.VERSION.SDK_INT >= 20) {
-            assertNotNull(notification.actions);
-            assertEquals(2, notification.actions.length);
+        assertNotNull(notification.actions);
+        assertEquals(2, notification.actions.length);
 
-            // Check that the decline action has the suggested color and title.
-            assertEquals(mContext.getString(R.string.call_notification_decline_action),
-                    notification.actions[0].title.toString());
-            assertEquals(Color.MAGENTA,
-                    ((SpannableStringBuilder) notification.actions[0].title).getSpans(0,
-                            notification.actions[0].title.length(),
-                            ForegroundColorSpan.class)[0].getForegroundColor());
+        // Check that the decline action has the suggested color and title.
+        assertEquals(mContext.getString(R.string.call_notification_decline_action),
+                notification.actions[0].title.toString());
+        assertEquals(Color.MAGENTA,
+                ((SpannableStringBuilder) notification.actions[0].title).getSpans(0,
+                        notification.actions[0].title.length(),
+                        ForegroundColorSpan.class)[0].getForegroundColor());
 
-            // Check that the answer action has the suggested color and title.
-            assertEquals(mContext.getString(R.string.call_notification_answer_action),
-                    notification.actions[1].title.toString());
-            assertEquals(Color.BLUE,
-                    ((SpannableStringBuilder) notification.actions[1].title).getSpans(0,
-                            notification.actions[1].title.length(),
-                            ForegroundColorSpan.class)[0].getForegroundColor());
-        }
+        // Check that the answer action has the suggested color and title.
+        assertEquals(mContext.getString(R.string.call_notification_answer_action),
+                notification.actions[1].title.toString());
+        assertEquals(Color.BLUE,
+                ((SpannableStringBuilder) notification.actions[1].title).getSpans(0,
+                        notification.actions[1].title.length(),
+                        ForegroundColorSpan.class)[0].getForegroundColor());
 
-        // For versions above 23, the Person icon is added as the notification's large Icon.
-        // Icons were unavailable before API 23.
-        if (Build.VERSION.SDK_INT >= 23) {
-            assertEquals(personIcon.toString(), notification.getLargeIcon().toString());
-        }
+        assertEquals(personIcon.toString(), notification.getLargeIcon().toString());
     }
 
     @SdkSuppress(maxSdkVersion = 30)
@@ -2959,19 +2907,16 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
         Bundle extras = builder.getExtras();
         assertTrue(extras.getBoolean(NotificationCompat.EXTRA_CALL_IS_VIDEO));
 
-        // Actions were introduced in API 20.
-        if (Build.VERSION.SDK_INT >= 20) {
-            assertNotNull(notification.actions);
-            assertEquals(2, notification.actions.length);
+        assertNotNull(notification.actions);
+        assertEquals(2, notification.actions.length);
 
-            // Check that the answer action has the suggested color and title.
-            assertEquals(mContext.getString(R.string.call_notification_answer_video_action),
-                    notification.actions[1].title.toString());
-            assertEquals(Color.BLUE,
-                    ((SpannableStringBuilder) notification.actions[1].title).getSpans(0,
-                            notification.actions[1].title.length(),
-                            ForegroundColorSpan.class)[0].getForegroundColor());
-        }
+        // Check that the answer action has the suggested color and title.
+        assertEquals(mContext.getString(R.string.call_notification_answer_video_action),
+                notification.actions[1].title.toString());
+        assertEquals(Color.BLUE,
+                ((SpannableStringBuilder) notification.actions[1].title).getSpans(0,
+                        notification.actions[1].title.length(),
+                        ForegroundColorSpan.class)[0].getForegroundColor());
     }
 
     @SdkSuppress(maxSdkVersion = 30)
@@ -3022,24 +2967,18 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
         // For versions above 11, the "Person" name from the style is applied to the title.
         assertEquals("test name", builder.mContentTitle);
 
-        // Actions were introduced in API 20.
-        if (Build.VERSION.SDK_INT >= 20) {
-            assertNotNull(notification.actions);
-            assertEquals(1, notification.actions.length);
+        assertNotNull(notification.actions);
+        assertEquals(1, notification.actions.length);
 
-            // Check that the hangup action has the suggested color and title.
-            assertEquals(mContext.getString(R.string.call_notification_hang_up_action),
-                    notification.actions[0].title.toString());
-            assertEquals(Color.MAGENTA,
-                    ((SpannableStringBuilder) notification.actions[0].title).getSpans(0,
-                            notification.actions[0].title.length(),
-                            ForegroundColorSpan.class)[0].getForegroundColor());
-        }
+        // Check that the hangup action has the suggested color and title.
+        assertEquals(mContext.getString(R.string.call_notification_hang_up_action),
+                notification.actions[0].title.toString());
+        assertEquals(Color.MAGENTA,
+                ((SpannableStringBuilder) notification.actions[0].title).getSpans(0,
+                        notification.actions[0].title.length(),
+                        ForegroundColorSpan.class)[0].getForegroundColor());
 
-        // For versions above 23, the Person icon is added as the notification's large Icon.
-        if (Build.VERSION.SDK_INT >= 23) {
-            assertEquals(personIcon.toString(), notification.getLargeIcon().toString());
-        }
+        assertEquals(personIcon.toString(), notification.getLargeIcon().toString());
     }
 
     @SdkSuppress(maxSdkVersion = 30)
@@ -3089,33 +3028,26 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
         // For versions above 11, the "Person" name from the style is applied to the title.
         assertEquals("test name", builder.mContentTitle);
 
+        assertNotNull(notification.actions);
+        assertEquals(2, notification.actions.length);
 
-        // Actions were introduced in API 20.
-        if (Build.VERSION.SDK_INT >= 20) {
-            assertNotNull(notification.actions);
-            assertEquals(2, notification.actions.length);
+        // Check that the decline action has the suggested color and title.
+        assertEquals(mContext.getString(R.string.call_notification_hang_up_action),
+                notification.actions[0].title.toString());
+        assertEquals(ContextCompat.getColor(mContext, R.color.call_notification_decline_color),
+                ((SpannableStringBuilder) notification.actions[0].title).getSpans(0,
+                        notification.actions[0].title.length(),
+                        ForegroundColorSpan.class)[0].getForegroundColor());
 
-            // Check that the decline action has the suggested color and title.
-            assertEquals(mContext.getString(R.string.call_notification_hang_up_action),
-                    notification.actions[0].title.toString());
-            assertEquals(ContextCompat.getColor(mContext, R.color.call_notification_decline_color),
-                    ((SpannableStringBuilder) notification.actions[0].title).getSpans(0,
-                            notification.actions[0].title.length(),
-                            ForegroundColorSpan.class)[0].getForegroundColor());
+        // Check that the answer action has the suggested color and title.
+        assertEquals(mContext.getString(R.string.call_notification_answer_action),
+                notification.actions[1].title.toString());
+        assertEquals(ContextCompat.getColor(mContext, R.color.call_notification_answer_color),
+                ((SpannableStringBuilder) notification.actions[1].title).getSpans(0,
+                        notification.actions[1].title.length(),
+                        ForegroundColorSpan.class)[0].getForegroundColor());
 
-            // Check that the answer action has the suggested color and title.
-            assertEquals(mContext.getString(R.string.call_notification_answer_action),
-                    notification.actions[1].title.toString());
-            assertEquals(ContextCompat.getColor(mContext, R.color.call_notification_answer_color),
-                    ((SpannableStringBuilder) notification.actions[1].title).getSpans(0,
-                            notification.actions[1].title.length(),
-                            ForegroundColorSpan.class)[0].getForegroundColor());
-        }
-
-        // For versions above 23, the Person icon is added as the notification's large Icon.
-        if (Build.VERSION.SDK_INT >= 23) {
-            assertEquals(personIcon.toString(), notification.getLargeIcon().toString());
-        }
+        assertEquals(personIcon.toString(), notification.getLargeIcon().toString());
     }
 
     @SdkSuppress(maxSdkVersion = 27)
@@ -3250,7 +3182,6 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
     }
 
     @Test
-    @SdkSuppress(minSdkVersion = 20)
     public void action_builder_fromAndroidActionAllowsZeroResIcon() {
         // Create action with a 0 resId Icon.
         Notification.Action action = new Notification.Action.Builder(0, "title", null)
@@ -3264,7 +3195,6 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
     }
 
     @Test
-    @SdkSuppress(minSdkVersion = 20)
     public void action_semanticAction_toAndFromNotification() {
         NotificationCompat.Action action =
                 newActionBuilder()
@@ -4056,21 +3986,9 @@ public class NotificationCompatTest extends BaseInstrumentationTestCase<TestActi
         assertThat(point2.getInt("position")).isEqualTo(50);
         assertThat(point2.getInt("colorInt")).isEqualTo(0xFFFFFF00);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            assertThat(
-                    extras.containsKey(NotificationCompat.EXTRA_PROGRESS_TRACKER_ICON)).isTrue();
-            assertThat(
-                    extras.containsKey(NotificationCompat.EXTRA_PROGRESS_START_ICON)).isTrue();
-            assertThat(
-                    extras.containsKey(NotificationCompat.EXTRA_PROGRESS_END_ICON)).isTrue();
-        } else {
-            assertThat(
-                    extras.containsKey(NotificationCompat.EXTRA_PROGRESS_TRACKER_ICON)).isFalse();
-            assertThat(
-                    extras.containsKey(NotificationCompat.EXTRA_PROGRESS_START_ICON)).isFalse();
-            assertThat(
-                    extras.containsKey(NotificationCompat.EXTRA_PROGRESS_END_ICON)).isFalse();
-        }
+        assertThat(extras.containsKey(NotificationCompat.EXTRA_PROGRESS_TRACKER_ICON)).isTrue();
+        assertThat(extras.containsKey(NotificationCompat.EXTRA_PROGRESS_START_ICON)).isTrue();
+        assertThat(extras.containsKey(NotificationCompat.EXTRA_PROGRESS_END_ICON)).isTrue();
     }
 
     // Add the @Test annotation to enable this test. This test is disabled by default as it's not a

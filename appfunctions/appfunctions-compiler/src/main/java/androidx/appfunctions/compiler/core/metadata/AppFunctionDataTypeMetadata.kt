@@ -16,6 +16,12 @@
 
 package androidx.appfunctions.compiler.core.metadata
 
+import androidx.appfunctions.compiler.core.IntrospectionHelper
+import androidx.appfunctions.compiler.core.findAnnotation
+import androidx.appfunctions.compiler.core.requirePropertyValueOfType
+import com.google.devtools.ksp.symbol.KSAnnotation
+import kotlin.reflect.cast
+
 abstract class AppFunctionDataTypeMetadata() {
     abstract val isNullable: Boolean
     abstract val description: String
@@ -132,13 +138,41 @@ data class AppFunctionReferenceTypeMetadata(
 data class AppFunctionIntTypeMetadata(
     override val isNullable: Boolean,
     override val description: String,
+    val enumValues: Set<Int>? = null,
 ) : AppFunctionDataTypeMetadata() {
     override fun toAppFunctionDataTypeMetadataDocument(): AppFunctionDataTypeMetadataDocument {
         return AppFunctionDataTypeMetadataDocument(
             type = AppFunctionDataTypeMetadata.TYPE_INT,
             isNullable = isNullable,
             description = description,
+            enumValues = enumValues.orEmpty().map { it.toString() },
         )
+    }
+
+    companion object {
+        fun create(
+            isNullable: Boolean,
+            description: String,
+            annotations: Sequence<KSAnnotation>,
+        ): AppFunctionIntTypeMetadata {
+            return AppFunctionIntTypeMetadata(
+                isNullable,
+                description,
+                annotations
+                    .findAnnotation(
+                        IntrospectionHelper.AppFunctionIntValueConstraintAnnotation.CLASS_NAME
+                    )
+                    ?.requirePropertyValueOfType(
+                        IntrospectionHelper.AppFunctionIntValueConstraintAnnotation
+                            .PROPERTY_ENUM_VALUES,
+                        // Array properties are returned as ArrayList from KSP.
+                        java.util.ArrayList::class,
+                    )
+                    ?.map { Int::class.cast(it) }
+                    ?.toSet()
+                    ?.ifEmpty { null },
+            )
+        }
     }
 }
 
@@ -184,13 +218,41 @@ data class AppFunctionDoubleTypeMetadata(
 data class AppFunctionStringTypeMetadata(
     override val isNullable: Boolean,
     override val description: String,
+    val enumValues: Set<String>? = null,
 ) : AppFunctionDataTypeMetadata() {
     override fun toAppFunctionDataTypeMetadataDocument(): AppFunctionDataTypeMetadataDocument {
         return AppFunctionDataTypeMetadataDocument(
             type = AppFunctionDataTypeMetadata.TYPE_STRING,
             isNullable = isNullable,
             description = description,
+            enumValues = enumValues.orEmpty().toList(),
         )
+    }
+
+    companion object {
+        fun create(
+            isNullable: Boolean,
+            description: String,
+            annotations: Sequence<KSAnnotation>,
+        ): AppFunctionStringTypeMetadata {
+            return AppFunctionStringTypeMetadata(
+                isNullable,
+                description,
+                annotations
+                    .findAnnotation(
+                        IntrospectionHelper.AppFunctionStringValueConstraintAnnotation.CLASS_NAME
+                    )
+                    ?.requirePropertyValueOfType(
+                        IntrospectionHelper.AppFunctionStringValueConstraintAnnotation
+                            .PROPERTY_ENUM_VALUES,
+                        // Array properties are returned as ArrayList from KSP.
+                        java.util.ArrayList::class,
+                    )
+                    ?.map { String::class.cast(it) }
+                    ?.toSet()
+                    ?.ifEmpty { null },
+            )
+        }
     }
 }
 
@@ -265,6 +327,7 @@ data class AppFunctionDataTypeMetadataDocument(
     val isNullable: Boolean = false,
     val objectQualifiedName: String? = null,
     val description: String = "",
+    val enumValues: List<String> = emptyList(),
 ) {
     fun toAppFunctionDataTypeMetadata(): AppFunctionDataTypeMetadata =
         when (type) {
@@ -309,7 +372,11 @@ data class AppFunctionDataTypeMetadataDocument(
                     description = description,
                 )
             AppFunctionDataTypeMetadata.TYPE_INT ->
-                AppFunctionIntTypeMetadata(isNullable = isNullable, description = description)
+                AppFunctionIntTypeMetadata(
+                    isNullable = isNullable,
+                    description = description,
+                    enumValues.map { it.toInt() }.toSet().ifEmpty { null },
+                )
 
             AppFunctionDataTypeMetadata.TYPE_LONG ->
                 AppFunctionLongTypeMetadata(isNullable = isNullable, description = description)
@@ -321,7 +388,11 @@ data class AppFunctionDataTypeMetadataDocument(
                 AppFunctionDoubleTypeMetadata(isNullable = isNullable, description = description)
 
             AppFunctionDataTypeMetadata.TYPE_STRING ->
-                AppFunctionStringTypeMetadata(isNullable = isNullable, description = description)
+                AppFunctionStringTypeMetadata(
+                    isNullable = isNullable,
+                    description = description,
+                    enumValues = enumValues.toSet().ifEmpty { null },
+                )
 
             AppFunctionDataTypeMetadata.TYPE_BOOLEAN ->
                 AppFunctionBooleanTypeMetadata(isNullable = isNullable, description = description)

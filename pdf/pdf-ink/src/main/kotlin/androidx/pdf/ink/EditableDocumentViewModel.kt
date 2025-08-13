@@ -16,45 +16,114 @@
 
 package androidx.pdf.ink
 
-import android.os.ParcelFileDescriptor
+import android.graphics.Matrix
+import android.net.Uri
 import androidx.annotation.RestrictTo
+import androidx.annotation.VisibleForTesting
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
-import androidx.pdf.annotation.draftstate.ImmutableAnnotationEditsDraftState
-import androidx.pdf.annotation.draftstate.SimpleAnnotationEditsDraftState
+import androidx.lifecycle.viewModelScope
+import androidx.pdf.annotation.EditablePdfDocument
+import androidx.pdf.annotation.manager.AnnotationsManager
+import androidx.pdf.annotation.manager.InMemoryAnnotationsManager
+import androidx.pdf.annotation.models.AnnotationsDisplayState
 import androidx.pdf.annotation.models.PdfAnnotation
-import java.nio.file.Files
+import androidx.pdf.annotation.models.PdfAnnotationData
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 @RestrictTo(RestrictTo.Scope.LIBRARY)
-internal class EditableDocumentViewModel() : ViewModel() {
+internal class EditableDocumentViewModel(private val state: SavedStateHandle) : ViewModel() {
+    private lateinit var annotationsManager: AnnotationsManager
 
-    private val draftPfd = createDraftPfd()
-    private val annotationEditDraft = SimpleAnnotationEditsDraftState(draftPfd)
-    private val _annotationDraftStateFlow =
-        MutableStateFlow(ImmutableAnnotationEditsDraftState(emptyMap()))
+    private val _annotationDisplayStateFlow = MutableStateFlow(AnnotationsDisplayState.EMPTY)
 
-    /** Stream of annotation edit draft states. */
-    val annotationDraftStateFlow: StateFlow<ImmutableAnnotationEditsDraftState>
-        get() = _annotationDraftStateFlow.asStateFlow()
+    internal val annotationsDisplayStateFlow: StateFlow<AnnotationsDisplayState> =
+        _annotationDisplayStateFlow.asStateFlow()
+
+    internal val isEditModeEnabledFlow: StateFlow<Boolean> =
+        state.getStateFlow(EDIT_MODE_ENABLED_KEY, false)
+
+    internal var isEditModeEnabled: Boolean
+        get() = state[EDIT_MODE_ENABLED_KEY] ?: false
+        set(value) {
+            state[EDIT_MODE_ENABLED_KEY] = value
+        }
+
+    internal var editablePdfDocument: EditablePdfDocument? = null
+        set(value) {
+            field = value
+
+            if (value != null) {
+                maybeInitialiseForDocument(value)
+            }
+        }
+
+    @VisibleForTesting
+    private fun maybeInitialiseForDocument(document: EditablePdfDocument) {
+        val documentUri = document.uri
+
+        // If the document has changed, reset the edit states
+        if (documentUri != state.get<Uri>(DOCUMENT_URI_KEY)) {
+            state[EDIT_MODE_ENABLED_KEY] = false
+            state[DOCUMENT_URI_KEY] = documentUri
+            editablePdfDocument = document
+
+            annotationsManager = InMemoryAnnotationsManager(document)
+            _annotationDisplayStateFlow.value =
+                AnnotationsDisplayState(
+                    draftState = annotationsManager.getFullAnnotationStateSnapshot(),
+                    transformationMatrices = HashMap(),
+                )
+        }
+    }
 
     /** Adds a [PdfAnnotation] to the draft state. */
-    fun addAnnotations(annotation: PdfAnnotation) {
-        annotationEditDraft.addEdit(annotation)
-        _annotationDraftStateFlow.update { annotationEditDraft.toImmutableDraftState() }
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        draftPfd.close()
-    }
-
-    private companion object {
-        fun createDraftPfd(): ParcelFileDescriptor {
-            val tempFile = Files.createTempFile("PDF_ANNOTATIONS_DRAFT", ".txt").toFile()
-            return ParcelFileDescriptor.open(tempFile, ParcelFileDescriptor.MODE_READ_WRITE)
+    fun addDraftAnnotation(annotation: PdfAnnotation) {
+        if (editablePdfDocument != null) {
+            val unused = annotationsManager.addAnnotation(annotation)
+            _annotationDisplayStateFlow.update { currentState ->
+                currentState.copy(draftState = annotationsManager.getFullAnnotationStateSnapshot())
+            }
         }
+    }
+
+    /** Updates the transformation matrices for rendering annotations. */
+    fun updateTransformationMatrices(transformationMatrices: Map<Int, Matrix>) {
+        if (editablePdfDocument != null) {
+            _annotationDisplayStateFlow.update { displayState ->
+                displayState.copy(transformationMatrices = transformationMatrices)
+            }
+        }
+    }
+
+    /**
+     * Fetches annotations from the [AnnotationsManager] for the defined page range.
+     *
+     * @param startPage The starting page number (inclusive).
+     * @param endPage The ending page number (inclusive).
+     */
+    fun fetchAnnotationsForPageRange(startPage: Int, endPage: Int) {
+        if (editablePdfDocument == null) {
+            return
+        }
+
+        viewModelScope.launch {
+            val annotationsByPage = mutableMapOf<Int, List<PdfAnnotationData>>()
+            for (page in startPage..endPage) {
+                annotationsByPage[page] = annotationsManager.getAnnotationsForPage(page)
+            }
+            _annotationDisplayStateFlow.update { displayState ->
+                displayState.copy(draftState = annotationsManager.getFullAnnotationStateSnapshot())
+            }
+        }
+    }
+
+    internal companion object {
+        const val DOCUMENT_URI_KEY = "documentUri"
+        private const val EDIT_MODE_ENABLED_KEY = "isEditModeEnabled"
     }
 }

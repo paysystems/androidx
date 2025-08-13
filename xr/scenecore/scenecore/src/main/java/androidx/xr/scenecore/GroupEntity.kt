@@ -21,12 +21,10 @@ import androidx.xr.runtime.internal.Entity as RtEntity
 import androidx.xr.runtime.internal.JxrPlatformAdapter
 import androidx.xr.runtime.math.Pose
 
-// TODO: b/427566816 - Fix HiddenSuperclass suppression
 /**
  * An [Entity] that contains no content, but can have an arbitrary number of children. GroupEntity
  * is useful for organizing the placement and movement of a group of child SceneCore Entities.
  */
-@Suppress("HiddenSuperclass") // BaseEntity is an internal class
 public class GroupEntity private constructor(rtEntity: RtEntity, entityManager: EntityManager) :
     BaseEntity<RtEntity>(rtEntity, entityManager) {
     public companion object {
@@ -36,7 +34,7 @@ public class GroupEntity private constructor(rtEntity: RtEntity, entityManager: 
             entityManager: EntityManager,
             name: String,
             pose: Pose = Pose.Identity,
-        ): Entity =
+        ): GroupEntity =
             GroupEntity(
                 adapter.createGroupEntity(pose, name, adapter.activitySpaceRootImpl),
                 entityManager,
@@ -51,7 +49,7 @@ public class GroupEntity private constructor(rtEntity: RtEntity, entityManager: 
          */
         @JvmOverloads
         @JvmStatic
-        public fun create(session: Session, name: String, pose: Pose = Pose.Identity): Entity =
-            GroupEntity.create(session.platformAdapter, session.scene.entityManager, name, pose)
+        public fun create(session: Session, name: String, pose: Pose = Pose.Identity): GroupEntity =
+            create(session.platformAdapter, session.scene.entityManager, name, pose)
     }
 }

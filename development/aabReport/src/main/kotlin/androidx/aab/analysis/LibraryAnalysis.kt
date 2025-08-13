@@ -16,13 +16,14 @@
 
 package androidx.aab.analysis
 
+import androidx.aab.ApkInfo
 import androidx.aab.BundleInfo
 
 data class LibraryAnalysis(val hasDotVersionFiles: Boolean, val hasAppBundleDependencies: Boolean) :
     ScoreReporter {
     // TODO: compose version
     // TODO: don't embed compose tooling, perfetto tracing binary
-    override fun getScore(): SubScore {
+    override fun getSubScore(): SubScore {
         return SubScore(
             label = "Library Version Analysis",
             score = 0,
@@ -37,6 +38,13 @@ data class LibraryAnalysis(val hasDotVersionFiles: Boolean, val hasAppBundleDepe
     }
 
     companion object {
+        fun ApkInfo.getLibraryAnalysis(): LibraryAnalysis {
+            return LibraryAnalysis(
+                hasDotVersionFiles = dotVersionFiles.isNotEmpty(),
+                hasAppBundleDependencies = false,
+            )
+        }
+
         fun BundleInfo.getLibraryAnalysis(): LibraryAnalysis {
             return LibraryAnalysis(
                 hasDotVersionFiles = dotVersionFiles.isNotEmpty(),

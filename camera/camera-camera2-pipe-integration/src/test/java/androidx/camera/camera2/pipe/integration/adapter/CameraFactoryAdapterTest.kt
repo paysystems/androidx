@@ -45,14 +45,12 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.kotlin.mock
-import org.robolectric.annotation.Config
 import org.robolectric.annotation.internal.DoNotInstrument
 import org.robolectric.util.ReflectionHelpers
 
 @ExperimentalCoroutinesApi
 @RunWith(RobolectricCameraPipeTestRunner::class)
 @DoNotInstrument
-@Config(minSdk = Build.VERSION_CODES.LOLLIPOP)
 class CameraFactoryAdapterTest {
     private val testScope = TestScope()
     private lateinit var threadConfig: CameraThreadConfig
@@ -181,6 +179,24 @@ class CameraFactoryAdapterTest {
 
             // Assert: The selector is re-applied. "3" is filtered out for compat.
             assertThat(factory.availableCameraIds).containsExactly("0", "2", "4")
+        }
+
+    fun getAvailableCameraIds_previewsResult_withoutChangingState() =
+        testScope.runTest {
+            // Arrange
+            setFingerprint("fake-fingerprint")
+            val factory = createCameraFactoryAdapter(null)
+
+            // Assert initial state
+            assertThat(factory.availableCameraIds).containsExactly("0", "1", "2")
+
+            // Act: Preview a new list where camera "1" is removed.
+            val previewedIds = factory.getAvailableCameraIds(listOf("0", "2", "3"))
+
+            // Assert: The previewed list is correct.
+            assertThat(previewedIds).containsExactly("0", "2")
+            // Assert: The factory's internal state has NOT changed.
+            assertThat(factory.availableCameraIds).containsExactly("0", "1", "2")
         }
 
     @Test

@@ -16,14 +16,18 @@
 
 package androidx.aab.analysis
 
+import androidx.aab.ApkInfo
 import androidx.aab.BundleInfo
+import androidx.aab.Compiler
 import androidx.aab.R8JsonFileInfo
 import androidx.aab.analysis.R8Issues.getPrimaryOptimizationIssue
 import kotlin.math.roundToInt
 
 data class R8Analysis(
-    val mappingExpected: Boolean,
     val mappingPresent: Boolean,
+    val compilerMarker: Compiler,
+    val compilerJson: Compiler,
+    val r8JsonFileExpected: Boolean,
     val r8JsonFileInfo: R8JsonFileInfo?,
     val dexSha256ChecksumsMatching: Set<String>,
     val dexSha256ChecksumsR8JsonOnly: Set<String>,
@@ -37,14 +41,14 @@ data class R8Analysis(
             .roundToInt()
     }
 
-    override fun getScore(): SubScore {
+    override fun getSubScore(): SubScore {
         val issues =
             listOfNotNull(
                 if (dexSha256ChecksumsR8JsonOnly.isNotEmpty()) R8Issues.DexChecksumsMismatched
                 else null,
                 if (!mappingPresent && r8JsonFileInfo == null) R8Issues.NoMappingFileOrJsonMetadata
                 else null,
-                if (mappingPresent && r8JsonFileInfo == null) R8Issues.MissingJsonMetadata
+                if (r8JsonFileExpected && r8JsonFileInfo == null) R8Issues.MissingR8JsonMetadata
                 else null,
                 r8JsonFileInfo?.getPrimaryOptimizationIssue(),
             )
@@ -57,15 +61,63 @@ data class R8Analysis(
         )
     }
 
+    fun getDexMatchRatio(): Double? {
+        return if (
+            r8JsonFileInfo != null &&
+                (dexSha256ChecksumsR8JsonOnly.isNotEmpty() ||
+                    dexSha256ChecksumsMatching.isNotEmpty())
+        ) {
+            dexSha256ChecksumsMatching.size * 1.0 /
+                (dexSha256ChecksumsR8JsonOnly.size + dexSha256ChecksumsMatching.size)
+        } else {
+            null
+        }
+    }
+
+    fun csvEntries(): List<String> {
+        return listOf(
+            (r8JsonFileInfo?.getScore()).toString(),
+            compilerMarker.toString(),
+            compilerJson.toString(),
+            getDexMatchRatio().toString(),
+        )
+    }
+
     companion object {
+        val CSV_TITLES =
+            listOf(
+                "r8_score",
+                "r8_compilerFromMarker",
+                "r8_compilerFromJson",
+                "r8_ratio_json_shas_match_dex",
+            )
+
+        fun ApkInfo.getR8Analysis(): R8Analysis {
+            return R8Analysis(
+                mappingPresent = false,
+                compilerMarker = Compiler.fromMarkers(dexInfo),
+                compilerJson = Compiler.Unknown,
+                r8JsonFileExpected = false,
+                r8JsonFileInfo = null,
+                dexSha256ChecksumsDexOnly = emptySet(),
+                dexSha256ChecksumsMatching = emptySet(),
+                dexSha256ChecksumsR8JsonOnly = emptySet(),
+            )
+        }
+
         fun BundleInfo.getR8Analysis(): R8Analysis {
             val metadataJsonShas = r8JsonFileInfo?.dexShas?.toSet() ?: emptySet()
             val dexShas = dexInfo.map { it.sha256 }.toSet()
+
             return R8Analysis(
-                mappingExpected =
+                mappingPresent = mappingFileInfo != null,
+                compilerMarker = Compiler.fromMarkers(dexInfo),
+                // technically, should capture all *8.json files, but in comparison to dex markers,
+                // unlikely to be Both
+                compilerJson = r8JsonFileInfo?.compiler ?: Compiler.Unknown,
+                r8JsonFileExpected =
                     (this.appMetadataPropsInfoBundleMetadata ?: this.appMetadataPropsInfoMetaInf)
                         ?.agpAtLeast(8, 8) ?: false,
-                mappingPresent = r8JsonFileInfo != null,
                 r8JsonFileInfo = r8JsonFileInfo,
                 dexSha256ChecksumsMatching = metadataJsonShas.intersect(dexShas),
                 dexSha256ChecksumsDexOnly = dexShas - metadataJsonShas,

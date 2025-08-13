@@ -30,9 +30,10 @@ import android.util.Log;
 import androidx.compose.remote.core.Platform;
 import androidx.compose.remote.core.operations.Header;
 import androidx.compose.remote.core.operations.Theme;
-import androidx.compose.remote.creation.RemoteComposeWriter;
+import androidx.compose.remote.creation.RemoteComposeWriterAndroid;
 import androidx.compose.remote.creation.platform.AndroidxPlatformServices;
 import androidx.compose.remote.player.view.platform.RemoteComposeView;
+import androidx.test.filters.SdkSuppress;
 import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.Test;
@@ -45,6 +46,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 
+@SdkSuppress(minSdkVersion = 26) // b/437958945
 @RunWith(JUnit4.class)
 public class HeaderTest {
     private final boolean mSaveImages = false;
@@ -195,8 +197,8 @@ public class HeaderTest {
         paint.setColor(0x550000ff);
         canvas.drawOval(0, 200, tw, th, paint);
 
-        RemoteComposeWriter writer =
-                new RemoteComposeWriter(
+        RemoteComposeWriterAndroid writer =
+                new RemoteComposeWriterAndroid(
                         sPlatform,
                         hTag(Header.DOC_WIDTH, 600),
                         hTag(Header.DOC_HEIGHT, 600),
@@ -262,8 +264,8 @@ public class HeaderTest {
         paint.setColor(0x550000ff);
         canvas.drawOval(0, 200, tw, th, paint);
 
-        RemoteComposeWriter writer =
-                new RemoteComposeWriter(
+        RemoteComposeWriterAndroid writer =
+                new RemoteComposeWriterAndroid(
                         sPlatform,
                         hTag(Header.DOC_WIDTH, 600),
                         hTag(Header.DOC_HEIGHT, 500),

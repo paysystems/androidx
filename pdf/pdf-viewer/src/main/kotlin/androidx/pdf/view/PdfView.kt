@@ -45,6 +45,7 @@ import androidx.core.animation.addListener
 import androidx.core.graphics.toRectF
 import androidx.core.os.HandlerCompat
 import androidx.core.util.Pools
+import androidx.core.util.forEach
 import androidx.core.util.keyIterator
 import androidx.core.util.valueIterator
 import androidx.core.view.ViewCompat
@@ -57,8 +58,12 @@ import androidx.pdf.event.RequestFailureEvent
 import androidx.pdf.exceptions.RequestFailedException
 import androidx.pdf.models.FormWidgetInfo
 import androidx.pdf.selection.ContextMenuComponent
+import androidx.pdf.selection.Selection
 import androidx.pdf.selection.SelectionActionModeCallback
 import androidx.pdf.selection.SelectionMenuManager
+import androidx.pdf.selection.SelectionRenderer
+import androidx.pdf.selection.SelectionStateManager
+import androidx.pdf.selection.SelectionUiSignal
 import androidx.pdf.util.Accessibility
 import androidx.pdf.util.MathUtils
 import androidx.pdf.util.ZoomUtils
@@ -390,8 +395,9 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyle: Int = 0) :
     private var formEditInfoCollector: Job? = null
     private var selectionMenuJob: Job? = null
 
-    private var deferredScrollPage: Int? = null
-    private var deferredScrollPosition: PdfPoint? = null
+    private var deferredScrollTarget: DeferredScrollTarget? = null
+    private val onScrollDeferred: (DeferredScrollTarget) -> Unit = { deferredScrollTarget = it }
+
     private var lastOrientation: Int = resources.configuration.orientation
 
     /** Used to restore saved state */
@@ -455,6 +461,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyle: Int = 0) :
     private val externalInputManager = PdfViewExternalInputManager(this)
 
     private val scroller = RelativeScroller(context)
+    private val scrollDelegate = PdfViewScroller(this)
     /** Whether we are in a fling movement. This is used to detect the end of that movement */
     private var isFling = false
 
@@ -535,6 +542,20 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyle: Int = 0) :
         ) ?: true
     }
 
+    /** Returns a [SparseArray] of page locations ([RectF]) in view coordinates. */
+    @RestrictTo(RestrictTo.Scope.LIBRARY)
+    public fun getCurrentPageLocations(): SparseArray<RectF> {
+        val localPageLayoutManager = pageMetadataLoader ?: return SparseArray()
+        val pageLocations = localPageLayoutManager.pageLocations
+
+        val pageLocationsInViewCoords = SparseArray<RectF>(pageLocations.size())
+        pageLocations.forEach { page, pageLocationsInContentCoords ->
+            val rectToTransform = RectF(pageLocationsInContentCoords)
+            pageLocationsInViewCoords.put(page, rectToTransform.asViewRectF())
+        }
+        return pageLocationsInViewCoords
+    }
+
     @VisibleForTesting internal var pdfViewAccessibilityManager: PdfViewAccessibilityManager? = null
     @VisibleForTesting
     internal var isAccessibilityEnabled: Boolean =
@@ -578,24 +599,11 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyle: Int = 0) :
     @Suppress("UNUSED_PARAMETER")
     public fun scrollToPage(pageNum: Int) {
         checkMainThread()
-        val localPageLayoutManager =
-            pageMetadataLoader
-                ?: throw IllegalStateException("Can't scrollToPage without PdfDocument")
-        require(pageNum < (pdfDocument?.pageCount ?: Int.MIN_VALUE)) {
-            "Page $pageNum not in document"
-        }
-
-        if (localPageLayoutManager.reach >= pageNum) {
-            gotoPage(pageNum)
-        } else {
-            localPageLayoutManager.increaseReach(pageNum)
-            deferredScrollPage = pageNum
-            deferredScrollPosition = null
-        }
+        scrollDelegate.scrollToPage(pageNum, onScrollDeferred)
     }
 
     /**
-     * Scrolls to [position], optionally animating the scroll
+     * Scrolls to [position], aligns vertically to center, optionally animating the scroll
      *
      * This View cannot scroll to a page until it knows its dimensions. If [position] is distant
      * from the currently-visible page in a large PDF, there may be some delay while dimensions are
@@ -604,21 +612,20 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyle: Int = 0) :
     @Suppress("UNUSED_PARAMETER")
     public fun scrollToPosition(position: PdfPoint) {
         checkMainThread()
-        val localPageLayoutManager =
-            pageMetadataLoader
-                ?: throw IllegalStateException("Can't scrollToPage without PdfDocument")
+        scrollDelegate.scrollToPosition(position, ScrollAlignment.CENTRE, onScrollDeferred)
+    }
 
-        if (position.pageNum >= (pdfDocument?.pageCount ?: Int.MIN_VALUE)) {
-            return
-        }
-
-        if (localPageLayoutManager.reach >= position.pageNum) {
-            gotoPoint(position)
-        } else {
-            localPageLayoutManager.increaseReach(position.pageNum)
-            deferredScrollPosition = position
-            deferredScrollPage = null
-        }
+    /**
+     * Scrolls to [position], optionally animating the scroll
+     *
+     * This View cannot scroll to a page until it knows its dimensions. If [position] is distant
+     * from the currently-visible page in a large PDF, there may be some delay while dimensions are
+     * being loaded from the PDF.
+     *
+     * @param alignment The vertical alignment of the scroll position.
+     */
+    internal fun scrollToPosition(position: PdfPoint, @ScrollAlignmentDef alignment: Int) {
+        scrollDelegate.scrollToPosition(position, alignment, onScrollDeferred)
     }
 
     /**
@@ -769,56 +776,9 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyle: Int = 0) :
         return ret
     }
 
-    private fun gotoPage(pageNum: Int) {
-        checkMainThread()
-        val localPageLayoutManager =
-            pageMetadataLoader
-                ?: throw IllegalStateException("Can't scrollToPage without PdfDocument")
-        check(pageNum <= localPageLayoutManager.reach) { "Can't gotoPage that's not laid out" }
-
-        val pageRect =
-            localPageLayoutManager.getPageLocation(pageNum, getVisibleAreaInContentCoords())
-        // Zoom should match the width of the page
-        val zoom =
-            ZoomUtils.calculateZoomToFit(
-                viewportWidth.toFloat(),
-                viewportHeight.toFloat(),
-                pageRect.width(),
-                1f,
-            )
-        val x = ((pageRect.left + pageRect.width() / 2f) * zoom - (viewportWidth / 2f)).roundToInt()
-        val y =
-            ((pageRect.top + pageRect.height() / 2f) * zoom - (viewportHeight / 2f)).roundToInt()
-
-        // Set zoom to fit the width of the page, then scroll to the center of the page
-        this.zoom = zoom
-        scrollTo(x, y)
-    }
-
     /** Clears the current selection, if one exists. No-op if there is no current [Selection] */
     public fun clearSelection() {
         selectionStateManager?.clearSelection()
-    }
-
-    private fun gotoPoint(position: PdfPoint) {
-        checkMainThread()
-        val localPageLayoutManager =
-            pageMetadataLoader
-                ?: throw IllegalStateException("Can't scrollToPage without PdfDocument")
-        check(position.pageNum <= localPageLayoutManager.reach) {
-            "Can't gotoPoint on page that's not laid out"
-        }
-
-        val pageRect =
-            localPageLayoutManager.getPageLocation(
-                position.pageNum,
-                getVisibleAreaInContentCoords(),
-            )
-
-        val x = ((pageRect.left + position.x) * zoom - (viewportWidth / 2f)).roundToInt()
-        val y = ((pageRect.top + position.y) * zoom - (viewportHeight / 2f)).roundToInt()
-
-        scrollTo(x, y)
     }
 
     override fun dispatchHoverEvent(event: MotionEvent?): Boolean {
@@ -1739,14 +1699,22 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyle: Int = 0) :
             scrollTo(scrollX, scrollY)
         }
 
-        val localDeferredPosition = deferredScrollPosition
-        val localDeferredPage = deferredScrollPage
-        if (localDeferredPosition != null && localDeferredPosition.pageNum <= pageNum) {
-            gotoPoint(localDeferredPosition)
-            deferredScrollPosition = null
-        } else if (localDeferredPage != null && localDeferredPage <= pageNum) {
-            gotoPage(pageNum)
-            deferredScrollPage = null
+        when (val target = deferredScrollTarget) {
+            is DeferredScrollTarget.ToPage -> {
+                if (target.pageNum <= pageInfo.pageNum) {
+                    scrollDelegate.scrollToPage(target.pageNum) {}
+                    deferredScrollTarget = null
+                }
+            }
+            is DeferredScrollTarget.ToPosition -> {
+                if (target.position.pageNum <= pageInfo.pageNum) {
+                    scrollDelegate.scrollToPosition(target.position, ScrollAlignment.CENTRE) {}
+                    deferredScrollTarget = null
+                }
+            }
+            null -> {
+                // No deferred scroll, do nothing.
+            }
         }
     }
 
@@ -1839,7 +1807,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyle: Int = 0) :
         return toContentCoord(viewY, zoom, scrollY)
     }
 
-    private val contentWidth: Float
+    internal val contentWidth: Float
         get() = pageMetadataLoader?.paginationModel?.maxWidth ?: 0f
 
     internal val contentHeight: Float

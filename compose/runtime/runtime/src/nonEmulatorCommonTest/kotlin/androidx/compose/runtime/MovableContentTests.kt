@@ -1808,6 +1808,53 @@ class MovableContentTests {
         index++
         advance()
     }
+
+    @Test
+    fun moveContentBetweenSubcompositions() = compositionTest {
+        var inSubcompose by mutableStateOf(true)
+        val content = movableContentOf { Text("Some text") }
+        compose {
+            if (inSubcompose) {
+                Subcompose { content() }
+            } else {
+                DeferredSubcompose { content() }
+            }
+        }
+
+        inSubcompose = false
+        advance()
+    }
+
+    @Test
+    fun movableContentReactivated() = compositionTest {
+        var value by mutableStateOf(true)
+        var text by mutableStateOf("text")
+        val movableContent = movableContentOf { Linear { Text(text) } }
+
+        val content =
+            @Composable {
+                if (value) {
+                    movableContent()
+                } else {
+                    movableContent()
+                }
+            }
+
+        compose(content)
+        validate { Linear { Text(text) } }
+
+        val c = composition as ReusableComposition
+        c.deactivate()
+        value = false
+        c.setContentWithReuse(content)
+
+        c.deactivate()
+        value = true
+        text = "new text"
+        c.setContentWithReuse(content)
+
+        revalidate()
+    }
 }
 
 @Composable

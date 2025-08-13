@@ -63,7 +63,6 @@ class PagerNestedPrefetchingTest(val config: ParamConfig) : BasePagerTest(config
 
     private val pageSizePx = 30
     private val oageSizeDp = with(rule.density) { pageSizePx.toDp() }
-    private val activeNodes = mutableSetOf<String>()
     private val scheduler = TestPrefetchScheduler()
 
     @Test

@@ -27,12 +27,15 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.google.common.truth.Truth.assertThat
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertIs
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.timeout
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.junit.Rule
@@ -45,6 +48,7 @@ import org.robolectric.junit.rules.TimeoutRule
 @RunWith(RobolectricTestRunner::class)
 @Config(minSdk = Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 @SdkSuppress(minSdkVersion = Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+@OptIn(FlowPreview::class)
 class AppFunctionTestRuleTest {
     private val context = InstrumentationRegistry.getInstrumentation().context
     private val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
@@ -62,6 +66,7 @@ class AppFunctionTestRuleTest {
             val results =
                 appFunctionManagerCompat
                     .observeAppFunctions(AppFunctionSearchSpec())
+                    .timeout(FLOW_COLLECTION_TIMEOUT)
                     .take(1)
                     .toList()
 
@@ -91,7 +96,9 @@ class AppFunctionTestRuleTest {
             )
 
             // Collect in a separate scope to avoid deadlock within the testcase.
-            runBlocking(Dispatchers.Default) { emittedValues.take(2).collect {} }
+            runBlocking(Dispatchers.Default) {
+                emittedValues.timeout(FLOW_COLLECTION_TIMEOUT).take(2).collect {}
+            }
             assertThat(emittedValues.replayCache).hasSize(2)
             // Assert first result to be default value.
             assertThat(
@@ -122,6 +129,7 @@ class AppFunctionTestRuleTest {
                             schemaName = "createNote",
                         )
                     )
+                    .timeout(FLOW_COLLECTION_TIMEOUT)
                     .take(1)
                     .toList()
 
@@ -137,6 +145,7 @@ class AppFunctionTestRuleTest {
                     .observeAppFunctions(
                         AppFunctionSearchSpec(packageNames = setOf(context.packageName))
                     )
+                    .timeout(FLOW_COLLECTION_TIMEOUT)
                     .take(1)
                     .toList()
 
@@ -154,6 +163,7 @@ class AppFunctionTestRuleTest {
                             schemaCategory = "myNotes",
                         )
                     )
+                    .timeout(FLOW_COLLECTION_TIMEOUT)
                     .take(1)
                     .toList()
 
@@ -172,6 +182,7 @@ class AppFunctionTestRuleTest {
                             minSchemaVersion = 2,
                         )
                     )
+                    .timeout(FLOW_COLLECTION_TIMEOUT)
                     .take(1)
                     .toList()
 
@@ -250,4 +261,8 @@ class AppFunctionTestRuleTest {
             )
             assertThat(appFunctionManagerCompat.isAppFunctionEnabled(functionId)).isFalse()
         }
+
+    private companion object {
+        val FLOW_COLLECTION_TIMEOUT = 2.seconds
+    }
 }

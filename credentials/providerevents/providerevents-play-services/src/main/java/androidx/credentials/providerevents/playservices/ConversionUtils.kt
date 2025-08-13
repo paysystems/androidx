@@ -40,6 +40,8 @@ public class ConversionUtils {
     public companion object {
         private const val EXTRA_CREDENTIAL_CALLING_APP_INFO =
             "androidx.credentials.providerevents.extra.CALLING_APP_INFO"
+        private const val BUNDLE_REQUEST_JSON_KEY =
+            "androidx.credentials.providerevents.BUNDLE_REQUEST_JSON_KEY"
         private const val TAG = "ConversionUtils"
 
         public fun convertToGmsResponse(
@@ -90,8 +92,12 @@ public class ConversionUtils {
 
         public fun convertToJetpackRequest(
             request: GetCredentialTransferCapabilitiesRequest
-        ): CredentialTransferCapabilitiesRequest {
-            return CredentialTransferCapabilitiesRequest()
+        ): CredentialTransferCapabilitiesRequest? {
+            val requestJson = request.requestData.getString(BUNDLE_REQUEST_JSON_KEY)
+            if (requestJson == null) {
+                return null
+            }
+            return CredentialTransferCapabilitiesRequest(requestJson)
         }
 
         @Suppress("RestrictedApiAndroidX")
