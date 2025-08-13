@@ -21,6 +21,7 @@ import androidx.annotation.RestrictTo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.ExperimentalComposeApi
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalDensity
@@ -80,9 +81,7 @@ private class SpatialExternalSurfaceScopeInstance(private val entity: CoreSurfac
     SpatialExternalSurfaceScope {
 
     private var executedInit = false
-    private var executedDestroy = false
     private var pendingOnCreate: ((Surface) -> Unit)? = null
-    private var pendingOnDestroy: ((Surface) -> Unit)? = null
 
     override fun onSurfaceCreated(onSurfaceCreated: (Surface) -> Unit) {
         pendingOnCreate = onSurfaceCreated
@@ -96,15 +95,7 @@ private class SpatialExternalSurfaceScopeInstance(private val entity: CoreSurfac
     }
 
     override fun onSurfaceDestroyed(onSurfaceDestroyed: (Surface) -> Unit) {
-        pendingOnDestroy = onSurfaceDestroyed
-    }
-
-    internal fun executeOnDestroy() {
-        if (!executedDestroy) {
-            executedDestroy = true
-            pendingOnDestroy?.let { it(entity.surfaceEntity.getSurface()) }
-            entity.dispose()
-        }
+        entity.setOnSurfaceDestroyed(onSurfaceDestroyed)
     }
 }
 
@@ -113,9 +104,7 @@ private class SpatialExternalSphereSurfaceScopeInstance(
 ) : SpatialExternalSurfaceScope {
 
     private var executedInit = false
-    private var executedDestroy = false
     private var pendingOnCreate: ((Surface) -> Unit)? = null
-    private var pendingOnDestroy: ((Surface) -> Unit)? = null
 
     override fun onSurfaceCreated(onSurfaceCreated: (Surface) -> Unit) {
         pendingOnCreate = onSurfaceCreated
@@ -129,15 +118,7 @@ private class SpatialExternalSphereSurfaceScopeInstance(
     }
 
     override fun onSurfaceDestroyed(onSurfaceDestroyed: (Surface) -> Unit) {
-        pendingOnDestroy = onSurfaceDestroyed
-    }
-
-    internal fun executeOnDestroy() {
-        if (!executedDestroy) {
-            executedDestroy = true
-            pendingOnDestroy?.let { it(entity.surfaceEntity.getSurface()) }
-            entity.dispose()
-        }
+        entity.setOnSurfaceDestroyed(onSurfaceDestroyed)
     }
 }
 
@@ -194,7 +175,7 @@ public value class SurfaceProtection private constructor(public val value: Int) 
  *
  * Note that this Surface does not capture input events. It is also not currently possible to
  * synchronize StereoMode changes with application rendering or video decoding. This composable
- * currently cannot render in front of other panels, so movable modifier usage is not recommended if
+ * currently cannot render in front of other panels, so [dragPolicy] usage is not recommended if
  * there are other panels in the layout, aside from the content block of this Composable.
  *
  * Playing certain content will require the proper [SurfaceProtection]. This is mainly used to
@@ -206,6 +187,13 @@ public value class SurfaceProtection private constructor(public val value: Int) 
  * @param featheringEffect A [SpatialFeatheringEffect] to apply to to canvas of the surface exposed
  *   from [SpatialExternalSurfaceScope.onSurfaceCreated].
  * @param surfaceProtection Sets the Surface's protection from CPU access.
+ * @param dragPolicy An optional [DragPolicy] that defines the motion behavior of the
+ *   [SpatialPanel]. This can be either a [MovePolicy] for free movement or an [AnchorPolicy] for
+ *   anchoring to real-world surfaces. If a policy is provided, draggable UI controls will be shown,
+ *   allowing the user to manipulate the panel in 3D space. If null, no motion behavior is applied.
+ * @param resizePolicy An optional [ResizePolicy] configuration object that resizing behavior of
+ *   this [SpatialPanel]. The draggable UI controls will be shown that allow the user to resize the
+ *   element in 3D space. If null, there is no resize behavior applied to the element.
  * @param content Content block where the surface can be accessed using
  *   [SpatialExternalSurfaceScope.onSurfaceCreated]. Composable content will be rendered over the
  *   Surface canvas. If using [StereoMode.SideBySide] or [StereoMode.TopBottom], it is recommended
@@ -220,18 +208,25 @@ public fun SpatialExternalSurface(
     modifier: SubspaceModifier = SubspaceModifier,
     featheringEffect: SpatialFeatheringEffect = ZeroFeatheringEffect,
     surfaceProtection: SurfaceProtection = SurfaceProtection.None,
+    dragPolicy: DragPolicy? = null,
+    resizePolicy: ResizePolicy? = null,
     content: @Composable @SubspaceComposable SpatialExternalSurfaceScope.() -> Unit,
 ) {
+    val finalModifier = buildSpatialPanelModifier(modifier, dragPolicy, resizePolicy)
     val session = LocalSession.current
+    val density = LocalDensity.current
 
     // When surface protection changes, the surface entity has to be recreated because protection is
     // a non mutable setting.
     val coreSurfaceEntity =
-        rememberCoreSurfaceEntity(key = surfaceProtection) {
-            SurfaceEntity.create(
-                session = checkNotNull(session) { "Session is required" },
-                stereoMode = stereoMode.value,
-                contentSecurityLevel = surfaceProtection.value,
+        remember(surfaceProtection) {
+            CoreSurfaceEntity(
+                SurfaceEntity.create(
+                    session = checkNotNull(session) { "Session is required" },
+                    stereoMode = stereoMode.value,
+                    contentSecurityLevel = surfaceProtection.value,
+                ),
+                localDensity = density,
             )
         }
     val instance =
@@ -241,14 +236,11 @@ public fun SpatialExternalSurface(
     coreSurfaceEntity.stereoMode = stereoMode.value
     coreSurfaceEntity.setFeatheringEffect(featheringEffect)
 
-    DisposableEffect(instance) {
-        instance.executeOnCreate()
-        onDispose { instance.executeOnDestroy() }
-    }
+    LaunchedEffect(instance) { instance.executeOnCreate() }
 
     key(coreSurfaceEntity) {
         SubspaceLayout(
-            modifier = modifier,
+            modifier = finalModifier,
             coreEntity = coreSurfaceEntity,
             content = { instance.content() },
             measurePolicy = SpatialBoxMeasurePolicy(SpatialAlignment.Center, false),
@@ -399,10 +391,7 @@ private fun SpatialExternalSurfaceSphere(
     coreSurfaceEntity.radius = meterRadius
     coreSurfaceEntity.setFeatheringEffect(featheringEffect)
 
-    DisposableEffect(instance) {
-        instance.executeOnCreate()
-        onDispose { instance.executeOnDestroy() }
-    }
+    LaunchedEffect(instance) { instance.executeOnCreate() }
 
     // Sets a black environment if a custom one isn't set. With a custom background at 0
     // passthrough set, the system will minimize the application if the user leaves the boundary for

@@ -48,12 +48,6 @@ final class FeaturesImpl implements Features {
             return false;
         }
         switch (feature) {
-            // Aliases for other features
-            case Features.SEARCH_AND_CLICK_ACCUMULATOR:
-                // Requires JoinSpec to create the Click schema. TakenAction API is optional as we
-                // can index search and click as regular documents if TakenActions aren't available.
-                return isFeatureSupported(Features.JOIN_SPEC_AND_QUALIFIED_ID);
-
             // Android T Features
             case Features.ADD_PERMISSIONS_AND_GET_VISIBILITY:
                 // fall through
@@ -89,8 +83,13 @@ final class FeaturesImpl implements Features {
             case Features.SET_SCHEMA_CIRCULAR_REFERENCES:
                 return Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE;
 
-            // Android V Features
+            // SDK extension M-2023-11 features
             case Features.SCHEMA_ADD_INDEXABLE_NESTED_PROPERTIES:
+                return BuildCompat.T_EXTENSION_INT
+                        >= AppSearchVersionUtil.TExtensionVersions.M2023_11;
+
+            // SDK extension V Base features
+            case Features.SCHEMA_GET_INDEXABLE_NESTED_PROPERTIES:
                 return BuildCompat.T_EXTENSION_INT
                         >= AppSearchVersionUtil.TExtensionVersions.V_BASE;
 

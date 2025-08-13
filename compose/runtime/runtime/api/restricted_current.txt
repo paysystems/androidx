@@ -401,6 +401,17 @@ package androidx.compose.runtime {
     property public abstract boolean isComposing;
   }
 
+  public final class ControlledRetainScope extends androidx.compose.runtime.RetainScope {
+    ctor public ControlledRetainScope();
+    method public Object? getExitedValueOrDefault(Object key, Object? defaultIfAbsent);
+    method protected void onStartKeepingExitedValues();
+    method protected void onStopKeepingExitedValues();
+    method protected void saveExitingValue(Object key, Object? value);
+    method public void setParentRetainStateProvider(androidx.compose.runtime.RetainStateProvider parent);
+    method public void startKeepingExitedValues();
+    method public void stopKeepingExitedValues();
+  }
+
   @kotlin.annotation.MustBeDocumented @kotlin.annotation.Retention(kotlin.annotation.AnnotationRetention.BINARY) @kotlin.annotation.Target(allowedTargets=kotlin.annotation.AnnotationTarget.TYPE) public @interface DisallowComposableCalls {
   }
 
@@ -465,6 +476,14 @@ package androidx.compose.runtime {
     method @androidx.compose.runtime.snapshots.AutoboxingStateValueProperty(preferredPropertyName="floatValue") public default Float getValue();
     property public abstract float floatValue;
     property @androidx.compose.runtime.snapshots.AutoboxingStateValueProperty(preferredPropertyName="floatValue") public default Float value;
+  }
+
+  public final class ForgetfulRetainScope extends androidx.compose.runtime.RetainScope {
+    method public Object? getExitedValueOrDefault(Object key, Object? defaultIfAbsent);
+    method protected void onStartKeepingExitedValues();
+    method protected void onStopKeepingExitedValues();
+    method protected void saveExitingValue(Object key, Object? value);
+    field public static final androidx.compose.runtime.ForgetfulRetainScope INSTANCE;
   }
 
   public final class HotReloaderKt {
@@ -717,6 +736,66 @@ package androidx.compose.runtime {
     method public void onRemembered();
   }
 
+  public final class RetainKt {
+    method public static androidx.compose.runtime.ProvidableCompositionLocal<androidx.compose.runtime.RetainScope> getLocalRetainScope();
+    method @androidx.compose.runtime.Composable @kotlin.PublishedApi internal static <T> T retain(int typeHash, Object?[] keys, kotlin.jvm.functions.Function0<? extends T> calculation);
+    method @BytecodeOnly @androidx.compose.runtime.Composable @kotlin.PublishedApi internal static <T> T! retain(int, Object![], kotlin.jvm.functions.Function0<? extends T!>, androidx.compose.runtime.Composer?, int);
+    method @androidx.compose.runtime.Composable @kotlin.PublishedApi internal static <T> T retain(int typeHash, kotlin.jvm.functions.Function0<? extends T> calculation);
+    method @BytecodeOnly @androidx.compose.runtime.Composable @kotlin.PublishedApi internal static <T> T! retain(int, kotlin.jvm.functions.Function0<? extends T!>, androidx.compose.runtime.Composer?, int);
+    method @KotlinOnly @androidx.compose.runtime.Composable public static inline <reified T> T retain(java.lang.Object?... keys, kotlin.jvm.functions.Function0<T> calculation);
+    method @KotlinOnly @androidx.compose.runtime.Composable public static inline <reified T> T retain(kotlin.jvm.functions.Function0<T> calculation);
+    property public static androidx.compose.runtime.ProvidableCompositionLocal<androidx.compose.runtime.RetainScope> LocalRetainScope;
+  }
+
+  public interface RetainObserver {
+    method public void onEnteredComposition();
+    method public void onExitedComposition();
+    method public void onRetained();
+    method public void onRetired();
+  }
+
+  public abstract class RetainScope implements androidx.compose.runtime.RetainStateProvider {
+    ctor public RetainScope();
+    method public final void addRetainStateObserver(androidx.compose.runtime.RetainStateProvider.RetainStateObserver observer);
+    method public abstract Object? getExitedValueOrDefault(Object key, Object? defaultIfAbsent);
+    method public final boolean isKeepingExitedValues();
+    method protected abstract void onStartKeepingExitedValues();
+    method protected abstract void onStopKeepingExitedValues();
+    method public final void removeRetainStateObserver(androidx.compose.runtime.RetainStateProvider.RetainStateObserver observer);
+    method protected final void requestKeepExitedValues();
+    method protected abstract void saveExitingValue(Object key, Object? value);
+    method protected final void unRequestKeepExitedValues();
+    property public final boolean isKeepingExitedValues;
+  }
+
+  public interface RetainStateProvider {
+    method public void addRetainStateObserver(androidx.compose.runtime.RetainStateProvider.RetainStateObserver observer);
+    method public boolean isKeepingExitedValues();
+    method public void removeRetainStateObserver(androidx.compose.runtime.RetainStateProvider.RetainStateObserver observer);
+    property public abstract boolean isKeepingExitedValues;
+  }
+
+  @androidx.compose.runtime.Stable public static final class RetainStateProvider.AlwaysKeepExitedValues implements androidx.compose.runtime.RetainStateProvider {
+    method public void addRetainStateObserver(androidx.compose.runtime.RetainStateProvider.RetainStateObserver observer);
+    method public boolean isKeepingExitedValues();
+    method public void removeRetainStateObserver(androidx.compose.runtime.RetainStateProvider.RetainStateObserver observer);
+    property public boolean isKeepingExitedValues;
+    field public static final androidx.compose.runtime.RetainStateProvider.AlwaysKeepExitedValues INSTANCE;
+  }
+
+  @androidx.compose.runtime.Stable public static final class RetainStateProvider.NeverKeepExitedValues implements androidx.compose.runtime.RetainStateProvider {
+    method public void addRetainStateObserver(androidx.compose.runtime.RetainStateProvider.RetainStateObserver observer);
+    method public boolean isKeepingExitedValues();
+    method public void removeRetainStateObserver(androidx.compose.runtime.RetainStateProvider.RetainStateObserver observer);
+    property public boolean isKeepingExitedValues;
+    field public static final androidx.compose.runtime.RetainStateProvider.NeverKeepExitedValues INSTANCE;
+  }
+
+  public static interface RetainStateProvider.RetainStateObserver {
+    method public void onStartKeepingExitedValues();
+    method public void onStopKeepingExitedValues();
+  }
+
   public sealed interface ReusableComposition extends androidx.compose.runtime.Composition {
     method public void deactivate();
     method public void setContentWithReuse(kotlin.jvm.functions.Function0<kotlin.Unit> content);
@@ -736,7 +815,7 @@ package androidx.compose.runtime {
     method @BytecodeOnly public static androidx.compose.runtime.SkippableUpdater! box-impl(androidx.compose.runtime.Composer!);
     method @BytecodeOnly public static <T> androidx.compose.runtime.Composer constructor-impl(androidx.compose.runtime.Composer);
     method @BytecodeOnly public androidx.compose.runtime.Composer! unbox-impl();
-    method public inline void update(kotlin.jvm.functions.Function1<? super androidx.compose.runtime.Updater<T>,kotlin.Unit> block);
+    method @KotlinOnly public inline void update(kotlin.jvm.functions.Function1<androidx.compose.runtime.Updater<T>,kotlin.Unit> block);
     method @BytecodeOnly public static void update-impl(androidx.compose.runtime.Composer!, kotlin.jvm.functions.Function1<? super androidx.compose.runtime.Updater<T!>!,kotlin.Unit!>);
     property @kotlin.PublishedApi internal androidx.compose.runtime.Composer composer;
   }
@@ -816,21 +895,25 @@ package androidx.compose.runtime {
     ctor @KotlinOnly public <T> Updater(androidx.compose.runtime.Composer composer);
     method @BytecodeOnly public static androidx.compose.runtime.Updater! box-impl(androidx.compose.runtime.Composer!);
     method @BytecodeOnly public static <T> androidx.compose.runtime.Composer constructor-impl(androidx.compose.runtime.Composer);
-    method public void init(kotlin.jvm.functions.Function1<? super T,kotlin.Unit> block);
+    method @KotlinOnly public void init(kotlin.jvm.functions.Function1<T,kotlin.Unit> block);
     method @BytecodeOnly public static void init-impl(androidx.compose.runtime.Composer!, kotlin.jvm.functions.Function1<? super T!,kotlin.Unit!>);
-    method public void reconcile(kotlin.jvm.functions.Function1<? super T,kotlin.Unit> block);
+    method @KotlinOnly public void reconcile(kotlin.jvm.functions.Function1<T,kotlin.Unit> block);
     method @BytecodeOnly public static void reconcile-impl(androidx.compose.runtime.Composer!, kotlin.jvm.functions.Function1<? super T!,kotlin.Unit!>);
-    method public inline void set(int value, kotlin.jvm.functions.Function2<? super T,? super java.lang.Integer,kotlin.Unit> block);
-    method public <V> void set(V value, kotlin.jvm.functions.Function2<? super T,? super V,kotlin.Unit> block);
+    method @KotlinOnly public inline void set(int value, kotlin.jvm.functions.Function2<T,java.lang.Integer,kotlin.Unit> block);
+    method @KotlinOnly public <V> void set(V value, kotlin.jvm.functions.Function2<T,V,kotlin.Unit> block);
     method @BytecodeOnly public static void set-impl(androidx.compose.runtime.Composer!, int, kotlin.jvm.functions.Function2<? super T!,? super java.lang.Integer!,kotlin.Unit!>);
     method @BytecodeOnly public static <V> void set-impl(androidx.compose.runtime.Composer!, V!, kotlin.jvm.functions.Function2<? super T!,? super V!,kotlin.Unit!>);
     method @BytecodeOnly public androidx.compose.runtime.Composer! unbox-impl();
-    method public inline void update(int value, kotlin.jvm.functions.Function2<? super T,? super java.lang.Integer,kotlin.Unit> block);
-    method public <V> void update(V value, kotlin.jvm.functions.Function2<? super T,? super V,kotlin.Unit> block);
+    method @KotlinOnly public inline void update(int value, kotlin.jvm.functions.Function2<T,java.lang.Integer,kotlin.Unit> block);
+    method @KotlinOnly public <V> void update(V value, kotlin.jvm.functions.Function2<T,V,kotlin.Unit> block);
     method @BytecodeOnly public static void update-impl(androidx.compose.runtime.Composer!, int, kotlin.jvm.functions.Function2<? super T!,? super java.lang.Integer!,kotlin.Unit!>);
     method @BytecodeOnly public static <V> void update-impl(androidx.compose.runtime.Composer!, V!, kotlin.jvm.functions.Function2<? super T!,? super V!,kotlin.Unit!>);
     property @kotlin.PublishedApi internal androidx.compose.runtime.Composer composer;
   }
+
+  @Deprecated public typealias CheckResult = androidx.annotation.CheckResult;
+
+  public typealias CompositeKeyHashCode = long;
 
 }
 
@@ -921,6 +1004,10 @@ package androidx.compose.runtime.collection {
 }
 
 package androidx.compose.runtime.internal {
+
+  public final class ClassHash_jvmKt {
+    method @KotlinOnly @kotlin.PublishedApi internal static inline <reified T> int classHash();
+  }
 
   @androidx.compose.runtime.ComposeCompilerApi @androidx.compose.runtime.Stable public interface ComposableLambda extends kotlin.jvm.functions.Function2<androidx.compose.runtime.Composer,java.lang.Integer,java.lang.Object?> kotlin.jvm.functions.Function10<java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,androidx.compose.runtime.Composer,java.lang.Integer,java.lang.Object?> kotlin.jvm.functions.Function11<java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,androidx.compose.runtime.Composer,java.lang.Integer,java.lang.Object?> kotlin.jvm.functions.Function13<java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,androidx.compose.runtime.Composer,java.lang.Integer,java.lang.Integer,java.lang.Object?> kotlin.jvm.functions.Function14<java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,androidx.compose.runtime.Composer,java.lang.Integer,java.lang.Integer,java.lang.Object?> kotlin.jvm.functions.Function15<java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,androidx.compose.runtime.Composer,java.lang.Integer,java.lang.Integer,java.lang.Object?> kotlin.jvm.functions.Function16<java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,androidx.compose.runtime.Composer,java.lang.Integer,java.lang.Integer,java.lang.Object?> kotlin.jvm.functions.Function17<java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,androidx.compose.runtime.Composer,java.lang.Integer,java.lang.Integer,java.lang.Object?> kotlin.jvm.functions.Function18<java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,androidx.compose.runtime.Composer,java.lang.Integer,java.lang.Integer,java.lang.Object?> kotlin.jvm.functions.Function19<java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,androidx.compose.runtime.Composer,java.lang.Integer,java.lang.Integer,java.lang.Object?> kotlin.jvm.functions.Function20<java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,androidx.compose.runtime.Composer,java.lang.Integer,java.lang.Integer,java.lang.Object?> kotlin.jvm.functions.Function21<java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,androidx.compose.runtime.Composer,java.lang.Integer,java.lang.Integer,java.lang.Object?> kotlin.jvm.functions.Function3<java.lang.Object?,androidx.compose.runtime.Composer,java.lang.Integer,java.lang.Object?> kotlin.jvm.functions.Function4<java.lang.Object?,java.lang.Object?,androidx.compose.runtime.Composer,java.lang.Integer,java.lang.Object?> kotlin.jvm.functions.Function5<java.lang.Object?,java.lang.Object?,java.lang.Object?,androidx.compose.runtime.Composer,java.lang.Integer,java.lang.Object?> kotlin.jvm.functions.Function6<java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,androidx.compose.runtime.Composer,java.lang.Integer,java.lang.Object?> kotlin.jvm.functions.Function7<java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,androidx.compose.runtime.Composer,java.lang.Integer,java.lang.Object?> kotlin.jvm.functions.Function8<java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,androidx.compose.runtime.Composer,java.lang.Integer,java.lang.Object?> kotlin.jvm.functions.Function9<java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,java.lang.Object?,androidx.compose.runtime.Composer,java.lang.Integer,java.lang.Object?> {
   }
@@ -1307,6 +1394,10 @@ package androidx.compose.runtime.snapshots {
     method @BytecodeOnly @Deprecated public androidx.compose.runtime.snapshots.StateRecord! create(int);
     method public androidx.compose.runtime.snapshots.StateRecord create(long snapshotId);
   }
+
+  public typealias SnapshotId = long;
+
+  public typealias SnapshotIdArray = long[];
 
 }
 

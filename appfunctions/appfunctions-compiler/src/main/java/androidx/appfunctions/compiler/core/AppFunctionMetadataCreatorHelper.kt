@@ -56,7 +56,9 @@ import com.google.devtools.ksp.symbol.KSValueParameter
  * A helper class that provides methods to construct
  * [androidx.appfunctions.compiler.core.metadata.AppFunctionMetadata] related class.
  */
-class AppFunctionMetadataCreatorHelper {
+class AppFunctionMetadataCreatorHelper(
+    private val sharedDataTypeDescriptionMap: Map<String, String> = mapOf()
+) {
 
     /**
      * Computes [AppFunctionAnnotationProperties] from [appFunctionAnnotation] and
@@ -151,6 +153,7 @@ class AppFunctionMetadataCreatorHelper {
                         // Parameter description will be provided through
                         // AppFunctionParameterMetadata.
                         description = "",
+                        parameter.annotations,
                     )
 
             add(
@@ -186,6 +189,7 @@ class AppFunctionMetadataCreatorHelper {
         sharedDataTypeMap: MutableMap<String, AppFunctionDataTypeMetadata>,
         seenDataTypeQualifiers: MutableSet<String>,
         allowSerializableInterfaceTypes: Boolean = false,
+        functionAnnotations: Sequence<KSAnnotation>,
     ): AppFunctionDataTypeMetadata {
         return returnType.toAppFunctionDataTypeMetadata(
             sharedDataTypeMap,
@@ -194,15 +198,32 @@ class AppFunctionMetadataCreatorHelper {
             allowSerializableInterfaceTypes,
             // Response description will be provided through AppFunctionResponseMetadata.
             description = "",
+            annotations = functionAnnotations,
         )
     }
 
+    /**
+     * Builds and returns [AppFunctionDataTypeMetadata] from the type reference.
+     *
+     * @param sharedDataTypeMap A mutable map used to share and reuse already processed data type
+     *   metadata, avoiding duplication.
+     * @param seenDataTypeQualifiers A mutable set used to track qualifiers of data types that have
+     *   already been seen, to prevent cycles or redundant processing.
+     * @param resolvedAnnotatedSerializableProxies Contains resolved proxies for annotated
+     *   serializable types used during metadata construction.
+     * @param allowSerializableInterfaceTypes Indicates whether interfaces marked with
+     *   `@Serializable` should be allowed.
+     * @param description A textual description to be associated with the resulting metadata.
+     * @param annotations Sequence of annotations applied at the usage site (e.g., function
+     *   parameter, return type, or property declaration) of this type reference.
+     */
     private fun KSTypeReference.toAppFunctionDataTypeMetadata(
         sharedDataTypeMap: MutableMap<String, AppFunctionDataTypeMetadata>,
         seenDataTypeQualifiers: MutableSet<String>,
         resolvedAnnotatedSerializableProxies: ResolvedAnnotatedSerializableProxies,
         allowSerializableInterfaceTypes: Boolean,
         description: String,
+        annotations: Sequence<KSAnnotation> = emptySequence(),
     ): AppFunctionDataTypeMetadata {
         val appFunctionTypeReference = AppFunctionTypeReference(this)
         return when (appFunctionTypeReference.typeCategory) {
@@ -211,6 +232,7 @@ class AppFunctionMetadataCreatorHelper {
                     appFunctionTypeReference.toAppFunctionDataType(),
                     appFunctionTypeReference.isNullable,
                     description,
+                    annotations,
                 )
             PRIMITIVE_ARRAY ->
                 AppFunctionArrayTypeMetadata(
@@ -219,6 +241,7 @@ class AppFunctionMetadataCreatorHelper {
                             appFunctionTypeReference.determineArrayItemType(),
                             isNullable = false,
                             description = "",
+                            annotations,
                         ),
                     isNullable = appFunctionTypeReference.isNullable,
                     description = description,
@@ -232,6 +255,7 @@ class AppFunctionMetadataCreatorHelper {
                                 AppFunctionTypeReference(appFunctionTypeReference.itemTypeReference)
                                     .isNullable,
                             description = "",
+                            annotations,
                         ),
                     isNullable = appFunctionTypeReference.isNullable,
                     description = description,
@@ -394,7 +418,16 @@ class AppFunctionMetadataCreatorHelper {
         }
         seenDataTypeQualifiers.add(serializableTypeQualifiedName)
 
-        val serializableDescription = appFunctionSerializableType.description
+        val serializableDescription =
+            when {
+                appFunctionSerializableType.description.isNotEmpty() ->
+                    appFunctionSerializableType.description
+                appFunctionSerializableType is AnnotatedParameterizedAppFunctionSerializable ->
+                    sharedDataTypeDescriptionMap[
+                        appFunctionSerializableType.unparameterizedJvmQualifiedName] ?: ""
+                else -> sharedDataTypeDescriptionMap[serializableTypeQualifiedName] ?: ""
+            }
+
         val superTypesWithSerializableAnnotation =
             appFunctionSerializableType.findSuperTypesWithSerializableAnnotation()
         val superTypesWithCapabilityAnnotation =
@@ -583,7 +616,11 @@ class AppFunctionMetadataCreatorHelper {
                             seenDataTypeQualifiers,
                             resolvedAnnotatedSerializableProxies,
                             allowSerializableInterfaceTypes,
-                            property.description,
+                            // Remove type parameter in case of generic type.
+                            sharedDataTypeDescriptionMap[
+                                "${serializableTypeQualifiedName.substringBefore("<")}#${property.name}"]
+                                ?: "",
+                            annotations = property.propertyAnnotations,
                         )
                     put(property.name, innerAppFunctionDataTypeMetadata)
                     if (property.isRequired) {
@@ -672,6 +709,7 @@ class AppFunctionMetadataCreatorHelper {
         primitiveType: Int,
         isNullable: Boolean,
         description: String,
+        annotations: Sequence<KSAnnotation>,
     ): AppFunctionDataTypeMetadata {
         return when (primitiveType) {
             AppFunctionDataTypeMetadata.TYPE_UNIT ->
@@ -681,7 +719,11 @@ class AppFunctionMetadataCreatorHelper {
                 AppFunctionBytesTypeMetadata(isNullable = isNullable, description = description)
 
             AppFunctionDataTypeMetadata.TYPE_INT ->
-                AppFunctionIntTypeMetadata(isNullable = isNullable, description = description)
+                AppFunctionIntTypeMetadata.create(
+                    isNullable = isNullable,
+                    description = description,
+                    annotations,
+                )
 
             AppFunctionDataTypeMetadata.TYPE_LONG ->
                 AppFunctionLongTypeMetadata(isNullable = isNullable, description = description)
@@ -696,7 +738,11 @@ class AppFunctionMetadataCreatorHelper {
                 AppFunctionBooleanTypeMetadata(isNullable = isNullable, description = description)
 
             AppFunctionDataTypeMetadata.TYPE_STRING ->
-                AppFunctionStringTypeMetadata(isNullable = isNullable, description = description)
+                AppFunctionStringTypeMetadata.create(
+                    isNullable = isNullable,
+                    description = description,
+                    annotations,
+                )
 
             AppFunctionDataTypeMetadata.TYPE_PENDING_INTENT ->
                 AppFunctionPendingIntentTypeMetadata(

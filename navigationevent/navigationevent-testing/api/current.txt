@@ -9,6 +9,7 @@ package androidx.navigationevent.testing {
     method public int getProgressedInvocations();
     method public java.util.List<androidx.navigationevent.NavigationEvent> getStartedEvents();
     method public int getStartedInvocations();
+    method protected void onEventCompleted();
     property public int cancelledInvocations;
     property public int completedInvocations;
     property public java.util.List<androidx.navigationevent.NavigationEvent> progressedEvents;
@@ -30,10 +31,6 @@ package androidx.navigationevent.testing {
     property public int fallbackOnBackPressedInvocations;
     property public androidx.navigationevent.NavigationEventDispatcher navigationEventDispatcher;
     property public int onHasEnabledCallbacksChangedInvocations;
-  }
-
-  public final class TestNavigationEventKt {
-    method public static androidx.navigationevent.NavigationEvent TestNavigationEvent(optional @FloatRange(from=0.0) float touchX, optional @FloatRange(from=0.0) float touchY, optional @FloatRange(from=0.0, to=1.0) float progress, optional int swipeEdge, optional long frameTimeMillis);
   }
 
 }

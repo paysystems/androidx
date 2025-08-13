@@ -55,6 +55,15 @@ import kotlin.jvm.JvmField
 @ExperimentalFoundationApi
 object ComposeFoundationFlags {
     /**
+     * Selecting flag to enable Drag Gesture "Pick-up" on drag gesture detectors. This also applies
+     * to Draggables and Scrollables which use gesture detectors as well. Any parent drag detector
+     * will continue to monitor the event stream until the gesture terminates (all pointers are
+     * lifted), if a child gives up an event, the parent gesture detector will "pick-up" and
+     * continue the gesture until all pointers are up.
+     */
+    @Suppress("MutableBareField") @JvmField var DragGesturePickUpEnabled = true
+
+    /**
      * Whether to use more immediate coroutine dispatching in [detectTapGestures] and
      * [detectTapAndPress], true by default.
      */
@@ -86,6 +95,15 @@ object ComposeFoundationFlags {
     @Suppress("MutableBareField") @JvmField var isPausableCompositionInPrefetchEnabled = false
 
     /**
+     * Selecting flag to enable the use of automatic nested prefetch. When this is enabled, nested
+     * prefetching using the default Prefetch Strategies
+     * [androidx.compose.foundation.lazy.LazyListPrefetchStrategy] and
+     * [androidx.compose.foundation.lazy.grid.LazyGridPrefetchStrategy] or Cache Window will be
+     * automatically defined by the number of visible items in the nested LazyLayout.
+     */
+    @Suppress("MutableBareField") @JvmField var isAutomaticNestedPrefetchEnabled = true
+
+    /**
      * Flag that enables an optimized implementation for the [clickable] overload without an
      * [Indication] parameter. This also applies to [combinedClickable],
      * [androidx.compose.foundation.selection.selectable], and
@@ -99,6 +117,33 @@ object ComposeFoundationFlags {
      * parameter - this flag can be disabled as a temporary migration aid.
      */
     @Suppress("MutableBareField") @JvmField var isNonComposedClickableEnabled = true
+
+    /**
+     * Enables Compose trigger for calling
+     * [androidx.compose.ui.node.DelegatableNode.dispatchOnScrollChanged] callbacks during scroll
+     * events.
+     */
+    @Suppress("MutableBareField") @JvmField var isOnScrollChangedCallbackEnabled: Boolean = true
+
+    /**
+     * With this flag on, any dragging movement is offset by the container position offset before it
+     * is added to the [androidx.compose.ui.input.pointer.util.VelocityTracker]. Pointer Input
+     * positions are relative to a container's position. If the container changes positions with the
+     * movement this can cause problems because the VT doesn't know about changes in the container
+     * position. We should correct the Pointer Input position by offsetting it by the container
+     * position offset before sending the events to the VT. We will use the new
+     * [androidx.compose.ui.input.pointer.PointerInputChange] API.
+     */
+    @Suppress("MutableBareField")
+    @JvmField
+    var isAdjustPointerInputChangeOffsetForVelocityTrackerEnabled: Boolean = true
+
+    /**
+     * With this flag on a new fling cancellation behavior will be implemented. Previously, when the
+     * list hit the bounds we would cancel the fling since the list couldn't consume anything
+     * anymore. Now we only cancel the fling if the scrollable node is detatched.
+     */
+    @Suppress("MutableBareField") @JvmField var isFlingContinuationAtBoundsEnabled = true
 
     /**
      * With this flag on we don't use suspend pointer input as part of Modifier.clickable
@@ -143,15 +188,9 @@ object ComposeFoundationFlags {
     @Suppress("MutableBareField") @JvmField var isMouseWheel1DAxisLockingEnabled: Boolean = true
 
     /**
-     * With this flag on, [androidx.compose.foundation.gestures.snapping.snapFlingBehavior] allows
-     * the supplied snap animation spec to overshoot during snapping. A
-     * [androidx.compose.foundation.gestures.snapping.snapFlingBehavior] fling consists of two
-     * phases: Approach and Snap. This flag only affects the snap phase. For example, if you pass a
-     * [androidx.compose.animation.core.spring] spec with a bouncy damping ratio to
-     * [androidx.compose.foundation.gestures.snapping.snapFlingBehavior], the snapping animation
-     * will appear bouncy.
+     * With this flag on, Pager will use Cache Window as the default prefetching strategy, instead
+     * of 1 item in the direction of the scroll. The window used will be 1 view port AFTER the
+     * currently composed items, this includes visible and items composed through beyond bounds.
      */
-    @Suppress("MutableBareField")
-    @JvmField
-    var isSnapFlingBehaviorSnapAnimationSpecAllowsOvershootEnabled = true
+    @Suppress("MutableBareField") @JvmField var isCacheWindowForPagerEnabled = false
 }

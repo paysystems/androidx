@@ -26,10 +26,15 @@ import androidx.xr.runtime.internal.MaterialResource;
 import androidx.xr.runtime.internal.RenderingRuntime;
 import androidx.xr.runtime.internal.SceneRuntime;
 import androidx.xr.runtime.internal.TextureResource;
+import androidx.xr.runtime.internal.TextureSampler;
+import androidx.xr.runtime.math.Matrix3;
+import androidx.xr.runtime.math.Vector3;
+import androidx.xr.runtime.math.Vector4;
 import androidx.xr.scenecore.impl.extensions.XrExtensionsProvider;
 import androidx.xr.scenecore.impl.impress.ImpressApi;
 import androidx.xr.scenecore.impl.impress.ImpressApiImpl;
 import androidx.xr.scenecore.impl.impress.KhronosPbrMaterial;
+import androidx.xr.scenecore.impl.impress.Texture;
 import androidx.xr.scenecore.impl.impress.WaterMaterial;
 
 import com.android.extensions.xr.XrExtensions;
@@ -49,9 +54,11 @@ import org.jspecify.annotations.Nullable;
 class SpatialRenderingRuntime implements RenderingRuntime {
     private static final String SPLIT_ENGINE_LIBRARY_NAME = "impress_api_jni";
 
+    @SuppressWarnings("UnusedVariable")
     private final @NonNull SceneRuntime mSceneRuntime;
     private @Nullable Activity mActivity;
 
+    @SuppressWarnings("UnusedVariable")
     private final XrExtensions mExtensions;
     private final ImpressApi mImpressApi;
     private SplitEngineSubspaceManager mSplitEngineSubspaceManager;
@@ -121,8 +128,69 @@ class SpatialRenderingRuntime implements RenderingRuntime {
         return SpatialRenderingRuntime.create(sceneRuntime, activity, null, null, null);
     }
 
+    private static TextureResourceImpl getTextureResourceFromToken(long token) {
+        return new TextureResourceImpl(token);
+    }
+
     private static MaterialResourceImpl getMaterialResourceFromToken(long token) {
         return new MaterialResourceImpl(token);
+    }
+
+    // ResolvableFuture is marked as RestrictTo(LIBRARY_GROUP_PREFIX), which is intended for classes
+    // within AndroidX. We're in the process of migrating to AndroidX. Without suppressing this
+    // warning, however, we get a build error - go/bugpattern/RestrictTo.
+    @SuppressWarnings({"RestrictTo", "AsyncSuffixFuture"})
+    @Override
+    public @NonNull ListenableFuture<TextureResource> loadTexture(
+            @NonNull String path, @NonNull TextureSampler sampler) {
+        ResolvableFuture<TextureResource> textureResourceFuture = ResolvableFuture.create();
+        // TODO:b/374216912 - Consider calling setFuture() here to catch if the application calls
+        // cancel() on the return value from this function, so we can propagate the cancelation
+        // message to the Impress API.
+
+        if (!Looper.getMainLooper().isCurrentThread()) {
+            throw new IllegalStateException("This method must be called on the main thread.");
+        }
+
+        ListenableFuture<Texture> textureFuture;
+        textureFuture = mImpressApi.loadTexture(path, sampler);
+
+        textureFuture.addListener(
+                () -> {
+                    try {
+                        Texture texture = textureFuture.get();
+                        textureResourceFuture.set(
+                                getTextureResourceFromToken(texture.getNativeHandle()));
+                    } catch (Exception e) {
+                        if (e instanceof InterruptedException) {
+                            Thread.currentThread().interrupt();
+                        }
+                        textureResourceFuture.setException(e);
+                    }
+                },
+                // It's convenient for the main application for us to dispatch their listeners on
+                // the main thread, because they are required to call back to Impress from there,
+                // and it's likely that they will want to call back into the SDK to create entities
+                // from within a listener. We defensively post to the main thread here, but in
+                // practice this should not cause a thread hop because the Impress API already
+                // dispatches its callbacks to the main thread.
+                mActivity::runOnUiThread);
+        return textureResourceFuture;
+    }
+
+    @Override
+    public @Nullable TextureResource borrowReflectionTexture() {
+        Texture texture = mImpressApi.borrowReflectionTexture();
+        if (texture == null) {
+            return null;
+        }
+        return getTextureResourceFromToken(texture.getNativeHandle());
+    }
+
+    @Override
+    public void destroyTexture(@NonNull TextureResource texture) {
+        TextureResourceImpl textureResource = (TextureResourceImpl) texture;
+        mImpressApi.destroyNativeObject(textureResource.getTextureToken());
     }
 
     // ResolvableFuture is marked as RestrictTo(LIBRARY_GROUP_PREFIX), which is intended for classes
@@ -315,6 +383,409 @@ class SpatialRenderingRuntime implements RenderingRuntime {
             throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
         }
         mImpressApi.destroyNativeObject(((MaterialResourceImpl) material).getMaterialToken());
+    }
+
+    @Override
+    public void setBaseColorTextureOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, @NonNull TextureResource baseColor) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        if (!(baseColor instanceof TextureResourceImpl)) {
+            throw new IllegalArgumentException("TextureResource is not a TextureResourceImpl");
+        }
+        mImpressApi.setBaseColorTextureOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(),
+                ((TextureResourceImpl) baseColor).getTextureToken());
+    }
+
+    @Override
+    public void setBaseColorUvTransformOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, @NonNull Matrix3 uvTransform) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        float[] data = uvTransform.getData();
+        mImpressApi.setBaseColorUvTransformOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(),
+                data[0],
+                data[1],
+                data[2],
+                data[3],
+                data[4],
+                data[5],
+                data[6],
+                data[7],
+                data[8]);
+    }
+
+    @Override
+    public void setBaseColorFactorsOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, @NonNull Vector4 factors) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        mImpressApi.setBaseColorFactorsOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(),
+                factors.getX(),
+                factors.getY(),
+                factors.getZ(),
+                factors.getW());
+    }
+
+    @Override
+    public void setMetallicRoughnessTextureOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, @NonNull TextureResource metallicRoughness) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        if (!(metallicRoughness instanceof TextureResourceImpl)) {
+            throw new IllegalArgumentException("TextureResource is not a TextureResourceImpl");
+        }
+        mImpressApi.setMetallicRoughnessTextureOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(),
+                ((TextureResourceImpl) metallicRoughness).getTextureToken());
+    }
+
+    @Override
+    public void setMetallicRoughnessUvTransformOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, @NonNull Matrix3 uvTransform) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        float[] data = uvTransform.getData();
+        mImpressApi.setMetallicRoughnessUvTransformOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(),
+                data[0],
+                data[1],
+                data[2],
+                data[3],
+                data[4],
+                data[5],
+                data[6],
+                data[7],
+                data[8]);
+    }
+
+    @Override
+    public void setMetallicFactorOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, float factor) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        mImpressApi.setMetallicFactorOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(), factor);
+    }
+
+    @Override
+    public void setRoughnessFactorOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, float factor) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        mImpressApi.setRoughnessFactorOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(), factor);
+    }
+
+    @Override
+    public void setNormalTextureOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, @NonNull TextureResource normal) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        if (!(normal instanceof TextureResourceImpl)) {
+            throw new IllegalArgumentException("TextureResource is not a TextureResourceImpl");
+        }
+        mImpressApi.setNormalTextureOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(),
+                ((TextureResourceImpl) normal).getTextureToken());
+    }
+
+    @Override
+    public void setNormalUvTransformOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, @NonNull Matrix3 uvTransform) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        float[] data = uvTransform.getData();
+        mImpressApi.setNormalUvTransformOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(),
+                data[0],
+                data[1],
+                data[2],
+                data[3],
+                data[4],
+                data[5],
+                data[6],
+                data[7],
+                data[8]);
+    }
+
+    @Override
+    public void setNormalFactorOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, float factor) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        mImpressApi.setNormalFactorOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(), factor);
+    }
+
+    @Override
+    public void setAmbientOcclusionTextureOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, @NonNull TextureResource ambientOcclusion) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        if (!(ambientOcclusion instanceof TextureResourceImpl)) {
+            throw new IllegalArgumentException("TextureResource is not a TextureResourceImpl");
+        }
+        mImpressApi.setAmbientOcclusionTextureOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(),
+                ((TextureResourceImpl) ambientOcclusion).getTextureToken());
+    }
+
+    @Override
+    public void setAmbientOcclusionUvTransformOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, @NonNull Matrix3 uvTransform) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        float[] data = uvTransform.getData();
+        mImpressApi.setAmbientOcclusionUvTransformOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(),
+                data[0],
+                data[1],
+                data[2],
+                data[3],
+                data[4],
+                data[5],
+                data[6],
+                data[7],
+                data[8]);
+    }
+
+    @Override
+    public void setAmbientOcclusionFactorOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, float factor) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        mImpressApi.setAmbientOcclusionFactorOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(), factor);
+    }
+
+    @Override
+    public void setEmissiveTextureOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, @NonNull TextureResource emissive) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        if (!(emissive instanceof TextureResourceImpl)) {
+            throw new IllegalArgumentException("TextureResource is not a TextureResourceImpl");
+        }
+        mImpressApi.setEmissiveTextureOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(),
+                ((TextureResourceImpl) emissive).getTextureToken());
+    }
+
+    @Override
+    public void setEmissiveUvTransformOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, @NonNull Matrix3 uvTransform) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        float[] data = uvTransform.getData();
+        mImpressApi.setEmissiveUvTransformOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(),
+                data[0],
+                data[1],
+                data[2],
+                data[3],
+                data[4],
+                data[5],
+                data[6],
+                data[7],
+                data[8]);
+    }
+
+    @Override
+    public void setEmissiveFactorsOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, @NonNull Vector3 factors) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        mImpressApi.setEmissiveFactorsOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(),
+                factors.getX(),
+                factors.getY(),
+                factors.getZ());
+    }
+
+    @Override
+    public void setClearcoatTextureOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, @NonNull TextureResource clearcoat) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        if (!(clearcoat instanceof TextureResourceImpl)) {
+            throw new IllegalArgumentException("TextureResource is not a TextureResourceImpl");
+        }
+        mImpressApi.setClearcoatTextureOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(),
+                ((TextureResourceImpl) clearcoat).getTextureToken());
+    }
+
+    @Override
+    public void setClearcoatNormalTextureOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, @NonNull TextureResource clearcoatNormal) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        if (!(clearcoatNormal instanceof TextureResourceImpl)) {
+            throw new IllegalArgumentException("TextureResource is not a TextureResourceImpl");
+        }
+        mImpressApi.setClearcoatNormalTextureOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(),
+                ((TextureResourceImpl) clearcoatNormal).getTextureToken());
+    }
+
+    @Override
+    public void setClearcoatRoughnessTextureOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, @NonNull TextureResource clearcoatRoughness) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        if (!(clearcoatRoughness instanceof TextureResourceImpl)) {
+            throw new IllegalArgumentException("TextureResource is not a TextureResourceImpl");
+        }
+        mImpressApi.setClearcoatRoughnessTextureOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(),
+                ((TextureResourceImpl) clearcoatRoughness).getTextureToken());
+    }
+
+    @Override
+    public void setClearcoatFactorsOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, float intensity, float roughness, float normal) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        mImpressApi.setClearcoatFactorsOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(), intensity, roughness, normal);
+    }
+
+    @Override
+    public void setSheenColorTextureOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, @NonNull TextureResource sheenColor) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        if (!(sheenColor instanceof TextureResourceImpl)) {
+            throw new IllegalArgumentException("TextureResource is not a TextureResourceImpl");
+        }
+        mImpressApi.setSheenColorTextureOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(),
+                ((TextureResourceImpl) sheenColor).getTextureToken());
+    }
+
+    @Override
+    public void setSheenColorFactorsOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, @NonNull Vector3 factors) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        mImpressApi.setSheenColorFactorsOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(),
+                factors.getX(),
+                factors.getY(),
+                factors.getZ());
+    }
+    @Override
+    public void setSheenRoughnessTextureOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, @NonNull TextureResource sheenRoughness) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        if (!(sheenRoughness instanceof TextureResourceImpl)) {
+            throw new IllegalArgumentException("TextureResource is not a TextureResourceImpl");
+        }
+        mImpressApi.setSheenRoughnessTextureOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(),
+                ((TextureResourceImpl) sheenRoughness).getTextureToken());
+    }
+
+    @Override
+    public void setSheenRoughnessFactorOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, float factor) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        mImpressApi.setSheenRoughnessFactorOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(), factor);
+    }
+
+    @Override
+    public void setTransmissionTextureOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, @NonNull TextureResource transmission) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        if (!(transmission instanceof TextureResourceImpl)) {
+            throw new IllegalArgumentException("TextureResource is not a TextureResourceImpl");
+        }
+        mImpressApi.setTransmissionTextureOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(),
+                ((TextureResourceImpl) transmission).getTextureToken());
+    }
+
+    @Override
+    public void setTransmissionUvTransformOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, @NonNull Matrix3 uvTransform) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        float[] data = uvTransform.getData();
+        mImpressApi.setTransmissionUvTransformOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(),
+                data[0],
+                data[1],
+                data[2],
+                data[3],
+                data[4],
+                data[5],
+                data[6],
+                data[7],
+                data[8]);
+    }
+
+    @Override
+    public void setTransmissionFactorOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, float factor) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        mImpressApi.setTransmissionFactorOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(), factor);
+    }
+
+    @Override
+    public void setIndexOfRefractionOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, float indexOfRefraction) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        mImpressApi.setIndexOfRefractionOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(), indexOfRefraction);
+    }
+
+    @Override
+    public void setAlphaCutoffOnKhronosPbrMaterial(
+            @NonNull MaterialResource material, float alphaCutoff) {
+        if (!(material instanceof MaterialResourceImpl)) {
+            throw new IllegalArgumentException("MaterialResource is not a MaterialResourceImpl");
+        }
+        mImpressApi.setAlphaCutoffOnKhronosPbrMaterial(
+                ((MaterialResourceImpl) material).getMaterialToken(), alphaCutoff);
     }
 
     @Override

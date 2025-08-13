@@ -77,7 +77,7 @@ package androidx.xr.scenecore {
     method public androidx.xr.scenecore.AnchorPlacement createForPlanes(optional java.util.Set<java.lang.Integer> anchorablePlaneOrientations, optional java.util.Set<java.lang.Integer> anchorablePlaneSemanticTypes);
   }
 
-  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public abstract class BaseEntity<RtEntityType extends androidx.xr.runtime.internal.Entity> extends androidx.xr.scenecore.BaseScenePose<androidx.xr.runtime.internal.ActivityPose> implements androidx.xr.scenecore.Entity {
+  public abstract class BaseEntity<RtEntityType extends androidx.xr.runtime.internal.Entity> extends androidx.xr.scenecore.BaseScenePose<androidx.xr.runtime.internal.ActivityPose> implements androidx.xr.scenecore.Entity {
     method public void addChild(androidx.xr.scenecore.Entity child);
     method public boolean addComponent(androidx.xr.scenecore.Component component);
     method public void dispose();
@@ -101,8 +101,8 @@ package androidx.xr.scenecore {
     property public androidx.xr.scenecore.Entity? parent;
   }
 
-  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public abstract class BaseScenePose<RtActivityPoseType extends androidx.xr.runtime.internal.ActivityPose> implements androidx.xr.scenecore.ScenePose {
-    ctor public BaseScenePose(RtActivityPoseType rtActivityPose);
+  public abstract class BaseScenePose<RtActivityPoseType extends androidx.xr.runtime.internal.ActivityPose> implements androidx.xr.scenecore.ScenePose {
+    ctor protected BaseScenePose(RtActivityPoseType rtActivityPose);
     method public androidx.xr.runtime.math.Pose getActivitySpacePose();
     method public suspend Object? hitTest(androidx.xr.runtime.math.Vector3 origin, androidx.xr.runtime.math.Vector3 direction, int hitTestFilter, kotlin.coroutines.Continuation<? super androidx.xr.scenecore.HitTestResult>);
     method public suspend Object? hitTest(androidx.xr.runtime.math.Vector3 origin, androidx.xr.runtime.math.Vector3 direction, kotlin.coroutines.Continuation<? super androidx.xr.scenecore.HitTestResult>);
@@ -227,14 +227,14 @@ package androidx.xr.scenecore {
   }
 
   public final class GroupEntity extends androidx.xr.scenecore.BaseEntity<androidx.xr.runtime.internal.Entity> {
-    method public static androidx.xr.scenecore.Entity create(androidx.xr.runtime.Session session, String name);
-    method public static androidx.xr.scenecore.Entity create(androidx.xr.runtime.Session session, String name, optional androidx.xr.runtime.math.Pose pose);
+    method public static androidx.xr.scenecore.GroupEntity create(androidx.xr.runtime.Session session, String name);
+    method public static androidx.xr.scenecore.GroupEntity create(androidx.xr.runtime.Session session, String name, optional androidx.xr.runtime.math.Pose pose);
     field public static final androidx.xr.scenecore.GroupEntity.Companion Companion;
   }
 
   public static final class GroupEntity.Companion {
-    method public androidx.xr.scenecore.Entity create(androidx.xr.runtime.Session session, String name);
-    method public androidx.xr.scenecore.Entity create(androidx.xr.runtime.Session session, String name, optional androidx.xr.runtime.math.Pose pose);
+    method public androidx.xr.scenecore.GroupEntity create(androidx.xr.runtime.Session session, String name);
+    method public androidx.xr.scenecore.GroupEntity create(androidx.xr.runtime.Session session, String name, optional androidx.xr.runtime.math.Pose pose);
   }
 
   public final class Head extends androidx.xr.scenecore.BaseScenePose<androidx.xr.runtime.internal.HeadActivityPose> {
@@ -1259,7 +1259,7 @@ package androidx.xr.scenecore.impl {
     method public androidx.xr.runtime.internal.GltfEntity createGltfEntity(androidx.xr.runtime.math.Pose, androidx.xr.runtime.internal.GltfModelResource, androidx.xr.runtime.internal.Entity?);
     method public androidx.xr.runtime.internal.Entity createGroupEntity(androidx.xr.runtime.math.Pose, String, androidx.xr.runtime.internal.Entity);
     method public androidx.xr.runtime.internal.InteractableComponent createInteractableComponent(java.util.concurrent.Executor, androidx.xr.runtime.internal.InputEventListener);
-    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.runtime.internal.MaterialResource!>? createKhronosPbrMaterial(androidx.xr.runtime.internal.KhronosPbrMaterialSpec);
+    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.runtime.internal.MaterialResource!> createKhronosPbrMaterial(androidx.xr.runtime.internal.KhronosPbrMaterialSpec);
     method public androidx.xr.runtime.internal.LoggingEntity createLoggingEntity(androidx.xr.runtime.math.Pose);
     method public androidx.xr.runtime.internal.MovableComponent createMovableComponent(boolean, boolean, java.util.Set<androidx.xr.runtime.internal.AnchorPlacement!>, boolean);
     method public androidx.xr.runtime.internal.PanelEntity createPanelEntity(android.content.Context, androidx.xr.runtime.math.Pose, android.view.View, androidx.xr.runtime.internal.Dimensions, String, androidx.xr.runtime.internal.Entity);
@@ -1270,7 +1270,7 @@ package androidx.xr.scenecore.impl {
     method public androidx.xr.runtime.internal.SpatialPointerComponent createSpatialPointerComponent();
     method public androidx.xr.runtime.internal.SubspaceNodeEntity createSubspaceNodeEntity(androidx.xr.runtime.SubspaceNodeHolder<? extends java.lang.Object!>, androidx.xr.runtime.internal.Dimensions);
     method public androidx.xr.runtime.internal.SurfaceEntity createSurfaceEntity(@androidx.xr.runtime.internal.SurfaceEntity.StereoMode int, androidx.xr.runtime.math.Pose, androidx.xr.runtime.internal.SurfaceEntity.CanvasShape, @androidx.xr.runtime.internal.SurfaceEntity.ContentSecurityLevel int, @androidx.xr.runtime.internal.SurfaceEntity.SuperSampling int, androidx.xr.runtime.internal.Entity);
-    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.runtime.internal.MaterialResource!>? createWaterMaterial(boolean);
+    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.runtime.internal.MaterialResource!> createWaterMaterial(boolean);
     method public void destroyKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource);
     method public void destroyTexture(androidx.xr.runtime.internal.TextureResource);
     method public void destroyWaterMaterial(androidx.xr.runtime.internal.MaterialResource);
@@ -1292,11 +1292,11 @@ package androidx.xr.scenecore.impl {
     method public androidx.xr.runtime.internal.SpatialEnvironment getSpatialEnvironment();
     method public androidx.xr.runtime.internal.SpatialModeChangeListener getSpatialModeChangeListener();
     method public androidx.xr.scenecore.impl.perception.ViewProjections? getStereoViewsInOpenXrUnboundedSpace();
-    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.runtime.internal.ExrImageResource!>? loadExrImageByAssetName(String);
-    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.runtime.internal.ExrImageResource!>? loadExrImageByByteArray(byte[], String);
-    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.runtime.internal.GltfModelResource!>? loadGltfByAssetName(String);
-    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.runtime.internal.GltfModelResource!>? loadGltfByByteArray(byte[], String);
-    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.runtime.internal.TextureResource!>? loadTexture(String, androidx.xr.runtime.internal.TextureSampler);
+    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.runtime.internal.ExrImageResource!> loadExrImageByAssetName(String);
+    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.runtime.internal.ExrImageResource!> loadExrImageByByteArray(byte[], String);
+    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.runtime.internal.GltfModelResource!> loadGltfByAssetName(String);
+    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.runtime.internal.GltfModelResource!> loadGltfByByteArray(byte[], String);
+    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.runtime.internal.TextureResource!> loadTexture(String, androidx.xr.runtime.internal.TextureSampler);
     method public void removePerceivedResolutionChangedListener(java.util.function.Consumer<androidx.xr.runtime.internal.PixelDimensions!>);
     method public void removeSpatialCapabilitiesChangedListener(java.util.function.Consumer<androidx.xr.runtime.internal.SpatialCapabilities!>);
     method public void requestFullSpaceMode();
@@ -1414,16 +1414,6 @@ package androidx.xr.scenecore.impl.extensions {
 }
 
 package androidx.xr.scenecore.impl.impress {
-
-  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public interface AssetAnimator {
-    method public void onComplete();
-    method public void onFailure(String message);
-  }
-
-  @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public interface AssetLoader {
-    method public void onFailure(String message);
-    method public void onSuccess(long value);
-  }
 
   @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public class BindingsObjectPhantomReference extends java.lang.ref.PhantomReference<java.lang.Object!> {
   }

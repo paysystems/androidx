@@ -27,9 +27,11 @@ import androidx.compose.remote.core.RemoteContext;
 import androidx.compose.remote.core.operations.BitmapData;
 import androidx.compose.remote.core.operations.Theme;
 import androidx.compose.remote.creation.RemoteComposeContext;
+import androidx.compose.remote.creation.RemoteComposeContextAndroid;
 import androidx.compose.remote.creation.platform.AndroidxPlatformServices;
 import androidx.compose.remote.player.view.platform.RemoteComposeView;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.filters.SdkSuppress;
 import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.Ignore;
@@ -42,6 +44,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Random;
 
+@SdkSuppress(minSdkVersion = 26) // b/437958945
 @RunWith(AndroidJUnit4.class)
 public class ImageErrorTest {
 
@@ -60,7 +63,7 @@ public class ImageErrorTest {
         int th = lightImage.getHeight();
 
         RemoteComposeContext doc =
-                new RemoteComposeContext(
+                new RemoteComposeContextAndroid(
                         tw,
                         th,
                         "demo",

@@ -19,6 +19,9 @@ package androidx.appfunctions.integration.testapp.library
 import android.net.Uri
 import android.util.Log
 import androidx.appfunctions.AppFunctionContext
+import androidx.appfunctions.AppFunctionIntValueConstraint
+import androidx.appfunctions.AppFunctionSerializable
+import androidx.appfunctions.AppFunctionStringValueConstraint
 import androidx.appfunctions.service.AppFunction
 
 @Suppress("UNUSED_PARAMETER")
@@ -42,4 +45,33 @@ class TestFunctions2 {
     fun getUri(appFunctionContext: AppFunctionContext): Uri {
         return Uri.parse("https://www.google.com/")
     }
+
+    @AppFunction
+    fun functionWithSerializableParameter(
+        appFunctionContext: AppFunctionContext,
+        exampleSerializable: ExampleSerializable,
+        genericSerializable: GenericSerializable<Int>,
+    ) {}
+
+    @AppFunction
+    @AppFunctionIntValueConstraint(enumValues = [10, 20])
+    fun enumValueFunction(
+        appFunctionContext: AppFunctionContext,
+        @AppFunctionIntValueConstraint(enumValues = [0, 1]) intEnum: Int,
+        @AppFunctionStringValueConstraint(enumValues = ["A", "B"]) stringEnum: String,
+    ): Int = 10
 }
+
+/** AppFunctionSerializable in non-root library. */
+@AppFunctionSerializable(isDescribedByKdoc = true)
+class ExampleSerializable(
+    /** Int property of ExampleSerializable. */
+    val intProperty: Int
+)
+
+/** Example parameterized AppFunctionSerializable in another package. */
+@AppFunctionSerializable(isDescribedByKdoc = true)
+class GenericSerializable<T>(
+    /** Value property of GenericSerializable. */
+    val value: T
+)

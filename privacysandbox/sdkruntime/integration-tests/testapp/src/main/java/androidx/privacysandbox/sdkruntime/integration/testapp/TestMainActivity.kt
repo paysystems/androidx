@@ -28,9 +28,11 @@ import androidx.lifecycle.lifecycleScope
 import androidx.privacysandbox.sdkruntime.core.LoadSdkCompatException
 import androidx.privacysandbox.sdkruntime.integration.testapp.fragments.AppOwnedInterfacesFragment
 import androidx.privacysandbox.sdkruntime.integration.testapp.fragments.BaseFragment
+import androidx.privacysandbox.sdkruntime.integration.testapp.fragments.ClientImportanceListenerFragment
 import androidx.privacysandbox.sdkruntime.integration.testapp.fragments.GetClientPackageNameFragment
 import androidx.privacysandbox.sdkruntime.integration.testapp.fragments.LoadedSdksFragment
 import androidx.privacysandbox.sdkruntime.integration.testapp.fragments.SandboxDeathFragment
+import androidx.privacysandbox.sdkruntime.integration.testapp.fragments.SdkActivityFragment
 import androidx.privacysandbox.sdkruntime.integration.testapp.fragments.SdkContextFragment
 import com.google.android.material.navigation.NavigationView
 import kotlinx.coroutines.launch
@@ -43,7 +45,7 @@ class TestMainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        api = TestAppApi(applicationContext)
+        api = TestAppApi(this)
 
         logView = findViewById(R.id.logView)
         logView.setMovementMethod(ScrollingMovementMethod())
@@ -137,6 +139,9 @@ class TestMainActivity : AppCompatActivity() {
             R.id.itemSandboxDeathCuj -> switchContentFragment(SandboxDeathFragment())
             R.id.itemClientPackageCuj -> switchContentFragment(GetClientPackageNameFragment())
             R.id.itemSdkContextCuj -> switchContentFragment(SdkContextFragment())
+            R.id.itemClientImportanceListenerCuj ->
+                switchContentFragment(ClientImportanceListenerFragment())
+            R.id.itemSdkActivityCuj -> switchContentFragment(SdkActivityFragment())
             else -> addLogMessage("Invalid CUJ option")
         }
     }

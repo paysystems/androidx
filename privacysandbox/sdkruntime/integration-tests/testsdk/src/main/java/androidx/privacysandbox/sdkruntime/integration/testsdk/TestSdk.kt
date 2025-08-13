@@ -18,11 +18,15 @@ package androidx.privacysandbox.sdkruntime.integration.testsdk
 
 import android.content.Context
 import android.os.Bundle
+import android.os.IBinder
 import android.os.Process
 import android.util.Log
 import androidx.privacysandbox.sdkruntime.core.LoadSdkCompatException
+import androidx.privacysandbox.sdkruntime.core.SdkSandboxClientImportanceListenerCompat
 import androidx.privacysandbox.sdkruntime.integration.callDoSomething
+import androidx.privacysandbox.sdkruntime.integration.testaidl.IClientImportanceListener
 import androidx.privacysandbox.sdkruntime.integration.testaidl.ILoadSdkCallback
+import androidx.privacysandbox.sdkruntime.integration.testaidl.ISdkActivityHandler
 import androidx.privacysandbox.sdkruntime.integration.testaidl.ISdkApi
 import androidx.privacysandbox.sdkruntime.integration.testaidl.LoadedSdkInfo
 import androidx.privacysandbox.sdkruntime.provider.controller.SdkSandboxControllerCompat
@@ -33,6 +37,16 @@ import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 
 class TestSdk(private val sdkContext: Context) : ISdkApi.Stub() {
+
+    private val appSideClientImportanceListeners =
+        ClientCallbacksRegistry<
+            IClientImportanceListener,
+            SdkSandboxClientImportanceListenerCompat,
+        >(
+            wrapperFun = { ClientListenerWrapper(it) },
+            addBackend = { registerClientImportanceListener(it) },
+            removeBackend = { unregisterClientImportanceListener(it) },
+        )
 
     override fun doSomething(param: String): String {
         Log.i(TAG, "TestSdk#doSomething($param)")
@@ -112,6 +126,42 @@ class TestSdk(private val sdkContext: Context) : ISdkApi.Stub() {
             }
         } catch (_: FileNotFoundException) {
             return null
+        }
+    }
+
+    override fun registerClientImportanceListener(listener: IClientImportanceListener) {
+        appSideClientImportanceListeners.add(listener)
+    }
+
+    override fun unregisterClientImportanceListener(listener: IClientImportanceListener) {
+        appSideClientImportanceListeners.remove(listener)
+    }
+
+    override fun registerSdkActivityHandler(appSideActivityHandler: ISdkActivityHandler): IBinder {
+        return SdkSandboxControllerCompat.from(sdkContext)
+            .registerSdkSandboxActivityHandler(
+                ActivityHandlerWrapper(sdkContext, appSideActivityHandler)
+            )
+    }
+
+    private fun registerClientImportanceListener(
+        listener: SdkSandboxClientImportanceListenerCompat
+    ) {
+        SdkSandboxControllerCompat.from(sdkContext)
+            .registerSdkSandboxClientImportanceListener(Runnable::run, listener)
+    }
+
+    private fun unregisterClientImportanceListener(
+        listener: SdkSandboxClientImportanceListenerCompat
+    ) {
+        SdkSandboxControllerCompat.from(sdkContext)
+            .unregisterSdkSandboxClientImportanceListener(listener)
+    }
+
+    private class ClientListenerWrapper(private val clientListener: IClientImportanceListener) :
+        SdkSandboxClientImportanceListenerCompat {
+        override fun onForegroundImportanceChanged(isForeground: Boolean) {
+            clientListener.onForegroundImportanceChanged(isForeground)
         }
     }
 

@@ -816,6 +816,35 @@ public class WebViewFeatureInternal {
             new ApiFeature.NoFramework(WebViewFeature.ORIGIN_MATCHED_HEADERS,
                     Features.EXTRA_HEADER_FOR_ORIGINS);
 
+    /**
+     * Feature for {@link WebViewFeature#isFeatureSupported(String)}.
+     * This feature covers {@link WebViewStartUpConfig.Builder#setProfilesToLoadDuringStartup(Set)},
+     */
+    @WebViewCompat.ExperimentalAsyncStartUp
+    public static final StartupApiFeature.NoFramework STARTUP_FEATURE_SET_PROFILES_TO_LOAD =
+            new StartupApiFeature.NoFramework(WebViewFeature.STARTUP_FEATURE_SET_PROFILES_TO_LOAD,
+                    StartupFeatures.STARTUP_FEATURE_SET_PROFILES_TO_LOAD);
+
+    /**
+     * Feature for {@link WebViewFeature#isFeatureSupported(String)}.
+     * This feature covers
+     * {@link androidx.webkit.ProcessGlobalConfig#setUiThreadStartupMode(Context, int)}.
+     */
+    public static final StartupApiFeature.NoFramework
+            STARTUP_FEATURE_SET_UI_THREAD_STARTUP_MODE =
+            new StartupApiFeature.NoFramework(
+                    WebViewFeature.STARTUP_FEATURE_SET_UI_THREAD_STARTUP_MODE,
+                    StartupFeatures.STARTUP_FEATURE_SET_UI_THREAD_STARTUP_MODE);
+
+
+    /**
+     * Feature for {@link WebViewFeature#isFeatureSupported(String)}.
+     * This feature covers {@link Profile#preconnect(String)}
+     */
+    public static final ApiFeature.NoFramework PRECONNECT =
+            new ApiFeature.NoFramework(WebViewFeature.PRECONNECT,
+                    Features.PRECONNECT);
+
     // --- Add new feature constants above this line ---
 
     private WebViewFeatureInternal() {

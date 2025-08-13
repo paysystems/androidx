@@ -128,6 +128,7 @@ public class WebViewFeature {
             PAYMENT_REQUEST,
             WEBVIEW_BUILDER,
             WARM_UP_RENDERER_PROCESS,
+            PRECONNECT,
     })
     @Retention(RetentionPolicy.SOURCE)
     @Target({ElementType.PARAMETER, ElementType.METHOD})
@@ -142,6 +143,8 @@ public class WebViewFeature {
             STARTUP_FEATURE_SET_DATA_DIRECTORY_SUFFIX,
             STARTUP_FEATURE_SET_DIRECTORY_BASE_PATHS,
             STARTUP_FEATURE_CONFIGURE_PARTITIONED_COOKIES,
+            STARTUP_FEATURE_SET_PROFILES_TO_LOAD,
+            STARTUP_FEATURE_SET_UI_THREAD_STARTUP_MODE,
     })
     @Retention(RetentionPolicy.SOURCE)
     @Target({ElementType.PARAMETER, ElementType.METHOD})
@@ -541,7 +544,8 @@ public class WebViewFeature {
 
     /**
      * Feature for {@link #isStartupFeatureSupported(Context, String)}.
-     * This feature covers {@link ProcessGlobalConfig#setDirectoryBasePaths(Context, File, File)}
+     * This feature covers
+     * {@link ProcessGlobalConfig#setPartitionedCookiesEnabled(Context, Boolean)}
      */
     public static final String STARTUP_FEATURE_CONFIGURE_PARTITIONED_COOKIES =
             "STARTUP_FEATURE_CONFIGURE_PARTITIONED_COOKIES";
@@ -762,6 +766,27 @@ public class WebViewFeature {
      * {@link Profile#clearAllOriginMatchedHeaders()}.
      */
     public static final String ORIGIN_MATCHED_HEADERS = "ORIGIN_MATCHED_HEADERS";
+
+    /**
+     * Feature for {@link WebViewFeature#isFeatureSupported(String)}.
+     * This feature covers {@link WebViewStartUpConfig.Builder#setProfilesToLoadDuringStartup(Set)}.
+     */
+    public static final String STARTUP_FEATURE_SET_PROFILES_TO_LOAD =
+            "STARTUP_FEATURE_SET_PROFILES_TO_LOAD";
+
+    /**
+     * Feature for {@link #isStartupFeatureSupported(Context, String)}.
+     * This feature covers
+     * {@link ProcessGlobalConfig#setUiThreadStartupMode(Context, int)}.
+     */
+    public static final String STARTUP_FEATURE_SET_UI_THREAD_STARTUP_MODE =
+            "STARTUP_FEATURE_SET_UI_THREAD_STARTUP_MODE";
+
+    /**
+     * Feature for {@link #isFeatureSupported(String)}.
+     * This feature covers {@link Profile#preconnect(String)}
+     */
+    public static final String PRECONNECT = "PRECONNECT";
 
     /**
      * Return whether a feature is supported at run-time. This will check whether a feature is

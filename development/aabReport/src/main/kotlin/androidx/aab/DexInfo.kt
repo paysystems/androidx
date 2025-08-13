@@ -16,10 +16,14 @@
 
 package androidx.aab
 
+import androidx.aab.cli.VERBOSE
 import java.io.InputStream
 import java.security.MessageDigest
 import java.util.zip.CRC32
+import org.jf.dexlib2.Opcodes
+import org.jf.dexlib2.dexbacked.DexBackedDexFile
 
+/** Bundle information captured from `.dex` files (Not just classesXXX.dex, any .dex files) */
 data class DexInfo(
     /** Entry name (relative path) within the containing bundle */
     val entryName: String,
@@ -34,20 +38,60 @@ data class DexInfo(
 
     /** Sha256 of whole file */
     val sha256: String,
+
+    /** Size of bytes in the uncompressed dex */
+    val uncompressedSize: Long,
+
+    /** Size of bytes in the zip container */
+    val compressedSize: Long,
+
+    /** r8 map id, if present in the dex strings */
+    val r8MapId: String?,
+
+    /** r8 markers */
+    val r8Markers: List<R8Marker>,
 ) {
+    init {
+        require(uncompressedSize >= 0) { "Uncompressed size must be non-negative" }
+    }
+
+    data class R8Marker(val compiler: String, val map: Map<String, String>) {
+        companion object {
+            // """~~R8{"backend":"dex","compilation-mode":"release","has-checksums":false,"min-api":21,"pg-map-id":"17647d6605bb91237bf2b0766cb45b010d6e01aa899f20d7d6b08253bc38712e","r8-mode":"full","sha-1":"4ce18528a68a4b7401548810621405baaf439a48","version":"8.12.13-dev"}"""
+            fun from(markerString: String): R8Marker {
+                val entries = markerString.substringAfter('{').substringBefore('}').split(',')
+                return R8Marker(
+                    compiler = markerString.substring(2, markerString.indexOf("{")),
+                    map =
+                        entries.associate { it ->
+                            val kv = it.split(':')
+                            kv.first().removeSurrounding("\"") to kv.last().removeSurrounding("\"")
+                        },
+                )
+            }
+        }
+    }
+
     companion object {
-        fun from(entryName: String, src: InputStream): DexInfo {
+
+        fun from(entryName: String, compressedSize: Long, src: InputStream): DexInfo {
             val crc = CRC32()
             val sha256 = MessageDigest.getInstance("SHA-256")
 
-            // Process the stream in chunks, updating both hashes in the same loop.
-            val buffer = ByteArray(DEFAULT_BUFFER_SIZE) // Typically 8192
-            generateSequence { src.read(buffer).takeIf { it != -1 } }
-                .forEach { bytesRead ->
-                    // Feed the same chunk of data to both algorithms
-                    crc.update(buffer, 0, bytesRead)
-                    sha256.update(buffer, 0, bytesRead)
+            val bytes = src.readAllBytes()
+            crc.update(bytes)
+            sha256.update(bytes)
+            val dexFile = DexBackedDexFile(Opcodes.getDefault(), bytes)
+
+            val r8Markers = mutableListOf<R8Marker>()
+            var r8MapId: String? = null
+            dexFile.stringSection.forEach {
+                if (it.startsWith("~~") && it.endsWith("}")) {
+                    r8Markers.add(R8Marker.from(it))
+                } else if (it.startsWith("r8-map-id-")) {
+                    r8MapId = it
                 }
+            }
 
             // Finalize the SHA-256 hash and format it as a hex string.
             val sha256Bytes = sha256.digest()
@@ -55,20 +99,38 @@ data class DexInfo(
             val crc32Hex = crc.value.toInt().toHexString()
 
             // 4. Return the results in the data class.
-            return DexInfo(entryName = entryName, crc32 = crc32Hex, sha256 = sha256Hex)
+            return DexInfo(
+                entryName = entryName,
+                crc32 = crc32Hex,
+                sha256 = sha256Hex,
+                uncompressedSize = bytes.size.toLong(),
+                compressedSize = compressedSize,
+                r8MapId = r8MapId,
+                r8Markers = r8Markers,
+            )
         }
 
         val CSV_TITLES =
-            listOf("dex_names", "dex_sortedChecksumsSha256", "dex_sortedChecksumsCrc32")
+            listOf("dex_totalSizeMb") +
+                if (VERBOSE) {
+                    listOf("dex_names", "dex_sortedChecksumsSha256", "dex_sortedChecksumsCrc32")
+                } else {
+                    emptyList()
+                }
 
         fun List<DexInfo>.csvEntries(): List<String> {
-            return listOf(
-                // NOTE: we individually sort each of these, so they aren't associated with each
-                // other, but they are easy to compare when joined
-                joinToString(INTERNAL_CSV_SEPARATOR) { it.entryName },
-                this.map { it.sha256 }.sorted().joinToString(INTERNAL_CSV_SEPARATOR),
-                this.map { it.crc32 }.sorted().joinToString(INTERNAL_CSV_SEPARATOR),
-            )
+            return listOf((this.sumOf { it.uncompressedSize } / (1024.0 * 1024)).toString()) +
+                if (VERBOSE)
+                    listOf(
+                        joinToString(INTERNAL_CSV_SEPARATOR) { it.entryName },
+                        // NOTE: we individually sort each of these, so they aren't associated with
+                        // each other, but they are easy to compare when joined
+                        this.map { it.sha256 }.sorted().joinToString(INTERNAL_CSV_SEPARATOR),
+                        this.map { it.crc32 }.sorted().joinToString(INTERNAL_CSV_SEPARATOR),
+                    )
+                else {
+                    emptyList()
+                }
         }
     }
 }

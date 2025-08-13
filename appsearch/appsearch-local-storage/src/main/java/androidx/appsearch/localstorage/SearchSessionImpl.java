@@ -25,9 +25,11 @@ import android.os.ParcelFileDescriptor;
 import android.os.SystemClock;
 import android.util.Log;
 
+import androidx.annotation.OptIn;
 import androidx.annotation.WorkerThread;
 import androidx.appsearch.app.AppSearchBatchResult;
 import androidx.appsearch.app.AppSearchBlobHandle;
+import androidx.appsearch.app.AppSearchResult;
 import androidx.appsearch.app.AppSearchSession;
 import androidx.appsearch.app.CommitBlobResponse;
 import androidx.appsearch.app.ExperimentalAppSearchApi;
@@ -53,6 +55,8 @@ import androidx.appsearch.app.SetSchemaRequest;
 import androidx.appsearch.app.SetSchemaResponse;
 import androidx.appsearch.app.StorageInfo;
 import androidx.appsearch.exceptions.AppSearchException;
+import androidx.appsearch.flags.Flags;
+import androidx.appsearch.localstorage.stats.CallStats;
 import androidx.appsearch.localstorage.stats.OptimizeStats;
 import androidx.appsearch.localstorage.stats.RemoveStats;
 import androidx.appsearch.localstorage.stats.SetSchemaStats;
@@ -61,6 +65,7 @@ import androidx.appsearch.localstorage.visibilitystore.CallerAccess;
 import androidx.appsearch.stats.BaseStats;
 import androidx.appsearch.stats.SchemaMigrationStats;
 import androidx.appsearch.util.SchemaMigrationUtil;
+import androidx.collection.ArrayMap;
 import androidx.collection.ArraySet;
 import androidx.core.util.Preconditions;
 
@@ -335,7 +340,7 @@ class SearchSessionImpl implements AppSearchSession {
         // is not included in the request will be delete if we force override incompatible schemas.
         // And all documents of these types will be deleted as well. We should checkForOptimize for
         // these deletion.
-        checkForOptimize();
+        checkForOptimize(/*callStatsBuilder=*/ null);
         return future;
     }
 
@@ -406,7 +411,8 @@ class SearchSessionImpl implements AppSearchSession {
 
         // The existing documents with same ID will be deleted, so there may be some resources that
         // could be released after optimize().
-        checkForOptimize(/*mutateBatchSize=*/ documents.size() + takenActions.size());
+        checkForOptimize(/*mutateBatchSize=*/ documents.size() + takenActions.size(),
+                /*callStatsBuilder=*/ null);
         return future;
     }
 
@@ -590,6 +596,7 @@ class SearchSessionImpl implements AppSearchSession {
         });
     }
 
+    @OptIn(markerClass = ExperimentalAppSearchApi.class)
     @Override
     public @NonNull ListenableFuture<AppSearchBatchResult<String, Void>> removeAsync(
             @NonNull RemoveByDocumentIdRequest request) {
@@ -598,25 +605,70 @@ class SearchSessionImpl implements AppSearchSession {
         ListenableFuture<AppSearchBatchResult<String, Void>> future = execute(() -> {
             AppSearchBatchResult.Builder<String, Void> resultBuilder =
                     new AppSearchBatchResult.Builder<>();
-            for (String id : request.getIds()) {
-                RemoveStats.Builder removeStatsBuilder = null;
-                if (mLogger != null) {
-                    removeStatsBuilder = new RemoveStats.Builder(mPackageName, mDatabaseName);
-                }
+            RemoveStats.Builder removeStatsBuilder = null;
+            if (mLogger != null) {
+                removeStatsBuilder = new RemoveStats.Builder(mPackageName, mDatabaseName);
+            }
 
+            if (Flags.enableRemoveByIdUsesQuery()
+                    && mFeatures.isFeatureSupported(Features.SEARCH_SPEC_ADD_FILTER_DOCUMENT_IDS)) {
+                if (request.getIds().isEmpty()) {
+                    Log.w(TAG, "Request to delete items in namespace " + request.getNamespace()
+                            + " specified no ids!");
+                    return resultBuilder.build();
+                }
                 try {
-                    mAppSearchImpl.remove(mPackageName, mDatabaseName, request.getNamespace(), id,
-                            removeStatsBuilder,
-                            /*callStatsBuilder=*/null);
-                    resultBuilder.setSuccess(id, /*value=*/null);
+                    Map<String, Set<String>> deletedIds = new ArrayMap<>();
+                    SearchSpec searchSpec =
+                            new SearchSpec.Builder()
+                                    .addFilterDocumentIds(request.getIds())
+                                    .addFilterNamespaces(request.getNamespace())
+                                    .addFilterPackageNames(mPackageName)
+                                    .build();
+                    mAppSearchImpl.removeByQuery(mPackageName, mDatabaseName, /* queryExpression= */
+                            "",
+                            searchSpec, deletedIds, removeStatsBuilder,
+                            /* callStatsBuilder= */null);
+                    Set<String> deletionSet = deletedIds.get(request.getNamespace());
+                    for (String id : request.getIds()) {
+                        if (deletionSet != null && deletionSet.contains(id)) {
+                            resultBuilder.setSuccess(id, /*value=*/null);
+                        } else {
+                            resultBuilder.setResult(id, AppSearchResult.newFailedResult(
+                                    AppSearchResult.RESULT_NOT_FOUND, /*errorMessage=*/null));
+                        }
+                    }
                 } catch (Throwable t) {
-                    resultBuilder.setResult(id, throwableToFailedResult(t));
+                    AppSearchResult<Void> failure = throwableToFailedResult(t);
+                    for (String id : request.getIds()) {
+                        resultBuilder.setResult(id, failure);
+                    }
                 } finally {
                     if (mLogger != null) {
                         mLogger.logStats(removeStatsBuilder.build());
                     }
                 }
+            } else {
+                for (String id : request.getIds()) {
+                    if (mLogger != null) {
+                        removeStatsBuilder = new RemoveStats.Builder(mPackageName, mDatabaseName);
+                    }
+                    try {
+                        mAppSearchImpl.remove(mPackageName, mDatabaseName, request.getNamespace(),
+                                id,
+                                removeStatsBuilder,
+                                /*callStatsBuilder=*/null);
+                        resultBuilder.setSuccess(id, /*value=*/null);
+                    } catch (Throwable t) {
+                        resultBuilder.setResult(id, throwableToFailedResult(t));
+                    } finally {
+                        if (mLogger != null) {
+                            mLogger.logStats(removeStatsBuilder.build());
+                        }
+                    }
+                }
             }
+
             // Now that the batch has been written. Persist the newly written data.
             mAppSearchImpl.persistToDisk(
                     mPackageName,
@@ -630,7 +682,7 @@ class SearchSessionImpl implements AppSearchSession {
             dispatchChangeNotifications();
             return resultBuilder.build();
         });
-        checkForOptimize(/*mutateBatchSize=*/ request.getIds().size());
+        checkForOptimize(/*mutateBatchSize=*/ request.getIds().size(), /*callStatsBuilder=*/ null);
         return future;
     }
 
@@ -652,7 +704,7 @@ class SearchSessionImpl implements AppSearchSession {
                 removeStatsBuilder = new RemoveStats.Builder(mPackageName, mDatabaseName);
             }
             mAppSearchImpl.removeByQuery(mPackageName, mDatabaseName, queryExpression,
-                    searchSpec, removeStatsBuilder, /*callStatsBuilder=*/null);
+                    searchSpec, /*deletedIds=*/null, removeStatsBuilder, /*callStatsBuilder=*/null);
             // Now that the batch has been written. Persist the newly written data.
             mAppSearchImpl.persistToDisk(
                     mPackageName,
@@ -669,7 +721,7 @@ class SearchSessionImpl implements AppSearchSession {
             }
             return null;
         });
-        checkForOptimize();
+        checkForOptimize(/*callStatsBuilder=*/ null);
         return future;
     }
 
@@ -702,7 +754,7 @@ class SearchSessionImpl implements AppSearchSession {
         if (mIsMutated && !mIsClosed) {
             // No future is needed here since the method is void.
             FutureUtil.execute(mExecutor, () -> {
-                mAppSearchImpl.persistToDisk(mPackageName, BaseStats.CALL_TYPE_CLOSE,
+                mAppSearchImpl.persistToDisk(mPackageName, BaseStats.INTERNAL_CALL_TYPE_CLOSE,
                         PersistType.Code.FULL, mLogger,
                         /*callStatsBuilder=*/null);
                 mIsClosed = true;
@@ -761,20 +813,22 @@ class SearchSessionImpl implements AppSearchSession {
         mAppSearchImpl.dispatchAndClearChangeNotifications();
     }
 
-    private void checkForOptimize(int mutateBatchSize) {
+    private void checkForOptimize(int mutateBatchSize,
+            CallStats.@Nullable Builder callStatsBuilder) {
         mExecutor.execute(() -> {
             long totalLatencyStartMillis = SystemClock.elapsedRealtime();
-            OptimizeStats.Builder builder = null;
+            OptimizeStats.Builder optimizeStatsBuilder = null;
             try {
                 if (mLogger != null) {
-                    builder = new OptimizeStats.Builder();
+                    optimizeStatsBuilder = new OptimizeStats.Builder();
                 }
-                mAppSearchImpl.checkForOptimize(mutateBatchSize, builder);
+                mAppSearchImpl.checkForOptimize(mutateBatchSize, optimizeStatsBuilder,
+                        callStatsBuilder);
             } catch (AppSearchException e) {
                 Log.w(TAG, "Error occurred when check for optimize", e);
             } finally {
-                if (builder != null) {
-                    OptimizeStats oStats = builder
+                if (optimizeStatsBuilder != null) {
+                    OptimizeStats oStats = optimizeStatsBuilder
                             .setTotalLatencyMillis(
                                     (int) (SystemClock.elapsedRealtime() - totalLatencyStartMillis))
                             .build();
@@ -787,20 +841,20 @@ class SearchSessionImpl implements AppSearchSession {
         });
     }
 
-    private void checkForOptimize() {
+    private void checkForOptimize(CallStats.@Nullable Builder callStatsBuilder) {
         mExecutor.execute(() -> {
             long totalLatencyStartMillis = SystemClock.elapsedRealtime();
-            OptimizeStats.Builder builder = null;
+            OptimizeStats.Builder optimizeStatsBuilder = null;
             try {
                 if (mLogger != null) {
-                    builder = new OptimizeStats.Builder();
+                    optimizeStatsBuilder = new OptimizeStats.Builder();
                 }
-                mAppSearchImpl.checkForOptimize(builder);
+                mAppSearchImpl.checkForOptimize(optimizeStatsBuilder, callStatsBuilder);
             } catch (AppSearchException e) {
                 Log.w(TAG, "Error occurred when check for optimize", e);
             } finally {
-                if (builder != null) {
-                    OptimizeStats oStats = builder
+                if (optimizeStatsBuilder != null) {
+                    OptimizeStats oStats = optimizeStatsBuilder
                             .setTotalLatencyMillis(
                                     (int) (SystemClock.elapsedRealtime() - totalLatencyStartMillis))
                             .build();

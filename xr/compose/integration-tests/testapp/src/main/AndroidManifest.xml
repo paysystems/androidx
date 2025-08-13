@@ -83,6 +83,7 @@
             android:exported="true"
             android:label="SpatialCompose"
             android:enableOnBackInvokedCallback="true"
+            android:configChanges="screenSize|smallestScreenSize|orientation|screenLayout"
             android:theme="@style/Theme.IntegrationTestsApp" />
         <activity
             android:name=".spatialcompose.SpatialComposeWindowManager"
@@ -137,6 +138,18 @@
             android:name=".resizablepanel.ResizablePanel"
             android:exported="true"
             android:label="ResizablePanel"
+            android:theme="@style/Theme.IntegrationTestsApp" />
+        <activity
+            android:name=".accessibility.AccessibilityActivity"
+            android:exported="true"
+            android:label="AccessibilityTest"
+            android:theme="@style/Theme.IntegrationTestsApp" />
+        <activity
+            android:name=".spatialalignmentusage.SpatialAlignmentUsageActivity"
+            android:exported="true"
+            android:configChanges="screenSize|smallestScreenSize|orientation|screenLayout"
+            android:enableOnBackInvokedCallback="true"
+            android:label="SpatialAlignment"
             android:theme="@style/Theme.IntegrationTestsApp" />
 
 

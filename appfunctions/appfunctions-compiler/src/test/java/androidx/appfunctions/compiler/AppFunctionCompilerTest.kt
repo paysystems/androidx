@@ -359,6 +359,50 @@ class AppFunctionCompilerTest {
     }
 
     @Test
+    fun testIntValueConstraint_Xml_success() {
+        val report =
+            compilationTestHelper.compileAll(
+                sourceFileNames = listOf("IntEnumValueFunctions.KT"),
+                processorOptions = mapOf("appfunctions:aggregateAppFunctions" to "true"),
+            )
+        compilationTestHelper.assertSuccessWithResourceContent(
+            report = report,
+            expectGeneratedResourceFileName = "app_functions_v2.xml",
+            goldenFileName = "intEnumValueFunctions_app_functions_v2.xml",
+        )
+        compilationTestHelper.assertSuccessWithSourceContent(
+            report = report,
+            expectGeneratedSourceFileName = "${'$'}AggregatedAppFunctionInventory_Impl.kt",
+            goldenFileName = "${'$'}AggregatedAppFunctionInventory_IntEnum_Impl.KT",
+        )
+        compilationTestHelper.assertSuccessWithSourceContent(
+            report = report,
+            expectGeneratedSourceFileName = "${'$'}IntEnumValueFunctions_AppFunctionInventory.kt",
+            goldenFileName = "${'$'}IntEnumValueFunctions_AppFunctionInventory.KT",
+        )
+    }
+
+    @Test
+    fun testStringValueConstraint_Xml_success() {
+        val report =
+            compilationTestHelper.compileAll(
+                sourceFileNames = listOf("StringEnumValueFunctions.KT"),
+                processorOptions = mapOf("appfunctions:aggregateAppFunctions" to "true"),
+            )
+        compilationTestHelper.assertSuccessWithResourceContent(
+            report = report,
+            expectGeneratedResourceFileName = "app_functions_v2.xml",
+            goldenFileName = "stringEnumValueFunctions_app_functions_v2.xml",
+        )
+        compilationTestHelper.assertSuccessWithSourceContent(
+            report = report,
+            expectGeneratedSourceFileName =
+                "${'$'}StringEnumValueFunctions_AppFunctionInventory.kt",
+            goldenFileName = "${'$'}StringEnumValueFunctions_AppFunctionInventory.KT",
+        )
+    }
+
+    @Test
     fun testSerializableOutputFunctions_genAppFunctionInventory_success() {
         val report =
             compilationTestHelper.compileAll(

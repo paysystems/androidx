@@ -77,6 +77,9 @@ package androidx.xr.runtime.testing {
     property public java.util.UUID uuid;
   }
 
+  public final class FakeAnchorPlacement implements androidx.xr.runtime.internal.AnchorPlacement {
+  }
+
   @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class FakeAudioTrackExtensionsWrapper implements androidx.xr.runtime.internal.AudioTrackExtensionsWrapper {
     ctor public FakeAudioTrackExtensionsWrapper();
     method public androidx.xr.runtime.internal.PointSourceParams? getPointSourceParams(android.media.AudioTrack track);
@@ -173,11 +176,11 @@ package androidx.xr.runtime.testing {
     method public androidx.xr.runtime.internal.ActivityPanelEntity createActivityPanelEntity(androidx.xr.runtime.math.Pose pose, androidx.xr.runtime.internal.PixelDimensions windowBoundsPx, String name, android.app.Activity hostActivity, androidx.xr.runtime.internal.Entity parent);
     method @RequiresApi(android.os.Build.VERSION_CODES.O) public androidx.xr.runtime.testing.FakeAnchorEntity createAnchorEntity(androidx.xr.runtime.internal.Anchor anchor);
     method @RequiresApi(android.os.Build.VERSION_CODES.O) public androidx.xr.runtime.testing.FakeAnchorEntity createAnchorEntity(androidx.xr.runtime.internal.Dimensions bounds, androidx.xr.runtime.internal.PlaneType planeType, androidx.xr.runtime.internal.PlaneSemantic planeSemantic, java.time.Duration searchTimeout);
-    method public androidx.xr.runtime.internal.AnchorPlacement createAnchorPlacementForPlanes(java.util.Set<androidx.xr.runtime.internal.PlaneType> planeTypeFilter, java.util.Set<androidx.xr.runtime.internal.PlaneSemantic> planeSemanticFilter);
+    method public androidx.xr.runtime.testing.FakeAnchorPlacement createAnchorPlacementForPlanes(java.util.Set<androidx.xr.runtime.internal.PlaneType> planeTypeFilter, java.util.Set<androidx.xr.runtime.internal.PlaneSemantic> planeSemanticFilter);
     method public androidx.xr.runtime.internal.GltfEntity createGltfEntity(androidx.xr.runtime.math.Pose pose, androidx.xr.runtime.internal.GltfModelResource loadedGltf, androidx.xr.runtime.internal.Entity parentEntity);
     method public androidx.xr.runtime.internal.Entity createGroupEntity(androidx.xr.runtime.math.Pose pose, String name, androidx.xr.runtime.internal.Entity parent);
     method public androidx.xr.runtime.internal.InteractableComponent createInteractableComponent(java.util.concurrent.Executor executor, androidx.xr.runtime.internal.InputEventListener listener);
-    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.runtime.internal.MaterialResource>? createKhronosPbrMaterial(androidx.xr.runtime.internal.KhronosPbrMaterialSpec spec);
+    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.runtime.internal.MaterialResource> createKhronosPbrMaterial(androidx.xr.runtime.internal.KhronosPbrMaterialSpec spec);
     method public androidx.xr.runtime.internal.LoggingEntity createLoggingEntity(androidx.xr.runtime.math.Pose pose);
     method public androidx.xr.runtime.testing.FakeMovableComponent createMovableComponent(boolean systemMovable, boolean scaleInZ, java.util.Set<androidx.xr.runtime.internal.AnchorPlacement> anchorPlacement, boolean shouldDisposeParentAnchor);
     method public androidx.xr.runtime.internal.PanelEntity createPanelEntity(android.content.Context context, androidx.xr.runtime.math.Pose pose, android.view.View view, androidx.xr.runtime.internal.Dimensions dimensions, String name, androidx.xr.runtime.internal.Entity parent);
@@ -188,7 +191,7 @@ package androidx.xr.runtime.testing {
     method public androidx.xr.runtime.internal.SpatialPointerComponent createSpatialPointerComponent();
     method public androidx.xr.runtime.internal.SubspaceNodeEntity createSubspaceNodeEntity(androidx.xr.runtime.SubspaceNodeHolder<? extends java.lang.Object?> subspaceNodeHolder, androidx.xr.runtime.internal.Dimensions size);
     method public androidx.xr.runtime.internal.SurfaceEntity createSurfaceEntity(int stereoMode, androidx.xr.runtime.math.Pose pose, androidx.xr.runtime.internal.SurfaceEntity.CanvasShape canvasShape, int contentSecurityLevel, int superSampling, androidx.xr.runtime.internal.Entity parentEntity);
-    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.runtime.internal.MaterialResource>? createWaterMaterial(boolean isAlphaMapVersion);
+    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.runtime.internal.MaterialResource> createWaterMaterial(boolean isAlphaMapVersion);
     method public void destroyKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material);
     method public void destroyTexture(androidx.xr.runtime.internal.TextureResource texture);
     method public void destroyWaterMaterial(androidx.xr.runtime.internal.MaterialResource material);
@@ -572,21 +575,53 @@ package androidx.xr.runtime.testing {
 
   @RestrictTo(androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX) public final class FakeRenderingRuntime implements androidx.xr.runtime.internal.RenderingRuntime {
     ctor public FakeRenderingRuntime(androidx.xr.runtime.internal.SceneRuntime sceneRuntime, android.app.Activity activity);
+    method public androidx.xr.runtime.internal.TextureResource? borrowReflectionTexture();
     method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.runtime.internal.MaterialResource>? createKhronosPbrMaterial(androidx.xr.runtime.internal.KhronosPbrMaterialSpec spec);
     method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.runtime.internal.MaterialResource> createWaterMaterial(boolean isAlphaMapVersion);
     method public void destroyKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material);
+    method public void destroyTexture(androidx.xr.runtime.internal.TextureResource texture);
     method public void destroyWaterMaterial(androidx.xr.runtime.internal.MaterialResource material);
     method public void dispose();
     method public java.util.List<androidx.xr.runtime.testing.FakeRenderingRuntime.FakeKhronosPbrMaterial> getCreatedKhronosPbrMaterials();
     method public java.util.List<androidx.xr.runtime.testing.FakeRenderingRuntime.FakeWaterMaterial> getCreatedWaterMaterials();
+    method public com.google.common.util.concurrent.ListenableFuture<androidx.xr.runtime.internal.TextureResource> loadTexture(String assetName, androidx.xr.runtime.internal.TextureSampler sampler);
+    method public void setAlphaCutoffOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, float alphaCutoff);
     method public void setAlphaMapOnWaterMaterial(androidx.xr.runtime.internal.MaterialResource material, androidx.xr.runtime.internal.TextureResource alphaMap);
     method public void setAlphaStepMultiplierOnWaterMaterial(androidx.xr.runtime.internal.MaterialResource material, float alphaStepMultiplier);
+    method public void setAmbientOcclusionFactorOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, float factor);
+    method public void setAmbientOcclusionTextureOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, androidx.xr.runtime.internal.TextureResource ambientOcclusion);
+    method public void setAmbientOcclusionUvTransformOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, androidx.xr.runtime.math.Matrix3 uvTransform);
+    method public void setBaseColorFactorsOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, androidx.xr.runtime.math.Vector4 factors);
+    method public void setBaseColorTextureOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, androidx.xr.runtime.internal.TextureResource baseColor);
+    method public void setBaseColorUvTransformOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, androidx.xr.runtime.math.Matrix3 uvTransform);
+    method public void setClearcoatFactorsOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, float intensity, float roughness, float normal);
+    method public void setClearcoatNormalTextureOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, androidx.xr.runtime.internal.TextureResource clearcoatNormal);
+    method public void setClearcoatRoughnessTextureOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, androidx.xr.runtime.internal.TextureResource clearcoatRoughness);
+    method public void setClearcoatTextureOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, androidx.xr.runtime.internal.TextureResource clearcoat);
+    method public void setEmissiveFactorsOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, androidx.xr.runtime.math.Vector3 factors);
+    method public void setEmissiveTextureOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, androidx.xr.runtime.internal.TextureResource emissive);
+    method public void setEmissiveUvTransformOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, androidx.xr.runtime.math.Matrix3 uvTransform);
+    method public void setIndexOfRefractionOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, float indexOfRefraction);
+    method public void setMetallicFactorOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, float factor);
+    method public void setMetallicRoughnessTextureOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, androidx.xr.runtime.internal.TextureResource metallicRoughness);
+    method public void setMetallicRoughnessUvTransformOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, androidx.xr.runtime.math.Matrix3 uvTransform);
     method public void setNormalBoundaryOnWaterMaterial(androidx.xr.runtime.internal.MaterialResource material, float normalBoundary);
+    method public void setNormalFactorOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, float factor);
     method public void setNormalMapOnWaterMaterial(androidx.xr.runtime.internal.MaterialResource material, androidx.xr.runtime.internal.TextureResource normalMap);
     method public void setNormalSpeedOnWaterMaterial(androidx.xr.runtime.internal.MaterialResource material, float normalSpeed);
+    method public void setNormalTextureOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, androidx.xr.runtime.internal.TextureResource normal);
     method public void setNormalTilingOnWaterMaterial(androidx.xr.runtime.internal.MaterialResource material, float normalTiling);
+    method public void setNormalUvTransformOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, androidx.xr.runtime.math.Matrix3 uvTransform);
     method public void setNormalZOnWaterMaterial(androidx.xr.runtime.internal.MaterialResource material, float normalZ);
     method public void setReflectionMapOnWaterMaterial(androidx.xr.runtime.internal.MaterialResource material, androidx.xr.runtime.internal.TextureResource reflectionMap);
+    method public void setRoughnessFactorOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, float factor);
+    method public void setSheenColorFactorsOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, androidx.xr.runtime.math.Vector3 factors);
+    method public void setSheenColorTextureOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, androidx.xr.runtime.internal.TextureResource sheenColor);
+    method public void setSheenRoughnessFactorOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, float factor);
+    method public void setSheenRoughnessTextureOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, androidx.xr.runtime.internal.TextureResource sheenRoughness);
+    method public void setTransmissionFactorOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, float factor);
+    method public void setTransmissionTextureOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, androidx.xr.runtime.internal.TextureResource transmission);
+    method public void setTransmissionUvTransformOnKhronosPbrMaterial(androidx.xr.runtime.internal.MaterialResource material, androidx.xr.runtime.math.Matrix3 uvTransform);
     method public void startRenderer();
     method public void stopRenderer();
     property public java.util.List<androidx.xr.runtime.testing.FakeRenderingRuntime.FakeKhronosPbrMaterial> createdKhronosPbrMaterials;

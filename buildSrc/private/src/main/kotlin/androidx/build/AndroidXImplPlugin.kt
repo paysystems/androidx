@@ -232,7 +232,7 @@ abstract class AndroidXImplPlugin @Inject constructor() : Plugin<Project> {
         project.disallowAccidentalAndroidDependenciesInKmpProject(androidXKmpExtension)
         TaskUpToDateValidator.setup(project, registry)
 
-        project.workaroundPrebuiltTakingPrecedenceOverProject()
+        project.workaroundAndroidXDependencyResolutions()
         project.configureSamplesProject()
         project.configureMaxDepVersions(androidXExtension)
         project.configureUnzipChromeBuildService()
@@ -280,14 +280,6 @@ abstract class AndroidXImplPlugin @Inject constructor() : Plugin<Project> {
         androidXExtension: AndroidXExtension,
     ) {
         anchorTask.configure { it.dependsOn(task) }
-        val ignoreFailuresProperty =
-            project.providers.gradleProperty(TEST_FAILURES_DO_NOT_FAIL_TEST_TASK)
-        val ignoreFailures = ignoreFailuresProperty.isPresent
-        if (ignoreFailures) {
-            task.ignoreFailures = true
-        }
-        task.inputs.property("ignoreFailures", ignoreFailures)
-
         val xmlReportDestDir = project.getHostTestResultDirectory()
         val testName = "${project.path}:${task.name}"
         project.addToModuleInfo(testName, buildFeatures.isIsolatedProjectsEnabled())
@@ -598,7 +590,6 @@ abstract class AndroidXImplPlugin @Inject constructor() : Plugin<Project> {
             isTestApp = true,
         )
         project.buildOnServerDependsOnAssembleRelease()
-        project.buildOnServerDependsOnLint()
     }
 
     private fun configureWithTestPlugin(project: Project, androidXExtension: AndroidXExtension) {
@@ -837,12 +828,6 @@ abstract class AndroidXImplPlugin @Inject constructor() : Plugin<Project> {
         project.addToBuildOnServer("assembleRelease")
     }
 
-    private fun Project.buildOnServerDependsOnLint() {
-        if (!project.usingMaxDepVersions().get()) {
-            project.addToBuildOnServer("lint")
-        }
-    }
-
     private fun HasDeviceTests.configureTests() {
         deviceTests.forEach { (_, deviceTest) ->
             deviceTest.packaging.resources.apply {
@@ -952,7 +937,6 @@ abstract class AndroidXImplPlugin @Inject constructor() : Plugin<Project> {
             project.addToBuildOnServer(verifyELFRegionAlignmentTaskProvider)
         }
         project.buildOnServerDependsOnAssembleRelease()
-        project.buildOnServerDependsOnLint()
     }
 
     private fun configureGradlePluginPlugin(project: Project) {
@@ -1694,10 +1678,21 @@ fun AndroidXExtension.validateMavenVersion() {
     }
 }
 
-/** Workaround for https://github.com/gradle/gradle/issues/27407 */
-fun Project.workaroundPrebuiltTakingPrecedenceOverProject() {
+/** Workarounds for configuration resolution */
+fun Project.workaroundAndroidXDependencyResolutions() {
     project.configurations.configureEach { configuration ->
+        // https://github.com/gradle/gradle/issues/27407
         configuration.resolutionStrategy.preferProjectModules()
+
+        // https://github.com/gradle/gradle/issues/7594
+        configuration.resolutionStrategy.eachDependency { dependency ->
+            if (dependency.requested.group.startsWith("androidx.")) {
+                // Drop aar classifier that comes from <type>aar</type> in POM files
+                // as it causes a bug in Gradle. Gradle does not actually need the
+                // classifiers for Android libraries for them to work correctly.
+                dependency.artifactSelection { it.withoutArtifactSelectors() }
+            }
+        }
     }
 }
 

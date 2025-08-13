@@ -16,8 +16,10 @@
 
 package androidx.privacysandbox.sdkruntime.integration.testaidl;
 
-import androidx.privacysandbox.sdkruntime.integration.testaidl.LoadedSdkInfo;
+import androidx.privacysandbox.sdkruntime.integration.testaidl.IClientImportanceListener;
 import androidx.privacysandbox.sdkruntime.integration.testaidl.ILoadSdkCallback;
+import androidx.privacysandbox.sdkruntime.integration.testaidl.ISdkActivityHandler;
+import androidx.privacysandbox.sdkruntime.integration.testaidl.LoadedSdkInfo;
 
 interface ISdkApi {
     String doSomething(String param);
@@ -36,4 +38,9 @@ interface ISdkApi {
 
     void writeToFile(String filename, String data);
     @nullable String readFromFile(String filename);
+
+    void registerClientImportanceListener(in IClientImportanceListener listener);
+    void unregisterClientImportanceListener(in IClientImportanceListener listener);
+
+    IBinder registerSdkActivityHandler(in ISdkActivityHandler appSideActivityHandler);
 }

@@ -19,9 +19,9 @@ package androidx.aab
 import androidx.aab.AppMetadataPropsInfo.Companion.csvEntries
 import androidx.aab.DexInfo.Companion.csvEntries
 import androidx.aab.MappingFileInfo.Companion.csvEntries
-import androidx.aab.ProfileInfo.Companion.csvEntries
+import androidx.aab.ProfInfo.Companion.csvEntries
 import androidx.aab.R8JsonFileInfo.Companion.csvEntries
-import androidx.aab.cli.VERBOSE
+import androidx.aab.SoInfo.Companion.csvEntries
 import com.android.tools.build.libraries.metadata.AppDependencies
 import java.io.File
 import java.io.FileInputStream
@@ -32,10 +32,15 @@ import java.util.zip.ZipInputStream
 /** Separator for CSV output within entries (such as multiple dex SHAs in one column) */
 const val INTERNAL_CSV_SEPARATOR = "--"
 
+/**
+ * Container for all information extracted directly from the bundle, prior to any cross-reference
+ * analysis.
+ */
 data class BundleInfo(
     val path: String,
-    val profileInfo: ProfileInfo?,
+    val profileInfo: ProfInfo?,
     val dexInfo: List<DexInfo>,
+    val soInfo: List<SoInfo>,
     val mappingFileInfo: MappingFileInfo?,
     val r8JsonFileInfo: R8JsonFileInfo?,
     val dotVersionFiles: Map<String, String>, // map maven coordinates -> version number
@@ -43,27 +48,26 @@ data class BundleInfo(
     val appMetadataPropsInfoMetaInf: AppMetadataPropsInfo?,
     val appMetadataPropsInfoBundleMetadata: AppMetadataPropsInfo?,
 ) {
-    fun toCsvLine(): String {
-        return (listOf(path) +
-                profileInfo.csvEntries() +
-                dexInfo.csvEntries() +
-                mappingFileInfo.csvEntries() +
-                r8JsonFileInfo.csvEntries() +
-                appMetadataPropsInfoBundleMetadata.csvEntries() +
-                appMetadataPropsInfoMetaInf.csvEntries())
-            .joinToString(separator = ", ")
-    }
+    fun csvEntries(): List<String> =
+        listOf(path.substringAfterLast(File.separatorChar)) +
+            profileInfo.csvEntries() +
+            dexInfo.csvEntries() +
+            soInfo.csvEntries() +
+            mappingFileInfo.csvEntries() +
+            r8JsonFileInfo.csvEntries() +
+            appMetadataPropsInfoBundleMetadata.csvEntries() +
+            appMetadataPropsInfoMetaInf.csvEntries()
 
     companion object {
-        val CSV_HEADER =
-            (listOf("path") +
-                    ProfileInfo.CSV_TITLES +
-                    DexInfo.CSV_TITLES +
-                    MappingFileInfo.CSV_TITLES +
-                    R8JsonFileInfo.CSV_TITLES +
-                    AppMetadataPropsInfo.CSV_TITLES_BUNDLE +
-                    AppMetadataPropsInfo.CSV_TITLES_META_INF)
-                .joinToString(", ")
+        val CSV_TITLES =
+            listOf("filename") +
+                ProfInfo.CSV_TITLES +
+                DexInfo.CSV_TITLES +
+                SoInfo.CSV_TITLES +
+                MappingFileInfo.CSV_TITLES +
+                R8JsonFileInfo.CSV_TITLES +
+                AppMetadataPropsInfo.CSV_TITLES_BUNDLE +
+                AppMetadataPropsInfo.CSV_TITLES_META_INF
 
         // TODO: Move to wrapper object
         const val DEPENDENCIES_PB_LOCATION =
@@ -75,35 +79,43 @@ data class BundleInfo(
 
         fun from(path: String, inputStream: InputStream): BundleInfo {
             val dexInfo = mutableListOf<DexInfo>()
+            val soInfo = mutableListOf<SoInfo>()
             val dotVersionFiles = mutableMapOf<String, String>()
             var mappingFileInfo: MappingFileInfo? = null
             var r8MetadataFileInfo: R8JsonFileInfo? = null
             var appDependencies: AppDependencies? = null
-            var profileInfo: ProfileInfo? = null
+            var profileInfo: ProfInfo? = null
             var appMetadataPropsInfoMetaInf: AppMetadataPropsInfo? = null
             var appMetadataPropsInfoBundleMetadata: AppMetadataPropsInfo? = null
             ZipInputStream(inputStream).use { zis ->
                 var entry: ZipEntry? = zis.nextEntry
 
                 while (entry != null) {
-                    if (VERBOSE && !entry.name.contains("/res/")) {
-                        println(entry.name) // just for debugging
-                    }
                     when {
                         entry.name.contains("/dex/classes") && entry.name.endsWith(".dex") -> {
-                            dexInfo.add(DexInfo.from(entry.name, zis))
+                            dexInfo.add(DexInfo.from(entry.name, entry.compressedSize, zis))
                         }
 
-                        entry.name == ProfileInfo.BUNDLE_LOCATION -> {
-                            profileInfo = ProfileInfo.readFromProfile(zis)
+                        entry.name == ProfInfo.BUNDLE_LOCATION -> {
+                            profileInfo = ProfInfo.readFromProfile(zis)
                         }
 
                         entry.name.endsWith(".version") && entry.name.contains("/META-INF/") -> {
                             dotVersionFiles[entry.name] = zis.bufferedReader().readText().trim()
                         }
 
-                        entry.name == R8JsonFileInfo.BUNDLE_LOCATION -> {
-                            r8MetadataFileInfo = R8JsonFileInfo.fromJson(zis)
+                        entry.name == R8JsonFileInfo.BUNDLE_LOCATION_D8 -> {
+                            if (r8MetadataFileInfo != null) {
+                                println("Found duplicate r8 or d8 json files")
+                            }
+                            r8MetadataFileInfo = R8JsonFileInfo.fromD8()
+                        }
+
+                        entry.name == R8JsonFileInfo.BUNDLE_LOCATION_R8 -> {
+                            if (r8MetadataFileInfo != null) {
+                                println("Found duplicate r8 or d8 json files")
+                            }
+                            r8MetadataFileInfo = R8JsonFileInfo.fromR8Json(zis)
                         }
 
                         entry.name == DEPENDENCIES_PB_LOCATION -> {
@@ -111,7 +123,7 @@ data class BundleInfo(
                         }
 
                         entry.name == MappingFileInfo.BUNDLE_LOCATION -> {
-                            mappingFileInfo = MappingFileInfo()
+                            mappingFileInfo = MappingFileInfo.from(zis)
                         }
 
                         entry.name == AppMetadataPropsInfo.BUNDLE_LOCATION_METADATA -> {
@@ -121,19 +133,12 @@ data class BundleInfo(
                         entry.name == AppMetadataPropsInfo.BUNDLE_LOCATION_META_INF -> {
                             appMetadataPropsInfoMetaInf = AppMetadataPropsInfo.from(zis)
                         }
-                    }
-                    entry = zis.nextEntry
-                }
-            }
 
-            if (VERBOSE) {
-                appDependencies?.run {
-                    // print all contained libraries
-                    library.forEach {
-                        it.maven_library?.run {
-                            println("LIB: ${groupId}:${artifactId}:${version}")
+                        entry.name.endsWith(".so") -> {
+                            soInfo.add(SoInfo(bundlePath = entry.name, size = zis.countBytes()))
                         }
                     }
+                    entry = zis.nextEntry
                 }
             }
 
@@ -141,6 +146,7 @@ data class BundleInfo(
                 path = path,
                 profileInfo = profileInfo,
                 dexInfo = dexInfo,
+                soInfo = soInfo,
                 mappingFileInfo = mappingFileInfo,
                 r8JsonFileInfo = r8MetadataFileInfo,
                 dotVersionFiles = dotVersionFiles,
