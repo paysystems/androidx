@@ -51,7 +51,7 @@ androidXMultiplatform {
                 api(libs.kotlinStdlib)
                 api(project(":room:room-common"))
                 api(project(":room:room-runtime"))
-                api(project(":sqlite:sqlite"))
+                api("androidx.sqlite:sqlite:2.6.1")
                 implementation(project(":room:room-migration"))
             }
         }
@@ -71,7 +71,7 @@ androidXMultiplatform {
             dependsOn(commonMain)
             dependencies {
                 api(libs.junit)
-                api(project(":sqlite:sqlite-framework"))
+                api("androidx.sqlite:sqlite-framework:2.6.1")
                 implementation("androidx.arch.core:core-runtime:2.2.0")
             }
         }
