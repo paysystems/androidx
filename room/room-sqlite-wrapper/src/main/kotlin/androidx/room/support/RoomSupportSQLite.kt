@@ -117,12 +117,11 @@ internal fun SQLiteStatement.bindQuery(query: SupportSQLiteQuery) {
 
 internal fun SQLiteStatement.toCursor(): Cursor {
     val columnNames = getColumnNames().toTypedArray()
-    val columnTypes = List(columnNames.size) { getColumnType(it) }
     val cursor = MatrixCursor(columnNames)
     while (step()) {
         val row =
             Array<Any?>(columnNames.size) { i ->
-                val columnType = columnTypes[i]
+                val columnType = getColumnType(i)
                 when (columnType) {
                     SQLITE_DATA_INTEGER -> getLong(i)
                     SQLITE_DATA_FLOAT -> getDouble(i)
