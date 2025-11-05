@@ -22,12 +22,13 @@ import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.SQLiteStatement
 import androidx.sqlite.driver.bundled.ResultCode.SQLITE_MISUSE
 import androidx.sqlite.throwSQLiteException
+import kotlin.concurrent.Volatile
 
 @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
 public actual class BundledSQLiteConnection(private val connectionPointer: Long) :
     SQLiteConnection {
 
-    @OptIn(ExperimentalStdlibApi::class) @Volatile private var isClosed = false
+    @Volatile private var isClosed = false
 
     actual override fun inTransaction(): Boolean {
         if (isClosed) {
@@ -54,9 +55,9 @@ public actual class BundledSQLiteConnection(private val connectionPointer: Long)
 
     actual override fun close() {
         if (!isClosed) {
+            isClosed = true
             nativeClose(connectionPointer)
         }
-        isClosed = true
     }
 }
 
