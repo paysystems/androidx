@@ -20,7 +20,6 @@ import androidx.collection.LruCache
 import androidx.room.TransactionScope
 import androidx.room.Transactor
 import androidx.room.Transactor.SQLiteTransactionType
-import androidx.room.concurrent.AtomicBoolean
 import androidx.room.concurrent.ReentrantLock
 import androidx.room.concurrent.ThreadLocal
 import androidx.room.concurrent.asContextElement
@@ -36,6 +35,7 @@ import androidx.sqlite.SQLiteStatement
 import androidx.sqlite.execSQL
 import androidx.sqlite.throwSQLiteException
 import kotlin.collections.removeLast as removeLastKt
+import kotlin.concurrent.Volatile
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
 import kotlin.time.Duration
@@ -58,9 +58,7 @@ internal class ConnectionPoolImpl : ConnectionPool {
     private val connectionElementKey = ConnectionElementKey()
     private val connectionThreadLocal = ThreadLocal<PooledConnectionImpl>()
 
-    private val _isClosed = AtomicBoolean(false)
-    private val isClosed: Boolean
-        get() = _isClosed.get()
+    @Volatile private var isClosed: Boolean = false
 
     // Amount of time to wait to acquire a connection before logging, Android uses 30 seconds in
     // its pool, so we do too here, but IDK if that is a good number. This timeout is unrelated
@@ -202,7 +200,8 @@ internal class ConnectionPoolImpl : ConnectionPool {
 
     // TODO: (b/319657104): Make suspending so pool closes when all connections are recycled.
     override fun close() {
-        if (_isClosed.compareAndSet(expect = false, update = true)) {
+        if (!isClosed) {
+            isClosed = true
             readers.close()
             writers.close()
         }
@@ -426,9 +425,7 @@ private class PooledConnectionImpl(
 ) : Transactor, RawConnectionAccessor {
     private val transactionStack = ArrayDeque<TransactionItem>()
 
-    private val _isRecycled = AtomicBoolean(false)
-    private val isRecycled: Boolean
-        get() = _isRecycled.get()
+    @Volatile private var isRecycled: Boolean = false
 
     override val rawConnection: SQLiteConnection
         get() = delegate
@@ -450,7 +447,8 @@ private class PooledConnectionImpl(
     }
 
     fun markRecycled() {
-        if (_isRecycled.compareAndSet(expect = false, update = true)) {
+        if (!isRecycled) {
+            isRecycled = true
             // Perform a rollback in case there is an active transaction so that the connection
             // is in a clean state when it is recycled.
             if (delegate.inTransaction()) {
