@@ -73,29 +73,30 @@ class InvalidationTrackerTest {
         roomDatabase = FakeRoomDatabase(shadowTables, viewTables, tableNames)
         roomDatabase.init(
             DatabaseConfiguration(
-                context = mock(),
-                name = null,
-                sqliteOpenHelperFactory = null,
-                migrationContainer = RoomDatabase.MigrationContainer(),
-                callbacks = null,
-                allowMainThreadQueries = true,
-                journalMode = RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING,
-                queryExecutor = { error("Should never be called") },
-                transactionExecutor = { error("Should never be called") },
-                multiInstanceInvalidationServiceIntent = null,
-                requireMigration = true,
-                allowDestructiveMigrationOnDowngrade = false,
-                migrationNotRequiredFrom = null,
-                copyFromAssetPath = null,
-                copyFromFile = null,
-                copyFromInputStream = null,
-                prepackagedDatabaseCallback = null,
-                typeConverters = emptyList(),
-                autoMigrationSpecs = emptyList(),
-                allowDestructiveMigrationForAllTables = false,
-                sqliteDriver = sqliteDriver,
-                queryCoroutineContext = testCoroutineScope.coroutineContext,
-            )
+                    context = mock(),
+                    name = null,
+                    sqliteOpenHelperFactory = null,
+                    migrationContainer = RoomDatabase.MigrationContainer(),
+                    callbacks = null,
+                    allowMainThreadQueries = true,
+                    journalMode = RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING,
+                    queryExecutor = { error("Should never be called") },
+                    transactionExecutor = { error("Should never be called") },
+                    multiInstanceInvalidationServiceIntent = null,
+                    requireMigration = true,
+                    allowDestructiveMigrationOnDowngrade = false,
+                    migrationNotRequiredFrom = null,
+                    copyFromAssetPath = null,
+                    copyFromFile = null,
+                    copyFromInputStream = null,
+                    prepackagedDatabaseCallback = null,
+                    typeConverters = emptyList(),
+                    autoMigrationSpecs = emptyList(),
+                    allowDestructiveMigrationForAllTables = false,
+                    sqliteDriver = sqliteDriver,
+                    queryCoroutineContext = testCoroutineScope.coroutineContext,
+                )
+                .apply { this.preparedStatementCacheSize = 0 }
         )
         tracker = roomDatabase.invalidationTracker
     }

@@ -737,6 +737,9 @@ constructor(
         return isMigrationRequired(version, version + 1)
     }
 
+    /* Size of the prepared statement cache. 25 to match Android Framework cache size. 0 if cache is to be unused. */
+    internal var preparedStatementCacheSize = 25
+
     /**
      * Returns whether a migration is required between two versions.
      *
@@ -776,27 +779,31 @@ constructor(
         queryCoroutineContext: CoroutineContext? = this.queryCoroutineContext,
     ): DatabaseConfiguration =
         DatabaseConfiguration(
-            context,
-            name,
-            sqliteOpenHelperFactory,
-            migrationContainer,
-            callbacks,
-            allowMainThreadQueries,
-            journalMode,
-            queryExecutor,
-            transactionExecutor,
-            multiInstanceInvalidationServiceIntent,
-            requireMigration,
-            allowDestructiveMigrationOnDowngrade,
-            migrationNotRequiredFrom,
-            copyFromAssetPath,
-            copyFromFile,
-            copyFromInputStream,
-            prepackagedDatabaseCallback,
-            typeConverters,
-            autoMigrationSpecs,
-            allowDestructiveMigrationForAllTables,
-            sqliteDriver,
-            queryCoroutineContext,
-        )
+                context,
+                name,
+                sqliteOpenHelperFactory,
+                migrationContainer,
+                callbacks,
+                allowMainThreadQueries,
+                journalMode,
+                queryExecutor,
+                transactionExecutor,
+                multiInstanceInvalidationServiceIntent,
+                requireMigration,
+                allowDestructiveMigrationOnDowngrade,
+                migrationNotRequiredFrom,
+                copyFromAssetPath,
+                copyFromFile,
+                copyFromInputStream,
+                prepackagedDatabaseCallback,
+                typeConverters,
+                autoMigrationSpecs,
+                allowDestructiveMigrationForAllTables,
+                sqliteDriver,
+                queryCoroutineContext,
+            )
+            .also {
+                it.useTempTrackingTable = this.useTempTrackingTable
+                it.preparedStatementCacheSize = this.preparedStatementCacheSize
+            }
 }
