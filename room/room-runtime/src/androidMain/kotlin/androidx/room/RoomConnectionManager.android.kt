@@ -89,6 +89,7 @@ internal actual class RoomConnectionManager : BaseRoomConnectionManager {
                     newSingleConnectionPool(
                         driver = DriverWrapper(config.sqliteDriver),
                         fileName = ":memory:",
+                        config.preparedStatementCacheSize,
                     )
                 } else {
                     newConnectionPool(
@@ -96,6 +97,7 @@ internal actual class RoomConnectionManager : BaseRoomConnectionManager {
                         fileName = config.name,
                         maxNumOfReaders = config.journalMode.getMaxNumberOfReaders(),
                         maxNumOfWriters = config.journalMode.getMaxNumberOfWriters(),
+                        config.preparedStatementCacheSize,
                     )
                 }
         }
