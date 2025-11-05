@@ -21,6 +21,7 @@ import androidx.annotation.RestrictTo
 import androidx.sqlite.SQLiteStatement
 import androidx.sqlite.driver.bundled.ResultCode.SQLITE_MISUSE
 import androidx.sqlite.throwSQLiteException
+import kotlin.concurrent.Volatile
 
 @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
 public actual class BundledSQLiteStatement(
@@ -28,7 +29,7 @@ public actual class BundledSQLiteStatement(
     private val statementPointer: Long,
 ) : SQLiteStatement {
 
-    @OptIn(ExperimentalStdlibApi::class) @Volatile private var isClosed = false
+    @Volatile private var isClosed = false
 
     actual override fun bindBlob(index: Int, value: ByteArray) {
         throwIfClosed()
@@ -112,9 +113,9 @@ public actual class BundledSQLiteStatement(
 
     actual override fun close() {
         if (!isClosed) {
+            isClosed = true
             nativeClose(statementPointer)
         }
-        isClosed = true
     }
 
     private fun throwIfClosed() {
