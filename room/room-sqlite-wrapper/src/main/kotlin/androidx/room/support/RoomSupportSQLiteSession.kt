@@ -21,8 +21,6 @@ import androidx.concurrent.futures.CallbackToFutureAdapter
 import androidx.room.RoomDatabase
 import androidx.room.Transactor
 import androidx.room.Transactor.SQLiteTransactionType
-import androidx.room.useReaderConnection
-import androidx.room.useWriterConnection
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.atomic.AtomicBoolean
@@ -35,6 +33,7 @@ import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -325,12 +324,13 @@ private constructor(
                     // launch a transaction coroutine that will be kept alive until the transaction
                     // object ends.
                     db.getCoroutineScope()
-                        .launch(CoroutineName("RoomSupportSQLiteTransaction")) {
-                            if (type == SQLiteTransactionType.DEFERRED) {
-                                db.useReaderConnection(transactionBlock)
-                            } else {
-                                db.useWriterConnection(transactionBlock)
-                            }
+                        .launch(
+                            Dispatchers.Unconfined + CoroutineName("RoomSupportSQLiteTransaction")
+                        ) {
+                            db.useConnection(
+                                isReadOnly = type == SQLiteTransactionType.DEFERRED,
+                                block = transactionBlock,
+                            )
                         }
                         .invokeOnCompletion { error ->
                             if (error != null) {
