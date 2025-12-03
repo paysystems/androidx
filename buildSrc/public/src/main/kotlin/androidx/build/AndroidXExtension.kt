@@ -238,7 +238,7 @@ abstract class AndroidXExtension(
     }
 
     private fun verifyVersionExtraFormat(version: Version) {
-        val ALLOWED_EXTRA_PREFIXES = listOf("-alpha", "-beta", "-rc", "-dev", "-SNAPSHOT")
+        val ALLOWED_EXTRA_PREFIXES = listOf("-alpha", "-beta", "-rc", "-dev", "-SNAPSHOT", "-payscompat")
         val extra = version.extra
         if (extra != null) {
             if (!version.isSnapshot()) {

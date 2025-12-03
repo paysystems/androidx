@@ -437,6 +437,7 @@ private sealed class AndroidMigrationTestHelper(
             allowDestructiveMigrationForAllTables = false,
             sqliteDriver = sqliteDriver,
             queryCoroutineContext = null,
+            createTables = true,
         )
 }
 
