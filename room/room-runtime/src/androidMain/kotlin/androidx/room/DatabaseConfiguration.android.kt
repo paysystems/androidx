@@ -104,7 +104,9 @@ constructor(
 
     /* The Coroutine context for the database. */
     @JvmField public actual val queryCoroutineContext: CoroutineContext?,
-    @JvmField public val createTables: Boolean,
+
+    /* Whether should Room create tables by itself. */
+    @JvmField public actual val createTables: Boolean,
 ) {
     /**
      * If true, table invalidation in an instance of [RoomDatabase] is broadcast and synchronized

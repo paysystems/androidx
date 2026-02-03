@@ -175,7 +175,15 @@ public abstract class BaseRoomConnectionManager {
 
     protected fun onCreate(connection: SQLiteConnection) {
         val isEmptyDatabase = hasEmptySchema(connection)
-        openDelegate.createAllTables(connection)
+        if (configuration.createTables) {
+            openDelegate.createAllTables(connection)
+        } else {
+            // Tables creation is skipped. So let the client to create them.
+            check(callbacks.isNotEmpty()) {
+                "RoomDatabase#Callback is required when tables creation is skipped."
+            }
+            invokeCreateCallback(connection)
+        }
         if (!isEmptyDatabase) {
             // A 0 version pre-populated database goes through the create path, Room only allows
             // for versions greater than 0, so if we find the database not to be empty, then it is
@@ -186,8 +194,14 @@ public abstract class BaseRoomConnectionManager {
             }
         }
         updateIdentity(connection)
-        openDelegate.onCreate(connection)
-        invokeCreateCallback(connection)
+        if (configuration.createTables) {
+            // Tables are created by Room.
+            openDelegate.onCreate(connection)
+            invokeCreateCallback(connection)
+        } else {
+            // Tables are created by client. Don't invoke the callback second time.
+            openDelegate.onCreate(connection)
+        }
     }
 
     private fun hasEmptySchema(connection: SQLiteConnection): Boolean =

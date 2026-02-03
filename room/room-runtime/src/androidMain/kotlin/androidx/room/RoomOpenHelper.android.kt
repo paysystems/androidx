@@ -68,7 +68,10 @@ public open class RoomOpenHelper(
             delegate.createAllTables(db)
         } else {
             // Tables creation is skipped. So let the client to create them.
-            delegate.onCreate(db)
+            check(!callbacks.isNullOrEmpty()) {
+                "RoomDatabase#Callback is required when tables creation is skipped."
+            }
+            callbacks.forEach { it.onCreate(db) }
         }
         if (!isEmptyDatabase) {
             // A 0 version pre-populated database goes through the create path because the
@@ -84,10 +87,13 @@ public open class RoomOpenHelper(
         }
         updateIdentity(db)
         if (shouldCreateTables) {
-            // Tables created by Room.
+            // Tables are created by Room.
+            delegate.onCreate(db)
+            callbacks?.forEach { it.onCreate(db) }
+        } else {
+            // Tables are created by client. Don't invoke the callback second time.
             delegate.onCreate(db)
         }
-        callbacks?.forEach { it.onCreate(db) }
     }
 
     override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) {

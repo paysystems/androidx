@@ -45,4 +45,6 @@ public expect class DatabaseConfiguration {
     public val sqliteDriver: SQLiteDriver?
     /* The Coroutine context for the database. */
     public val queryCoroutineContext: CoroutineContext?
+    /* Whether should Room create tables by itself. */
+    public val createTables: Boolean
 }

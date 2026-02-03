@@ -422,6 +422,7 @@ public expect abstract class RoomDatabase() {
          * Called when the database is created for the first time.
          *
          * This function called after all the tables are created.
+         * If tables creation is skipped you should create tables here by yourself.
          *
          * @param connection The database connection.
          */
