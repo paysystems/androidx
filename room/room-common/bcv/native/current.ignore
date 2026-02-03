@@ -1,16 +1,1 @@
 // Baseline format: 1.0
-[iosArm64]: Added declaration androidx.room/ColumnCompat to androidx.room:room-common
-[iosSimulatorArm64]: Added declaration androidx.room/ColumnCompat to androidx.room:room-common
-[iosX64]: Added declaration androidx.room/ColumnCompat to androidx.room:room-common
-[linuxArm64]: Added declaration androidx.room/ColumnCompat to androidx.room:room-common
-[linuxX64]: Added declaration androidx.room/ColumnCompat to androidx.room:room-common
-[macosArm64]: Added declaration androidx.room/ColumnCompat to androidx.room:room-common
-[macosX64]: Added declaration androidx.room/ColumnCompat to androidx.room:room-common
-[tvosArm64]: Added declaration androidx.room/ColumnCompat to androidx.room:room-common
-[tvosSimulatorArm64]: Added declaration androidx.room/ColumnCompat to androidx.room:room-common
-[tvosX64]: Added declaration androidx.room/ColumnCompat to androidx.room:room-common
-[watchosArm32]: Added declaration androidx.room/ColumnCompat to androidx.room:room-common
-[watchosArm64]: Added declaration androidx.room/ColumnCompat to androidx.room:room-common
-[watchosDeviceArm64]: Added declaration androidx.room/ColumnCompat to androidx.room:room-common
-[watchosSimulatorArm64]: Added declaration androidx.room/ColumnCompat to androidx.room:room-common
-[watchosX64]: Added declaration androidx.room/ColumnCompat to androidx.room:room-common
