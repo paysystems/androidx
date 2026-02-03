@@ -946,6 +946,7 @@ public actual abstract class RoomDatabase {
 
         private var driver: SQLiteDriver? = null
         private var queryCoroutineContext: CoroutineContext? = null
+        private var createTables: Boolean = true
 
         private var inMemoryTrackingTableMode = true
 
@@ -1648,6 +1649,11 @@ public actual abstract class RoomDatabase {
             this.queryCoroutineContext = context
         }
 
+        @Suppress("BuilderSetStyle")
+        public fun skipTablesCreation(): Builder<T> = apply {
+            createTables = false
+        }
+
         /**
          * Sets whether Room will use an in-memory table or a persisted table to track invalidation.
          *
@@ -1805,6 +1811,7 @@ public actual abstract class RoomDatabase {
                             allowDestructiveMigrationForAllTables,
                         sqliteDriver = driver,
                         queryCoroutineContext = queryCoroutineContext,
+                        createTables = createTables,
                     )
                     .apply { this.useTempTrackingTable = inMemoryTrackingTableMode }
             val db = factory?.invoke() ?: findAndInstantiateDatabaseImpl(klass.java)
@@ -1912,7 +1919,7 @@ public actual abstract class RoomDatabase {
     public actual abstract class Callback {
         /**
          * Called when the database is created for the first time. This is called after all the
-         * tables are created.
+         * tables are created. If tables creation is skipped, this is called immediately.
          *
          * This function is only called when Room is configured without a driver. If a driver is set
          * using [Builder.setDriver], then only the version that receives a [SQLiteConnection] is

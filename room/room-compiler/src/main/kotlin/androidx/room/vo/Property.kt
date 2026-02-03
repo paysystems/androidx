@@ -45,6 +45,7 @@ data class Property(
     var indexed: Boolean = false,
     /** Whether the table column for this property should be NOT NULL */
     val nonNull: Boolean = calcNonNull(type, parent),
+    val compatColumn: CompatColumn? = null,
 ) : HasSchemaIdentity {
     lateinit var getter: PropertyGetter
     lateinit var setter: PropertySetter

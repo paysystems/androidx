@@ -104,6 +104,9 @@ constructor(
 
     /* The Coroutine context for the database. */
     @JvmField public actual val queryCoroutineContext: CoroutineContext?,
+
+    /* Whether should Room create tables by itself. */
+    @JvmField public actual val createTables: Boolean,
 ) {
     /**
      * If true, table invalidation in an instance of [RoomDatabase] is broadcast and synchronized
@@ -143,6 +146,7 @@ constructor(
         queryExecutor: Executor,
         requireMigration: Boolean,
         migrationNotRequiredFrom: Set<Int>?,
+        createTables: Boolean,
     ) : this(
         context = context,
         name = name,
@@ -166,6 +170,7 @@ constructor(
         allowDestructiveMigrationForAllTables = false,
         sqliteDriver = null,
         queryCoroutineContext = null,
+        createTables = createTables,
     )
 
     /**
@@ -204,6 +209,7 @@ constructor(
         requireMigration: Boolean,
         allowDestructiveMigrationOnDowngrade: Boolean,
         migrationNotRequiredFrom: Set<Int>?,
+        createTables: Boolean,
     ) : this(
         context = context,
         name = name,
@@ -230,6 +236,7 @@ constructor(
         allowDestructiveMigrationForAllTables = false,
         sqliteDriver = null,
         queryCoroutineContext = null,
+        createTables = createTables,
     )
 
     /**
@@ -272,6 +279,7 @@ constructor(
         migrationNotRequiredFrom: Set<Int>?,
         copyFromAssetPath: String?,
         copyFromFile: File?,
+        createTables: Boolean,
     ) : this(
         context = context,
         name = name,
@@ -298,6 +306,7 @@ constructor(
         allowDestructiveMigrationForAllTables = false,
         sqliteDriver = null,
         queryCoroutineContext = null,
+        createTables = createTables,
     )
 
     /**
@@ -343,6 +352,7 @@ constructor(
         copyFromAssetPath: String?,
         copyFromFile: File?,
         copyFromInputStream: Callable<InputStream>?,
+        createTables: Boolean,
     ) : this(
         context = context,
         name = name,
@@ -369,6 +379,7 @@ constructor(
         allowDestructiveMigrationForAllTables = false,
         sqliteDriver = null,
         queryCoroutineContext = null,
+        createTables = createTables,
     )
 
     /**
@@ -417,6 +428,7 @@ constructor(
         copyFromFile: File?,
         copyFromInputStream: Callable<InputStream>?,
         prepackagedDatabaseCallback: RoomDatabase.PrepackagedDatabaseCallback?,
+        createTables: Boolean,
     ) : this(
         context = context,
         name = name,
@@ -443,6 +455,7 @@ constructor(
         allowDestructiveMigrationForAllTables = false,
         sqliteDriver = null,
         queryCoroutineContext = null,
+        createTables = createTables,
     )
 
     /**
@@ -493,6 +506,7 @@ constructor(
         copyFromInputStream: Callable<InputStream>?,
         prepackagedDatabaseCallback: RoomDatabase.PrepackagedDatabaseCallback?,
         typeConverters: List<Any>,
+        createTables: Boolean,
     ) : this(
         context = context,
         name = name,
@@ -519,6 +533,7 @@ constructor(
         allowDestructiveMigrationForAllTables = false,
         sqliteDriver = null,
         queryCoroutineContext = null,
+        createTables = createTables,
     )
 
     /**
@@ -571,6 +586,7 @@ constructor(
         prepackagedDatabaseCallback: RoomDatabase.PrepackagedDatabaseCallback?,
         typeConverters: List<Any>,
         autoMigrationSpecs: List<AutoMigrationSpec>,
+        createTables: Boolean,
     ) : this(
         context = context,
         name = name,
@@ -597,6 +613,7 @@ constructor(
         allowDestructiveMigrationForAllTables = false,
         sqliteDriver = null,
         queryCoroutineContext = null,
+        createTables = createTables,
     )
 
     /**
@@ -649,6 +666,7 @@ constructor(
         prepackagedDatabaseCallback: RoomDatabase.PrepackagedDatabaseCallback?,
         typeConverters: List<Any>,
         autoMigrationSpecs: List<AutoMigrationSpec>,
+        createTables: Boolean,
     ) : this(
         context = context,
         name = name,
@@ -672,6 +690,7 @@ constructor(
         allowDestructiveMigrationForAllTables = false,
         sqliteDriver = null,
         queryCoroutineContext = null,
+        createTables = createTables,
     )
 
     @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) // used in generated code
@@ -697,6 +716,7 @@ constructor(
         typeConverters: List<Any>,
         autoMigrationSpecs: List<AutoMigrationSpec>,
         allowDestructiveMigrationForAllTables: Boolean,
+        createTables: Boolean,
     ) : this(
         context = context,
         name = name,
@@ -720,6 +740,7 @@ constructor(
         allowDestructiveMigrationForAllTables = allowDestructiveMigrationForAllTables,
         sqliteDriver = null,
         queryCoroutineContext = null,
+        createTables = createTables,
     )
 
     /**
@@ -777,6 +798,7 @@ constructor(
         allowDestructiveMigrationForAllTables: Boolean = this.allowDestructiveMigrationForAllTables,
         sqliteDriver: SQLiteDriver? = this.sqliteDriver,
         queryCoroutineContext: CoroutineContext? = this.queryCoroutineContext,
+        createTables: Boolean = this.createTables,
     ): DatabaseConfiguration =
         DatabaseConfiguration(
                 context,
@@ -801,6 +823,7 @@ constructor(
                 allowDestructiveMigrationForAllTables,
                 sqliteDriver,
                 queryCoroutineContext,
+                createTables,
             )
             .also {
                 it.useTempTrackingTable = this.useTempTrackingTable

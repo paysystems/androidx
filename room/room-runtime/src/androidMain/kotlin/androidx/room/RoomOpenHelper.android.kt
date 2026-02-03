@@ -63,7 +63,16 @@ public open class RoomOpenHelper(
 
     override fun onCreate(db: SupportSQLiteDatabase) {
         val isEmptyDatabase = hasEmptySchema(db)
-        delegate.createAllTables(db)
+        val shouldCreateTables = configuration?.createTables != false
+        if (shouldCreateTables) {
+            delegate.createAllTables(db)
+        } else {
+            // Tables creation is skipped. So let the client to create them.
+            check(!callbacks.isNullOrEmpty()) {
+                "RoomDatabase#Callback is required when tables creation is skipped."
+            }
+            callbacks.forEach { it.onCreate(db) }
+        }
         if (!isEmptyDatabase) {
             // A 0 version pre-populated database goes through the create path because the
             // framework's SQLiteOpenHelper thinks the database was just created from scratch. If we
@@ -77,8 +86,14 @@ public open class RoomOpenHelper(
             }
         }
         updateIdentity(db)
-        delegate.onCreate(db)
-        callbacks?.forEach { it.onCreate(db) }
+        if (shouldCreateTables) {
+            // Tables are created by Room.
+            delegate.onCreate(db)
+            callbacks?.forEach { it.onCreate(db) }
+        } else {
+            // Tables are created by client. Don't invoke the callback second time.
+            delegate.onCreate(db)
+        }
     }
 
     override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) {

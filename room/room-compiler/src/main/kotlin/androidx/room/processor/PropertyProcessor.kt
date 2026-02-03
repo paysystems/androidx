@@ -16,12 +16,14 @@
 
 package androidx.room.processor
 
+import androidx.room.ColumnCompat
 import androidx.room.ColumnInfo
 import androidx.room.compiler.codegen.CodeLanguage
 import androidx.room.compiler.processing.XFieldElement
 import androidx.room.compiler.processing.XType
 import androidx.room.parser.Collate
 import androidx.room.parser.SQLTypeAffinity
+import androidx.room.vo.CompatColumn
 import androidx.room.vo.EmbeddedProperty
 import androidx.room.vo.Property
 import java.util.Locale
@@ -40,6 +42,14 @@ class PropertyProcessor(
     fun process(): Property {
         val member = element.asMemberOf(containing)
         val columnInfoAnnotation = element.getAnnotation(ColumnInfo::class)
+        val columnCompatAnnotation = element.getAnnotation(ColumnCompat::class)
+        val columnCompatType = columnCompatAnnotation?.get("type")?.asString()
+        val columnCompatNonNull = columnCompatAnnotation?.get("nonNull")?.asBoolean()
+        val compatColumn = if (columnCompatType == null || columnCompatNonNull == null) {
+            null
+        } else {
+            CompatColumn(type = columnCompatType, nonNull = columnCompatNonNull)
+        }
         val elementName = element.name
         val annotationColumnName = columnInfoAnnotation?.get("name")?.asString()
         val rawCName =
@@ -94,6 +104,7 @@ class PropertyProcessor(
                 parent = propertyParent,
                 indexed = columnInfoAnnotation?.get("index")?.asBoolean() ?: false,
                 nonNull = nonNull,
+                compatColumn = compatColumn,
             )
 
         // TODO(b/273592453): Figure out a way to detect value classes in KAPT and guard against it.
